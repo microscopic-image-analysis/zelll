@@ -1,6 +1,7 @@
 /// TODO
 
 ///cell grid stuff
+#[allow(dead_code)]
 pub mod cellgrid;
 
 pub fn add(left: usize, right: usize) -> usize {
@@ -17,3 +18,4 @@ mod tests {
         assert_eq!(result, 4);
     }
 }
+

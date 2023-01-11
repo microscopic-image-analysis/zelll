@@ -1,160 +1,17 @@
-//TODO: make everything a Point3 or [;3] for now?
-//TODO: mixing it seems wrong but somehow it makes sense to use either of both types
-//TODO: in different situations. [;3] -> Point3 is easy, reverse requires some boilerplate
+#[allow(dead_code)]
+pub mod iter;
+#[allow(dead_code)]
+pub mod multiindex;
+#[allow(dead_code)]
+pub mod util;
 
-#![allow(dead_code)]
-use nalgebra::*; //{geometry::*, Point3};
+pub use iter::*;
+pub use multiindex::*;
 use ndarray::Array3;
-
-//TODO: at some point, if I mutate points in a point cloud and do not rebuild the cell grid entirely,
-//TODO: I'd probably need to check against the concrete Aabb instance to make sure points stay in the grid
-//TODO: or rather: if points stay in the grid, I won't have to rebuild the cell grid
-#[derive(Clone, Copy, Debug)]
-struct Aabb {
-    inf: Point3<f64>,
-    sup: Point3<f64>,
-}
-
-impl Aabb {
-    fn from_pointcloud(point_cloud: &PointCloud) -> Self {
-        let init = if point_cloud.is_empty() {
-            Point3::<f64>::default()
-        } else {
-            point_cloud.0[0]
-        };
-
-        let (inf, sup) = point_cloud
-            .0
-            .iter()
-            .fold((init, init), |(i, s), point| (i.inf(point), s.sup(point)));
-
-        Self { inf, sup }
-    }
-}
-
-/// The grid described by `GridInfo` may be slightly larger than the underlying bounding box `aabb`.
-#[derive(Clone, Copy, Debug)]
-struct GridInfo {
-    aabb: Aabb,
-    cutoff: f64,
-    shape: [usize; 3],
-}
-
-impl GridInfo {
-    fn new(aabb: Aabb, cutoff: f64) -> Self {
-        // TODO: not sure yet if I want shape to be a Point3
-        let mut shape = [0, 0, 0];
-        // TODO: This is not very nice yet. We'll figure the precise types out later
-        shape.copy_from_slice(
-            ((aabb.sup - aabb.inf) / cutoff)
-                .map(|coord| coord.ceil() as usize)
-                .as_slice(),
-        );
-
-        Self {
-            aabb,
-            cutoff,
-            shape,
-        }
-    }
-
-    fn origin(&self) -> &Point3<f64> {
-        &self.aabb.inf
-    }
-
-    //TODO: not sure where it fits better
-    //TODO: GridInfo knows enought to do compute the cell index for an arbitrary point
-    //TODO: but MultiIndex seems more fitting semantically?
-    fn cell_index(&self, point: &Point3<f64>) -> [usize; 3] {
-        let mut idx = [0, 0, 0];
-
-        idx.copy_from_slice(
-            ((point - self.aabb.inf) / self.cutoff)
-                .map(|coord| coord.ceil() as usize)
-                .as_slice(),
-        );
-
-        idx
-    }
-}
-
-//TODO: impl Deref to index
-//TODO: maybe MultiIndex should own a point cloud and I should provide methods to deref to point cloud
-//TODO: and/or deconstruct to underlying point cloud
-//TODO: implementing From/Into is not trivial here because point cloud has no knowledge about the cutoff
-//TODO: Also: this currently assumes that the order of points in point cloud does not change
-//TODO: i.e. index in multiindex corresponds to index in point cloud
-struct MultiIndex {
-    grid_info: GridInfo,
-    index: Vec<[usize; 3]>,
-}
-
-impl MultiIndex {
-    fn with_capacity(info: GridInfo, capacity: usize) -> Self {
-        Self {
-            grid_info: info,
-            index: Vec::with_capacity(capacity),
-        }
-    }
-
-    fn from_pointcloud(point_cloud: &PointCloud, cutoff: f64) -> Self {
-        let aabb = Aabb::from_pointcloud(point_cloud);
-        let grid_info = GridInfo::new(aabb, cutoff);
-
-        let index = point_cloud
-            .0
-            .iter()
-            .map(|point| grid_info.cell_index(point))
-            .collect();
-
-        Self { grid_info, index }
-    }
-
-    //TODO: should I allow to change the cutoff in this or a similar method?
-    //TODO: might be nice and save some allocations
-    //TODO: but one could argue changing the cutoff would justify constructing a new multi index
-    //TODO: but I copy grid info any way, so might as well change it
-    fn update_indices(&mut self, point_cloud: &PointCloud) {
-        //`GridInfo` is `Copy`
-        // we need to copy here since partial borrowing is not possible
-        //TODO: this really depends on which struct should handle cell_index() computation
-        //TODO: but I probably shouldn't think about it too much, rustc will probably optimize it away
-        //TODO: but we might have to benchmark it at some point
-        //TODO: also see: https://www.forrestthewoods.com/blog/should-small-rust-structs-be-passed-by-copy-or-by-borrow/
-        let info = self.grid_info;
-        self.index
-            .iter_mut()
-            .zip(point_cloud.0.iter())
-            .for_each(|(idx, point)| *idx = info.cell_index(point));
-    }
-}
-
-//TODO: For now we're just copying into our own struct for simplicity
-//TODO: There's not much use to this yet
-//TODO: maybe I should just keep this a type alias
-//TODO: which would allow me to just use &[Point3<f64>] in function signatures
-//TODO: also keep in mind https://rust-unofficial.github.io/patterns/anti_patterns/deref.html
-//TODO: #[repr(transparent)]?
-//TODO: see https://doc.rust-lang.org/nomicon/other-reprs.html#reprtransparent
-struct PointCloud(Vec<Point3<f64>>);
-
-impl PointCloud {
-    //TODO: we'll want a more generic way for this (maybe impl Deref)
-    fn from_points(points: &[[f64; 3]]) -> Self {
-        Self(points.iter().map(|p| Point3::from(*p)).collect())
-    }
-
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
+pub use util::*;
 
 //TODO: I don't like this so far but a builder pattern is a bit overkill right now
-struct CellGrid {
+pub struct CellGrid {
     points: PointCloud,
     cells: Array3<Option<usize>>,
     //TODO: see https://crates.io/crates/stable-vec and https://crates.io/crates/slab
@@ -163,7 +20,7 @@ struct CellGrid {
 }
 
 impl CellGrid {
-    fn new(points: &[[f64; 3]], cutoff: f64) -> Self {
+    pub fn new(points: &[[f64; 3]], cutoff: f64) -> Self {
         let points = PointCloud::from_points(points);
         let index = MultiIndex::from_pointcloud(&points, cutoff);
 
