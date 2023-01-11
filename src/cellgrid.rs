@@ -1,0 +1,317 @@
+//TODO: make everything a Point3 or [;3] for now?
+//TODO: mixing it seems wrong but somehow it makes sense to use either of both types
+//TODO: in different situations. [;3] -> Point3 is easy, reverse requires some boilerplate
+
+#![allow(dead_code)]
+use nalgebra::*; //{geometry::*, Point3};
+use ndarray::Array3;
+
+//TODO: at some point, if I mutate points in a point cloud and do not rebuild the cell grid entirely,
+//TODO: I'd probably need to check against the concrete Aabb instance to make sure points stay in the grid
+//TODO: or rather: if points stay in the grid, I won't have to rebuild the cell grid
+#[derive(Clone, Copy, Debug)]
+struct Aabb {
+    inf: Point3<f64>,
+    sup: Point3<f64>,
+}
+
+impl Aabb {
+    fn from_pointcloud(point_cloud: &PointCloud) -> Self {
+        let init = if point_cloud.is_empty() {
+            Point3::<f64>::default()
+        } else {
+            point_cloud.0[0]
+        };
+
+        let (inf, sup) = point_cloud
+            .0
+            .iter()
+            .fold((init, init), |(i, s), point| (i.inf(point), s.sup(point)));
+
+        Self { inf, sup }
+    }
+}
+
+/// The grid described by `GridInfo` may be slightly larger than the underlying bounding box `aabb`.
+#[derive(Clone, Copy, Debug)]
+struct GridInfo {
+    aabb: Aabb,
+    cutoff: f64,
+    shape: [usize; 3],
+}
+
+impl GridInfo {
+    fn new(aabb: Aabb, cutoff: f64) -> Self {
+        // TODO: not sure yet if I want shape to be a Point3
+        let mut shape = [0, 0, 0];
+        // TODO: This is not very nice yet. We'll figure the precise types out later
+        shape.copy_from_slice(
+            ((aabb.sup - aabb.inf) / cutoff)
+                .map(|coord| coord.ceil() as usize)
+                .as_slice(),
+        );
+
+        Self {
+            aabb,
+            cutoff,
+            shape,
+        }
+    }
+
+    fn origin(&self) -> &Point3<f64> {
+        &self.aabb.inf
+    }
+
+    //TODO: not sure where it fits better
+    //TODO: GridInfo knows enought to do compute the cell index for an arbitrary point
+    //TODO: but MultiIndex seems more fitting semantically?
+    fn cell_index(&self, point: &Point3<f64>) -> [usize; 3] {
+        let mut idx = [0, 0, 0];
+
+        idx.copy_from_slice(
+            ((point - self.aabb.inf) / self.cutoff)
+                .map(|coord| coord.ceil() as usize)
+                .as_slice(),
+        );
+
+        idx
+    }
+}
+
+//TODO: impl Deref to index
+//TODO: maybe MultiIndex should own a point cloud and I should provide methods to deref to point cloud
+//TODO: and/or deconstruct to underlying point cloud
+//TODO: implementing From/Into is not trivial here because point cloud has no knowledge about the cutoff
+//TODO: Also: this currently assumes that the order of points in point cloud does not change
+//TODO: i.e. index in multiindex corresponds to index in point cloud
+struct MultiIndex {
+    grid_info: GridInfo,
+    index: Vec<[usize; 3]>,
+}
+
+impl MultiIndex {
+    fn with_capacity(info: GridInfo, capacity: usize) -> Self {
+        Self {
+            grid_info: info,
+            index: Vec::with_capacity(capacity),
+        }
+    }
+
+    fn from_pointcloud(point_cloud: &PointCloud, cutoff: f64) -> Self {
+        let aabb = Aabb::from_pointcloud(point_cloud);
+        let grid_info = GridInfo::new(aabb, cutoff);
+
+        let index = point_cloud
+            .0
+            .iter()
+            .map(|point| grid_info.cell_index(point))
+            .collect();
+
+        Self { grid_info, index }
+    }
+
+    //TODO: should I allow to change the cutoff in this or a similar method?
+    //TODO: might be nice and save some allocations
+    //TODO: but one could argue changing the cutoff would justify constructing a new multi index
+    //TODO: but I copy grid info any way, so might as well change it
+    fn update_indices(&mut self, point_cloud: &PointCloud) {
+        //`GridInfo` is `Copy`
+        // we need to copy here since partial borrowing is not possible
+        //TODO: this really depends on which struct should handle cell_index() computation
+        //TODO: but I probably shouldn't think about it too much, rustc will probably optimize it away
+        //TODO: but we might have to benchmark it at some point
+        //TODO: also see: https://www.forrestthewoods.com/blog/should-small-rust-structs-be-passed-by-copy-or-by-borrow/
+        let info = self.grid_info;
+        self.index
+            .iter_mut()
+            .zip(point_cloud.0.iter())
+            .for_each(|(idx, point)| *idx = info.cell_index(point));
+    }
+}
+
+//TODO: For now we're just copying into our own struct for simplicity
+//TODO: There's not much use to this yet
+//TODO: maybe I should just keep this a type alias
+//TODO: which would allow me to just use &[Point3<f64>] in function signatures
+//TODO: also keep in mind https://rust-unofficial.github.io/patterns/anti_patterns/deref.html
+//TODO: #[repr(transparent)]?
+//TODO: see https://doc.rust-lang.org/nomicon/other-reprs.html#reprtransparent
+struct PointCloud(Vec<Point3<f64>>);
+
+impl PointCloud {
+    //TODO: we'll want a more generic way for this (maybe impl Deref)
+    fn from_points(points: &[[f64; 3]]) -> Self {
+        Self(points.iter().map(|p| Point3::from(*p)).collect())
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+//TODO: I don't like this so far but a builder pattern is a bit overkill right now
+struct CellGrid {
+    points: PointCloud,
+    cells: Array3<Option<usize>>,
+    //TODO: see https://crates.io/crates/stable-vec and https://crates.io/crates/slab
+    cell_lists: Vec<Option<usize>>,
+    index: MultiIndex,
+}
+
+impl CellGrid {
+    fn new(points: &[[f64; 3]], cutoff: f64) -> Self {
+        let points = PointCloud::from_points(points);
+        let index = MultiIndex::from_pointcloud(&points, cutoff);
+
+        let mut cell_lists: Vec<Option<usize>> = Vec::default();
+        let mut cells: Array3<Option<usize>> = Array3::default(index.grid_info.shape);
+
+        index.index.iter().enumerate().for_each(|(i, cell)| {
+            if let Some(head) = cells[*cell] {
+                cell_lists[i] = Some(head);
+            }
+            cells[*cell] = Some(i);
+        });
+
+        Self {
+            points,
+            cells,
+            cell_lists,
+            index,
+        }
+    }
+
+    //TODO: either &mut self or move unchanged fields to returned new struct
+    //TODO: see https://doc.rust-lang.org/book/ch05-01-defining-structs.html#creating-instances-from-other-instances-with-struct-update-syntax
+    fn update(self) -> Self {
+        todo!()
+    }
+}
+
+//TODO: iterate over individual cell lists, all neighboured cells (full/half space), pairs of particles
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const POINTS: [[f64; 3]; 100] = [
+        [72.46735284035672, 46.44550378090424, 66.63901205139712],
+        [57.69674557034732, 54.53844814921267, 69.0970244304932],
+        [34.67813071756326, 53.16888452609834, 61.616297234615],
+        [40.13882919260389, 28.975922417310834, 55.253885301067996],
+        [42.61828804027062, 35.20552057284047, 62.1781605010535],
+        [63.14255785611127, 46.75634193050543, 17.216733004395778],
+        [64.58535798025872, 43.924718999414885, 44.359472356623854],
+        [56.508264823856265, 51.74535180326326, 88.07572874002203],
+        [51.40591695755581, 75.62211010510869, 47.55107384210809],
+        [44.08156272328777, 51.16721452838641, 52.49586501282618],
+        [34.38034961466383, 35.35377362779141, 54.70795827372833],
+        [58.079935039320354, 55.00772926184105, 54.68504356973868],
+        [52.87188519819982, 46.67167992644182, 67.34078941111173],
+        [38.17111850725933, 28.113313500884335, 53.987122308925414],
+        [59.037413467130236, 50.55283549816238, 64.76182846629645],
+        [43.12807740901327, 57.642793461405276, 57.89444992914932],
+        [47.75499500945548, 54.99327943953817, 38.231867403361356],
+        [25.188112076540705, 57.80348478947813, 41.94776503979341],
+        [61.26791732496439, 50.3328612531578, 67.28236273479564],
+        [46.31639982669126, 34.809947204968545, 55.41687957872044],
+        [68.24489572989566, 64.36252649586478, 45.59532638768112],
+        [39.642539405028884, 46.55482138885022, 20.66386840274636],
+        [46.42323385809075, 44.84961716169285, 62.03938038350073],
+        [63.83198454312149, 23.08193780980907, 60.85876845877909],
+        [47.49313247204821, 40.0130740435201, 39.48034890954136],
+        [63.70990546387425, 49.6834719629841, 38.76832383907555],
+        [73.22976567347294, 34.38492771863741, 63.10497561401529],
+        [31.56303787081657, 37.2810019672349, 49.186319948269805],
+        [48.891914222109676, 45.908605995610905, 57.85909914298353],
+        [42.19940343638644, 62.05045024256016, 46.04615587474219],
+        [61.36836663969868, 63.610202615133026, 65.50585643407233],
+        [53.22281550411799, 38.915573426336636, 56.142309179608084],
+        [97.22990511601748, 54.21499759713862, 56.8923471572009],
+        [44.45100277301918, 79.25799136076189, 63.8605867569631],
+        [65.48588740173099, 33.618136876932795, 58.813801883008665],
+        [59.84754006539127, 39.91580402346271, 27.31424273259812],
+        [10.220666496210917, 67.15814360954151, 33.83605442858338],
+        [49.86390666339886, 49.83180624543126, 66.48642667266306],
+        [30.658738700695373, 30.13233834816357, 29.77580361060121],
+        [40.55874707553164, 65.78441682847034, 65.329704096891],
+        [78.34600396932015, 57.89344459966851, 63.147527973823806],
+        [32.80493512781791, 83.82047561851411, 26.347874951756527],
+        [64.21155331024228, 51.55767210116186, 44.488493919235765],
+        [29.774253608613687, 60.36683123467222, 48.98986903681975],
+        [61.9463615693191, 46.70151655296417, 40.60905723084488],
+        [57.25175222727173, 58.267578504791096, 45.627601887896226],
+        [48.990436706721155, 39.28691192908618, 65.99996069071857],
+        [34.9551652667681, 33.993535834480646, 56.857243146927296],
+        [31.552421500401945, 44.69629084263187, 36.978637735334694],
+        [37.969456344079475, 56.73920865114978, 43.723353504599494],
+        [100.7362316586383, 29.325475738352132, 39.2961631010229],
+        [37.59217400693751, 54.6377588907565, 64.115798853594],
+        [56.737265860640804, 39.04376659614116, 52.94883384952191],
+        [61.138496819067534, 63.2680559138494, 51.68343302237743],
+        [36.178791209183004, 37.07869560366909, 89.81510004537876],
+        [25.367500334103767, 37.20404158565769, 71.20194533668426],
+        [39.5658971262939, 37.71015668463188, 69.69175059087647],
+        [74.59494233788367, 58.9386803091584, 49.89875712671498],
+        [36.027919768941864, 26.709842713120487, 55.55531436350241],
+        [60.19951310819511, 50.43685316547253, 48.84434124863185],
+        [47.08445998269379, 51.42256580514277, 34.77265928236812],
+        [16.239633312593277, 68.03538296971537, 45.690378394764245],
+        [44.146625228728404, 71.5587709356264, 59.59311627038948],
+        [67.73847715205741, 69.47789890147548, 72.04517453522703],
+        [46.43867689855991, 65.93355978193483, 72.17843732119677],
+        [64.76470527538888, 38.097835284089044, 23.65964644922338],
+        [22.00615978111906, 76.67598552439202, 29.24252006289259],
+        [64.08791191993704, 53.09100419914532, 48.754861682238875],
+        [55.46117771890817, 24.53825031550556, 45.18370209343301],
+        [86.07382920040648, 43.237350300817866, 55.591644162868114],
+        [54.83014612842436, 46.91667248552966, 76.70889773887879],
+        [61.67492326946063, 30.54211202203747, 41.95249605247814],
+        [21.611653936078874, 40.489755209396264, 78.65322598488636],
+        [27.253251225145146, 66.46042980543669, 62.14726515202773],
+        [29.5965367421379, 58.48553446136442, 19.986911598303685],
+        [47.108958973879545, 42.01956331048258, 34.129778053404785],
+        [73.17808321663728, 57.65297654476593, 30.211840054197957],
+        [13.667308188070699, 43.56974240978837, 61.20601784396419],
+        [31.84382087562678, 47.226355580202274, 34.865970681666624],
+        [31.547392451104017, 49.33602923976242, 33.12473753947354],
+        [39.68776738777069, 23.089387957833956, 62.45456486865129],
+        [58.86878521076362, 52.42993012186303, 30.29545978336863],
+        [37.47610734759132, 29.434093661037558, 43.32423412815852],
+        [58.57365118198644, 61.58027783599883, 61.411711315063194],
+        [54.15337178381058, 59.34935299268743, 61.84440491486255],
+        [62.19631196240582, 46.14088751172073, 57.496210851682065],
+        [57.163914610126795, 35.61326734970044, 42.95106224503242],
+        [24.73493184392569, 40.653528344244116, 44.673829547322676],
+        [53.33466064076672, 2.1362788844113467, 58.997439366269994],
+        [36.47450202576266, 56.04090352957959, 25.22421829800911],
+        [52.9409340230885, 18.71357687358318, 66.62607832586342],
+        [83.3291701136857, 54.40985511139716, 9.32770492411823],
+        [42.89771938036293, 43.96081062358374, 44.69028713355895],
+        [24.970927379898757, 39.22858982829084, 58.22650711255713],
+        [84.76794322987249, 23.223616574963835, 50.20197916194471],
+        [29.242059940317862, 46.68577310455115, 62.99451765905497],
+        [40.39908569084808, 34.73316890811478, 45.49875863568221],
+        [54.50362129284737, 39.2272313514261, 65.1884692955773],
+        [44.07093095603651, 33.768156172870206, 54.373898951277155],
+        [39.929742543788265, 62.62236865041245, 51.624880489282006],
+    ];
+
+    #[test]
+    fn test_naive_cellgrid() {
+        todo!()
+    }
+
+    #[test]
+    fn test_gridinfo() {
+        let point_cloud = PointCloud::from_points(&POINTS);
+        let aabb = Aabb::from_pointcloud(&point_cloud);
+        let grid_info = GridInfo::new(aabb, 5.0);
+        println!("{:?}", grid_info);
+    }
+}
+
