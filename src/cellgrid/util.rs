@@ -102,3 +102,17 @@ impl GridInfo {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_gridinfo() {
+        /*let point_cloud = PointCloud::from_points(&POINTS);
+        let aabb = Aabb::from_pointcloud(&point_cloud);
+        let grid_info = GridInfo::new(aabb, 5.0);
+        println!("{:?}", grid_info);*/
+        todo!("test");
+    }
+}
+
