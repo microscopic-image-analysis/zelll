@@ -11,6 +11,7 @@ use ndarray::Array3;
 pub use util::*;
 
 //TODO: I don't like this so far but a builder pattern is a bit overkill right now
+#[derive(Debug)]
 pub struct CellGrid {
     points: PointCloud,
     cells: Array3<Option<usize>>,
@@ -51,7 +52,7 @@ impl CellGrid {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    //use super::*;
 
     #[test]
     fn test_cellgrid() {

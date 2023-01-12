@@ -12,6 +12,7 @@ use nalgebra::*;
 //TODO: also keep in mind https://rust-unofficial.github.io/patterns/anti_patterns/deref.html
 //TODO: #[repr(transparent)]?
 //TODO: see https://doc.rust-lang.org/nomicon/other-reprs.html#reprtransparent
+#[derive(Debug)]
 pub struct PointCloud(pub(crate) Vec<Point3<f64>>);
 
 impl PointCloud {
@@ -104,7 +105,7 @@ impl GridInfo {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    //use super::*;
 
     #[test]
     fn test_gridinfo() {

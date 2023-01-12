@@ -6,6 +6,7 @@
 //TODO: i.e. index in multiindex corresponds to index in point cloud
 use crate::cellgrid::util::*;
 
+#[derive(Debug)]
 pub struct MultiIndex {
     pub(crate) grid_info: GridInfo,
     pub(crate) index: Vec<[usize; 3]>,
