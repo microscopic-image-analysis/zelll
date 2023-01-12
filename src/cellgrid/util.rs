@@ -71,7 +71,7 @@ impl GridInfo {
         // TODO: This is not very nice yet. We'll figure the precise types out later
         shape.copy_from_slice(
             ((aabb.sup - aabb.inf) / cutoff)
-                .map(|coord| coord.ceil() as usize)
+                .map(|coord| coord.floor() as usize + 1)
                 .as_slice(),
         );
 
@@ -93,8 +93,8 @@ impl GridInfo {
         let mut idx = [0, 0, 0];
 
         idx.copy_from_slice(
-            ((point - self.aabb.inf) / self.cutoff)
-                .map(|coord| coord.ceil() as usize)
+            ((point - self.origin()) / self.cutoff)
+                .map(|coord| coord.floor() as usize)
                 .as_slice(),
         );
 

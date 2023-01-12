@@ -24,7 +24,7 @@ impl CellGrid {
         let points = PointCloud::from_points(points);
         let index = MultiIndex::from_pointcloud(&points, cutoff);
 
-        let mut cell_lists: Vec<Option<usize>> = Vec::default();
+        let mut cell_lists: Vec<Option<usize>> = [None].repeat(points.len());
         let mut cells: Array3<Option<usize>> = Array3::default(index.grid_info.shape);
 
         index.index.iter().enumerate().for_each(|(i, cell)| {

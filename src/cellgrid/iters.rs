@@ -1,7 +1,6 @@
 //TODO: iterate over individual cell lists, all neighboured cells (full/half space), pairs of particles
 use super::CellGrid;
 use ndarray::{iter::IndexedIter, Dim, Dimension};
-use std::iter::Filter;
 
 /// Iterates over all cells in a [`CellGrid`], including empty cells.
 //TODO: I didn't wrap Filter in my CellGridIterator because I didn't know how to (problematic closure whose type I can't name)
@@ -10,7 +9,6 @@ use std::iter::Filter;
 ///
 /// # Examples
 ///
-//TODO: this example causes a panic in gridindex new/cell_index probably
 /// ```
 /// # use zelll::cellgrid::CellGrid;
 /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
