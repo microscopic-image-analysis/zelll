@@ -8,3 +8,8 @@ edition = "2018"
 [dependencies]
 nalgebra = "0.31"
 ndarray = "0.15"
+#rayon = { version = "1.6", optional = true }
+
+#[features]
+#default = []
+#parallel = ["rayon"]

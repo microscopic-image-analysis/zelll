@@ -55,6 +55,9 @@ impl CellGrid {
     /// # let cell_grid = CellGrid::new(&points, 1.0);
     /// cell_grid.iter().filter(|cell| !cell.is_empty());
     /// ```
+    //TODO: implementing par_iter() using rayon should be possible but is a bit finicky
+    //TODO: since there is no parallel equivalent of IndexedIter in ndarray
+    //TODO: but I should be able to use https://docs.rs/ndarray/0.15.6/ndarray/struct.Zip.html#method.indexed
     pub fn iter(&self) -> impl Iterator<Item = GridCell> {
         //TODO: could also filter_map() to remove empty cells here...
         self.cells
