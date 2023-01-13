@@ -1,5 +1,6 @@
 //TODO iterate over all neighboured cells (full/half space), pairs of particles
 //TODO: perhaps move parallel iteration into separate submodule
+use super::CellGrid;
 #[cfg(feature = "rayon")]
 use ndarray::{parallel::prelude::*, Zip};
 use ndarray::{Dim, Dimension};
