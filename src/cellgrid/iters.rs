@@ -1,5 +1,7 @@
 //TODO iterate over all neighboured cells (full/half space), pairs of particles
 use super::CellGrid;
+#[cfg(feature = "rayon")]
+use ndarray::{parallel::prelude::*, Zip};
 use ndarray::{Dim, Dimension};
 
 #[derive(Debug)]
@@ -69,6 +71,17 @@ impl CellGrid {
                 head,
             })
     }
+    #[cfg(feature = "rayon")]
+    //TODO: using ndarray's Zip like that has overhead but it seems to be the sensible approach
+    pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell> {
+        Zip::indexed(&self.cells)
+            .into_par_iter()
+            .map(move |(index, head)| GridCell {
+                grid: self,
+                index,
+                head,
+            })
+    }
 }
 
 //TODO: iterate over neighbored grid cells
@@ -103,6 +116,16 @@ mod tests {
             for point in cell.iter() {
                 println!("{}", point);
             }
+        }
+    }
+
+    #[cfg(feature = "rayon")]
+    #[test]
+    fn test_cellgrid_par_iter() {
+        let cell_grid: CellGrid = CellGrid::new(points, 1.0);
+
+        for cell in cell_grid.iter() {
+            println!("{:?}", cell);
         }
     }
 }

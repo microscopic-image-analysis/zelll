@@ -3,6 +3,8 @@
 ## Outline & Goals
 - implement "naive" cell list algorithm following Allen and Tildesley
 - clean up implementation and make it ergonomic to use
+    * work on docs
+    * fill and improve README.md
 - explore various optimization of memory locality:
     * manual prefetch instructions
     * sort point cloud by point location/multi index (points in the same cell should be close to each other in the cell list)

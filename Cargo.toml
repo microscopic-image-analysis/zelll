@@ -1,5 +1,13 @@
 [package]
 name = "zelll"
+authors = ["Vincent Messow <vincent.messow@uni-jena.dde>"]
+repository = "https://github.com/microscopic-image-analysis/zelll"
+readme = "README.md"
+license = "MIT"
+description = "tbd."
+include = ["src/*", "Cargo.toml", "README.md", "COPYING"]
+keywords = []
+categories = ["science"]
 version = "0.1.0"
 edition = "2018"
 
@@ -8,8 +16,7 @@ edition = "2018"
 [dependencies]
 nalgebra = "0.31"
 ndarray = "0.15"
-#rayon = { version = "1.6", optional = true }
 
-#[features]
-#default = []
-#parallel = ["rayon"]
+[features]
+default = []
+rayon = ["ndarray/rayon"]
