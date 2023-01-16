@@ -3,12 +3,12 @@
 use super::CellGrid;
 #[cfg(feature = "rayon")]
 use ndarray::{parallel::prelude::*, Zip};
-use ndarray::{Dim, Dimension};
+use ndarray::{Dim, IntoDimension};
 
 #[derive(Debug)]
 pub struct GridCell<'g> {
     grid: &'g CellGrid,
-    index: <Dim<[usize; 3]> as Dimension>::Pattern,
+    index: Dim<[usize; 3]>, //<Dim<[usize; 3]> as Dimension>::Pattern,
     //TODO: I guess I could just store Option<usize> directly as well
     head: &'g Option<usize>,
 }
@@ -25,7 +25,6 @@ impl GridCell<'_> {
         }
     }
 }
-
 /// Iterates over all points (or rather their indices) in the [`GridCell`] this `GridCellIterator` was created from.
 #[derive(Debug)]
 pub struct GridCellIterator<'g> {
@@ -65,7 +64,8 @@ impl CellGrid {
             // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
             .map(move |(index, head)| GridCell {
                 grid: self,
-                index,
+                //TODO: could use into_dimensions() in order to not having to store Dimension::Pattern in GridCell?
+                index: index.into_dimension(),
                 head,
             })
     }
@@ -77,16 +77,11 @@ impl CellGrid {
             .into_par_iter()
             .map(move |(index, head)| GridCell {
                 grid: self,
-                index,
+                index: index.into_dimension(),
                 head,
             })
     }
 }
-
-//TODO: iterate over neighbored grid cells
-//TODO: see https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html#method.windows
-//TODO: but this doesn't solve the issues with boundary conditions (i.e. wrapping around or partial windows)
-//TODO: could introduce empty auxiliary cells on the boundary
 
 #[cfg(test)]
 mod tests {
