@@ -10,13 +10,14 @@ use nalgebra::*;
 //TODO: maybe I should just keep this a type alias
 //TODO: which would allow me to just use &[Point3<f64>] in function signatures
 //TODO: also keep in mind https://rust-unofficial.github.io/patterns/anti_patterns/deref.html
+//TODO: rather impl AsRef https://doc.rust-lang.org/std/convert/trait.AsRef.html
 //TODO: #[repr(transparent)]?
 //TODO: see https://doc.rust-lang.org/nomicon/other-reprs.html#reprtransparent
 #[derive(Debug)]
 pub struct PointCloud(pub(crate) Vec<Point3<f64>>);
 
 impl PointCloud {
-    //TODO: we'll want a more generic way for this (maybe impl Deref)
+    //TODO: we'll want a more generic way for this (maybe impl Deref/AsRef)
     pub fn from_points(points: &[[f64; 3]]) -> Self {
         Self(points.iter().map(|p| Point3::from(*p)).collect())
     }

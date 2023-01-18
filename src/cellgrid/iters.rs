@@ -1,21 +1,28 @@
 //TODO iterate over all neighboured cells (full/half space), pairs of particles
 //TODO: perhaps move parallel iteration into separate submodule
-use super::CellGrid;
+use super::{CellGrid, CellNeighbors};
 #[cfg(feature = "rayon")]
-use ndarray::{parallel::prelude::*, Zip};
-use ndarray::{Dim, IntoDimension};
+use ndarray::parallel::prelude::*;
 
 #[derive(Debug)]
 pub struct GridCell<'g> {
-    grid: &'g CellGrid,
-    index: Dim<[usize; 3]>, //<Dim<[usize; 3]> as Dimension>::Pattern,
+    //TODO: maybe provide proper accessors to these fields for neighbors.rs to use?
+    pub(crate) grid: &'g CellGrid,
     //TODO: I guess I could just store Option<usize> directly as well
-    head: &'g Option<usize>,
+    pub(crate) head: &'g Option<usize>,
 }
 
 impl GridCell<'_> {
     pub fn is_empty(&self) -> bool {
         self.head.is_none()
+    }
+
+    /// Return the (multi-)index of this (non-empty) `GridCell`.
+    /// Returns `None` if the cell is empty.
+    //TODO: However, the public API should not provide a way to address empty cells
+    pub(crate) fn index(&self) -> Option<[usize; 3]> {
+        let idx = (*self.head)?;
+        Some(self.grid.index.index[idx])
     }
 
     pub fn iter(&self) -> GridCellIterator {
@@ -24,9 +31,33 @@ impl GridCell<'_> {
             state: self.head,
         }
     }
+
+    /// Check whether this `GridCell` is on the boundary of the [`CellGrid`].
+    /// Returns None if the cell is empty.
+    //TODO: Again, empty cells shouldn't be accessible via the public API
+    //TODO: I don't think I need it but let's keep it anyway
+    pub fn on_boundary(&self) -> Option<bool> {
+        let idx = self.index()?;
+        let shape = self.grid.index.grid_info.shape;
+
+        for (i, dim) in shape.iter().enumerate() {
+            if idx[i] == 0 || idx[i] + 1 == *dim {
+                return Some(true);
+            }
+        }
+        Some(false)
+    }
+
+    //TODO: currently only half-space and aperiodic boundaries
+    //TODO: handle half-/full-space  and (a-)periodic boundary conditions
+    //TODO: Also right now GridCell is always 3D, therefore CellNeighbors<3>
+    pub fn neighbors(&self) -> CellNeighbors<3> {
+        CellNeighbors::half_space(self)
+    }
 }
 /// Iterates over all points (or rather their indices) in the [`GridCell`] this `GridCellIterator` was created from.
 #[derive(Debug)]
+#[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct GridCellIterator<'g> {
     grid: &'g CellGrid,
     //TODO: I guess I could just store Option<usize> directly as well
@@ -47,7 +78,7 @@ impl Iterator for GridCellIterator<'_> {
 }
 
 impl CellGrid {
-    /// Returns an iterator over all [`GridCell`]s in this `CellGrid`, including empty cells.
+    /// Returns an iterator over all [`GridCell`]s in this `CellGrid`, excluding empty cells.
     ///
     /// # Examples
     ///
@@ -57,28 +88,32 @@ impl CellGrid {
     /// # let cell_grid = CellGrid::new(&points, 1.0);
     /// cell_grid.iter().filter(|cell| !cell.is_empty());
     /// ```
+    #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn iter(&self) -> impl Iterator<Item = GridCell> {
-        //TODO: could also filter_map() to remove empty cells here...
         self.cells
-            .indexed_iter()
+            .iter()
             // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
-            .map(move |(index, head)| GridCell {
-                grid: self,
-                //TODO: could use into_dimensions() in order to not having to store Dimension::Pattern in GridCell?
-                index: index.into_dimension(),
-                head,
+            .filter_map(move |head| {
+                if head.is_some() {
+                    Some(GridCell { grid: self, head })
+                } else {
+                    None
+                }
             })
     }
 
     #[cfg(feature = "rayon")]
-    //TODO: using ndarray's Zip like that has overhead but it seems to be the sensible approach
+    #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell> {
-        Zip::indexed(&self.cells)
-            .into_par_iter()
-            .map(move |(index, head)| GridCell {
-                grid: self,
-                index: index.into_dimension(),
-                head,
+        self.cells
+            .par_iter()
+            // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
+            .filter_map(move |head| {
+                if head.is_some() {
+                    Some(GridCell { grid: self, head })
+                } else {
+                    None
+                }
             })
     }
 }
