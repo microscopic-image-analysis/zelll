@@ -3,11 +3,14 @@ pub mod iters;
 #[allow(dead_code)]
 pub mod multiindex;
 #[allow(dead_code)]
+pub mod neighbors;
+#[allow(dead_code)]
 pub mod util;
 
 pub use iters::*;
 pub use multiindex::*;
 use ndarray::Array3;
+pub use neighbors::*;
 pub use util::*;
 
 //TODO: I don't like this so far but a builder pattern is a bit overkill right now
