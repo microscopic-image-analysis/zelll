@@ -17,8 +17,6 @@
 //TODO: would be nice to have a minimal example of these approaches to have a look at on godbolt.org
 
 use super::GridCell;
-use core::convert::{TryFrom, TryInto};
-use core::num::TryFromIntError;
 use core::ops::{Add, AddAssign};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
@@ -67,20 +65,16 @@ impl<const N: usize> Default for BalancedTernary<N> {
 
 //TODO: just implementing this for isize here
 //TODO: could also do it for other integral types using num or num_traits
-impl<const N: usize> TryFrom<BalancedTernary<N>> for isize {
-    //TODO: this error is not a good fit, should use map_err()
-    type Error = TryFromIntError;
+//TODO: This is infallible but will wrap around if BalancedTernary<N> is too large
+impl<const N: usize> From<BalancedTernary<N>> for isize {
+    fn from(value: BalancedTernary<N>) -> Self {
+        let mut place_value = 1isize;
 
-    fn try_from(value: BalancedTernary<N>) -> Result<Self, Self::Error> {
-        value
-            .0
-            .as_slice()
-            .iter()
-            .enumerate()
-            .try_fold(0isize, |acc, (i, trit)| {
-                i.try_into()
-                    .map(|exponent| acc + *trit as isize * 3isize.pow(exponent))
-            })
+        value.0.as_slice().iter().fold(0isize, |acc, trit| {
+            let new = acc.wrapping_add(*trit as isize).wrapping_mul(place_value);
+            place_value *= 3;
+            new
+        })
     }
 }
 //TODO: note that this does not over-/underflow but caps at MAX and MIN respectively
