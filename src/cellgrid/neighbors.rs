@@ -57,9 +57,17 @@ impl<const N: usize> BalancedTernary<N> {
 }
 
 impl<const N: usize> Default for BalancedTernary<N> {
+    /// Return the default value for `BalancedTernary`.
+    /// For practical reasons, this is not `BalancedTernary::ZERO` but
+    /// the balanced ternary representation of `1`.
     #[inline]
     fn default() -> Self {
-        Self::ZERO
+        // The reason for returning the "1" array is that `from_fn()` is not `const`
+        // (actually it's that [expr; N] requires a const expression),
+        // i.e. we can't define `BalancedTernary::ONE` as `const` for arbitrary `const N`.
+        let mut one = BalancedTernary::ZERO;
+        one.0[0] = BalancedTrit::Positive;
+        one
     }
 }
 
@@ -121,7 +129,7 @@ impl<'c> CellNeighbors<'c> {
     pub(crate) fn half_space(center: &'c GridCell<'c>) -> Self {
         Self {
             center,
-            state: BalancedTernary::ZERO,
+            state: BalancedTernary::default(),
         }
     }
 
