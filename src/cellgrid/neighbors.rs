@@ -115,6 +115,8 @@ pub struct CellNeighbors<'c> {
     state: BalancedTernary<3>,
 }
 
+// This probably the only slightly relevant advantage of using balanced ternary numbers;
+// The distinction between half and full space is simply given by the initial state of the iterator
 impl<'c> CellNeighbors<'c> {
     pub(crate) fn half_space(center: &'c GridCell<'c>) -> Self {
         Self {
@@ -131,52 +133,67 @@ impl<'c> CellNeighbors<'c> {
     }
 }
 
+//TODO: sum type/bool for boundary conditions would evaluated during runtime (pro: could change behavior during runtime)
+//TODO: type states for boundary conditions would be during compiletime (pro: no runtime cost, con: slightly less flexible)
 impl<'c> Iterator for CellNeighbors<'c> {
     type Item = GridCell<'c>;
-    //TODO: this definitively getting rewritten...
-    fn next(&mut self) -> Option<Self::Item> {
-        // We shouldn't be able to access empty cells via the public API
-        // If that happens this iterator is stopping because it's not really useful anyway
-        let center_index = self.center.index()?;
-        if self.state == BalancedTernary::MAX {
-            None
-        } else if self.state == BalancedTernary::ZERO {
-            // skip the center cell
-            self.state += BalancedTrit::Positive;
-            self.next()
-        } else {
-            let mut index: [usize; 3] = core::array::from_fn(|i| i);
-            for i in index {
-                //check for underflow (i.e. negative index coordinates)
-                if let Some(coord) = center_index[i].checked_add_signed(self.state.0[i] as isize) {
-                    // check for overflow (out of grid dimensions)
-                    if coord < self.center.grid.index.grid_info.shape[i] {
-                        index[i] = coord;
-                    } else {
-                        //TODO: also aperiodic boundary
-                        //TODO: refactor this, it's getting ugly and repetitive
-                        self.state += BalancedTrit::Positive;
-                        return self.next();
-                    }
-                } else {
-                    //TODO: currently only aperiodic boundary: increment self.state and call self.next() again
-                    //TODO: for periodic boundary: wrap out-of-bounds coordinates around and return new GridCell
-                    self.state += BalancedTrit::Positive;
-                    return self.next();
-                }
-            }
 
-            // check whether the neighboring cell at the newly constructed index is empty
-            if self.center.grid.cells[index].is_some() {
-                Some(GridCell {
-                    grid: self.center.grid,
-                    head: &self.center.grid.cells[index],
-                })
-            } else {
-                //TODO: again, refactoring needed
-                // we skip empty neighboring cells
+    fn next(&mut self) -> Option<Self::Item> {
+        // stop the iterator (by returning None) if the center cell is empty
+        // Semantically, empty cells could have non-empty neighbors but we don't need them in that case
+        // and empty cells should not be accessible using the public API anyway
+        let center = self.center.index()?;
+
+        //TODO: Note the recursive calls to self.next().
+        //TODO: I'm okay with that (for now) since in practice the number of neighbor cells is pretty limited.
+        //TODO: I'm sure the call stack won't mind too much.
+        match self.state {
+            // Iterator stops if the current state is already the last (which is always BalancedTernary::MAX)
+            BalancedTernary::MAX => None,
+            // Skip the center cell
+            BalancedTernary::ZERO => {
                 self.state += BalancedTrit::Positive;
                 self.next()
+            }
+            current_state => {
+                // `BalancedTernary` is `Copy` i.e. we can already increment `self.state` and use `current_state`
+                self.state += BalancedTrit::Positive;
+
+                //TODO: waiting for stabilization of
+                //TODO: https://doc.rust-lang.org/std/primitive.array.html#method.try_map or
+                //TODO: https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.try_collect
+                //TODO: I'm working around this using mutable state and try_for_each (try_fold would be awkward in this case)
+                let mut new_index = [0usize; 3];
+
+                // For convenience
+                let shape = self.center.grid.index.grid_info.shape;
+
+                new_index
+                    .iter_mut()
+                    .zip(center.iter())
+                    .zip(current_state.0.iter())
+                    .zip(shape.iter())
+                    .try_for_each(|(((i, c), s), sh)| {
+                        if let Some(new_i) = c.checked_add_signed(*s as isize) {
+                            if new_i < *sh {
+                                *i = new_i;
+                                Some(())
+                            } else {
+                                // upper grid bound violated, skip this cell
+                                //TODO: periodic boundaries: wrap around instead
+                                None
+                            }
+                        } else {
+                            // Lower grid bound violated, skip this cell
+                            //TODO: periodic boundaries: see above
+                            None
+                        }
+                    })
+                    .map(|()| GridCell {
+                        grid: self.center.grid,
+                        head: &self.center.grid.cells[new_index],
+                    })
+                    .or_else(|| self.next())
             }
         }
     }
