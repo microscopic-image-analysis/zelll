@@ -1,4 +1,4 @@
-//TODO: impl Deref to index
+//TODO: impl Deref/AsRef? to index
 //TODO: maybe MultiIndex should own a point cloud and I should provide methods to deref to point cloud
 //TODO: and/or deconstruct to underlying point cloud
 //TODO: implementing From/Into is not trivial here because point cloud has no knowledge about the cutoff

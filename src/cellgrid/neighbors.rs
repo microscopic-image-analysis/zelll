@@ -110,14 +110,8 @@ impl<const N: usize> Add<BalancedTrit> for BalancedTernary<N> {
     }
 }
 
-//TODO: To make this work properly in arbitrary dimensions, I need to address generic CellGrids, GridCells, MultiIndex etc. first
-//TODO: and/or reintroduce ndarray::Dim instead of using const arrays
-//TODO: The problem being that I keep references to 3D grid in each GridCell
-//TODO: next step: introduce const N: usize constraints
 #[derive(Debug)]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-//TODO: we already have a const parameter here.
-//TODO: At some point GridCell will have this too (or sth. like that)
 pub struct CellNeighbors<'c, const N: usize> {
     center: &'c GridCell<'c, N>,
     state: BalancedTernary<N>,

@@ -1,14 +1,10 @@
-//TODO: make everything a Point3 or [;3] for now?
-//TODO: mixing it seems wrong but somehow it makes sense to use either of both types
-//TODO: in different situations. [;3] -> Point3 is easy, reverse requires some boilerplate
-
 #![allow(dead_code)]
 use nalgebra::*;
 
 //TODO: For now we're just copying into our own struct for simplicity
 //TODO: There's not much use to this yet
 //TODO: maybe I should just keep this a type alias
-//TODO: which would allow me to just use &[Point3<f64>] in function signatures
+//TODO: which would allow me to just use &[Point<f64, N>] in function signatures
 //TODO: also keep in mind https://rust-unofficial.github.io/patterns/anti_patterns/deref.html
 //TODO: rather impl AsRef https://doc.rust-lang.org/std/convert/trait.AsRef.html
 //TODO: #[repr(transparent)]?
@@ -68,7 +64,7 @@ pub struct GridInfo<const N: usize> {
 
 impl<const N: usize> GridInfo<N> {
     pub fn new(aabb: Aabb<N>, cutoff: f64) -> Self {
-        // TODO: not sure yet if I want shape to be a Point3
+        // TODO: not sure yet if I want shape to be a Point<N>
         let mut shape = [0; N];
         // TODO: This is not very nice yet. We'll figure the precise types out later
         shape.copy_from_slice(

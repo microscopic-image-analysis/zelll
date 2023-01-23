@@ -51,7 +51,6 @@ impl<const N: usize> GridCell<'_, N> {
     /// Return [`CellNeighbors`], an iterator over all (currently half-space) non-empty neighboring cells.
     //TODO: currently only half-space and aperiodic boundaries
     //TODO: handle half-/full-space  and (a-)periodic boundary conditions
-    //TODO: Also right now GridCell is always 3D
     pub fn neighbors(&self) -> CellNeighbors<N> {
         CellNeighbors::half_space(self)
     }
