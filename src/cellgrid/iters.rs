@@ -5,14 +5,14 @@ use super::{CellGrid, CellNeighbors};
 use ndarray::parallel::prelude::*;
 
 #[derive(Debug)]
-pub struct GridCell<'g> {
+pub struct GridCell<'g, const N: usize> {
     //TODO: maybe provide proper accessors to these fields for neighbors.rs to use?
-    pub(crate) grid: &'g CellGrid,
+    pub(crate) grid: &'g CellGrid<N>,
     //TODO: I guess I could just store Option<usize> directly as well
     pub(crate) head: &'g Option<usize>,
 }
 
-impl GridCell<'_> {
+impl<const N: usize> GridCell<'_, N> {
     pub fn is_empty(&self) -> bool {
         self.head.is_none()
     }
@@ -20,12 +20,12 @@ impl GridCell<'_> {
     /// Return the (multi-)index of this (non-empty) `GridCell`.
     /// Returns `None` if the cell is empty.
     //TODO: However, the public API should not provide a way to address empty cells
-    pub(crate) fn index(&self) -> Option<[usize; 3]> {
+    pub(crate) fn index(&self) -> Option<[usize; N]> {
         let idx = (*self.head)?;
         Some(self.grid.index.index[idx])
     }
 
-    pub fn iter(&self) -> GridCellIterator {
+    pub fn iter(&self) -> GridCellIterator<N> {
         GridCellIterator {
             grid: self.grid,
             state: self.head,
@@ -52,20 +52,20 @@ impl GridCell<'_> {
     //TODO: currently only half-space and aperiodic boundaries
     //TODO: handle half-/full-space  and (a-)periodic boundary conditions
     //TODO: Also right now GridCell is always 3D
-    pub fn neighbors(&self) -> CellNeighbors {
+    pub fn neighbors(&self) -> CellNeighbors<N> {
         CellNeighbors::half_space(self)
     }
 }
 /// Iterates over all points (or rather their indices) in the [`GridCell`] this `GridCellIterator` was created from.
 #[derive(Debug)]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-pub struct GridCellIterator<'g> {
-    grid: &'g CellGrid,
+pub struct GridCellIterator<'g, const N: usize> {
+    grid: &'g CellGrid<N>,
     //TODO: I guess I could just store Option<usize> directly as well
     state: &'g Option<usize>,
 }
 
-impl Iterator for GridCellIterator<'_> {
+impl<const N: usize> Iterator for GridCellIterator<'_, N> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -78,7 +78,7 @@ impl Iterator for GridCellIterator<'_> {
     }
 }
 
-impl CellGrid {
+impl<const N: usize> CellGrid<N> {
     /// Returns an iterator over all [`GridCell`]s in this `CellGrid`, excluding empty cells.
     ///
     /// # Examples
@@ -90,7 +90,7 @@ impl CellGrid {
     /// cell_grid.iter().filter(|cell| !cell.is_empty());
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn iter(&self) -> impl Iterator<Item = GridCell> {
+    pub fn iter(&self) -> impl Iterator<Item = GridCell<N>> {
         self.cells
             .iter()
             // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
@@ -105,7 +105,7 @@ impl CellGrid {
 
     #[cfg(feature = "rayon")]
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell> {
+    pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<N>> {
         self.cells
             .par_iter()
             // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_cellgrid_iter() {
-        let cell_grid: CellGrid = CellGrid::new(points, 1.0);
+        let cell_grid: CellGrid<3> = CellGrid::new(points, 1.0);
 
         for cell in cell_grid.iter() {
             println!("{:?}", cell);
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn test_gridcell_iter() {
-        let cell_grid: CellGrid = CellGrid::new(points, 1.0);
+        let cell_grid: CellGrid<3> = CellGrid::new(points, 1.0);
 
         for cell in cell_grid.iter() {
             for point in cell.iter() {

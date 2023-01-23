@@ -14,12 +14,12 @@ use nalgebra::*;
 //TODO: #[repr(transparent)]?
 //TODO: see https://doc.rust-lang.org/nomicon/other-reprs.html#reprtransparent
 #[derive(Debug)]
-pub struct PointCloud(pub(crate) Vec<Point3<f64>>);
+pub struct PointCloud<const N: usize>(pub(crate) Vec<Point<f64, N>>);
 
-impl PointCloud {
+impl<const N: usize> PointCloud<N> {
     //TODO: we'll want a more generic way for this (maybe impl Deref/AsRef)
-    pub fn from_points(points: &[[f64; 3]]) -> Self {
-        Self(points.iter().map(|p| Point3::from(*p)).collect())
+    pub fn from_points(points: &[[f64; N]]) -> Self {
+        Self(points.iter().map(|p| Point::from(*p)).collect())
     }
 
     pub fn len(&self) -> usize {
@@ -35,15 +35,15 @@ impl PointCloud {
 //TODO: I'd probably need to check against the concrete Aabb instance to make sure points stay in the grid
 //TODO: or rather: if points stay in the grid, I won't have to rebuild the cell grid
 #[derive(Clone, Copy, Debug)]
-pub struct Aabb {
-    inf: Point3<f64>,
-    sup: Point3<f64>,
+pub struct Aabb<const N: usize> {
+    inf: Point<f64, N>,
+    sup: Point<f64, N>,
 }
 
-impl Aabb {
-    pub fn from_pointcloud(point_cloud: &PointCloud) -> Self {
+impl<const N: usize> Aabb<N> {
+    pub fn from_pointcloud(point_cloud: &PointCloud<N>) -> Self {
         let init = if point_cloud.is_empty() {
-            Point3::<f64>::default()
+            Point::<f64, N>::default()
         } else {
             point_cloud.0[0]
         };
@@ -59,17 +59,17 @@ impl Aabb {
 
 /// The grid described by `GridInfo` may be slightly larger than the underlying bounding box `aabb`.
 #[derive(Clone, Copy, Debug)]
-pub struct GridInfo {
-    aabb: Aabb,
+pub struct GridInfo<const N: usize> {
+    aabb: Aabb<N>,
     cutoff: f64,
     //TODO: probably should implement a method instead of using pub/pub(crate)
-    pub(crate) shape: [usize; 3],
+    pub(crate) shape: [usize; N],
 }
 
-impl GridInfo {
-    pub fn new(aabb: Aabb, cutoff: f64) -> Self {
+impl<const N: usize> GridInfo<N> {
+    pub fn new(aabb: Aabb<N>, cutoff: f64) -> Self {
         // TODO: not sure yet if I want shape to be a Point3
-        let mut shape = [0, 0, 0];
+        let mut shape = [0; N];
         // TODO: This is not very nice yet. We'll figure the precise types out later
         shape.copy_from_slice(
             ((aabb.sup - aabb.inf) / cutoff)
@@ -84,15 +84,15 @@ impl GridInfo {
         }
     }
 
-    pub fn origin(&self) -> &Point3<f64> {
+    pub fn origin(&self) -> &Point<f64, N> {
         &self.aabb.inf
     }
 
     //TODO: not sure where it fits better
     //TODO: GridInfo knows enough to do compute the cell index for an arbitrary point
     //TODO: but MultiIndex seems more fitting semantically?
-    pub fn cell_index(&self, point: &Point3<f64>) -> [usize; 3] {
-        let mut idx = [0, 0, 0];
+    pub fn cell_index(&self, point: &Point<f64, N>) -> [usize; N] {
+        let mut idx = [0; N];
 
         idx.copy_from_slice(
             ((point - self.origin()) / self.cutoff)

@@ -118,22 +118,22 @@ impl<const N: usize> Add<BalancedTrit> for BalancedTernary<N> {
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 //TODO: we already have a const parameter here.
 //TODO: At some point GridCell will have this too (or sth. like that)
-pub struct CellNeighbors<'c> {
-    center: &'c GridCell<'c>,
-    state: BalancedTernary<3>,
+pub struct CellNeighbors<'c, const N: usize> {
+    center: &'c GridCell<'c, N>,
+    state: BalancedTernary<N>,
 }
 
 // This probably the only slightly relevant advantage of using balanced ternary numbers;
 // The distinction between half and full space is simply given by the initial state of the iterator
-impl<'c> CellNeighbors<'c> {
-    pub(crate) fn half_space(center: &'c GridCell<'c>) -> Self {
+impl<'c, const N: usize> CellNeighbors<'c, N> {
+    pub(crate) fn half_space(center: &'c GridCell<'c, N>) -> Self {
         Self {
             center,
             state: BalancedTernary::default(),
         }
     }
 
-    pub(crate) fn full_space(center: &'c GridCell<'c>) -> Self {
+    pub(crate) fn full_space(center: &'c GridCell<'c, N>) -> Self {
         Self {
             center,
             state: BalancedTernary::MIN,
@@ -143,8 +143,8 @@ impl<'c> CellNeighbors<'c> {
 
 //TODO: sum type/bool for boundary conditions would evaluated during runtime (pro: could change behavior during runtime)
 //TODO: type states for boundary conditions would be during compiletime (pro: no runtime cost, con: slightly less flexible)
-impl<'c> Iterator for CellNeighbors<'c> {
-    type Item = GridCell<'c>;
+impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
+    type Item = GridCell<'c, N>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // stop the iterator (by returning None) if the center cell is empty
@@ -155,23 +155,24 @@ impl<'c> Iterator for CellNeighbors<'c> {
         //TODO: Note the recursive calls to self.next().
         //TODO: I'm okay with that (for now) since in practice the number of neighbor cells is pretty limited.
         //TODO: I'm sure the call stack won't mind too much.
+        // See https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#matching-named-variables
+        // and https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#extra-conditionals-with-match-guards
         match self.state {
             // Iterator stops if the current state is already the last (which is always BalancedTernary::MAX)
-            BalancedTernary::MAX => None,
+            max if max == BalancedTernary::MAX => None,
             // Skip the center cell
-            BalancedTernary::ZERO => {
+            zero if zero == BalancedTernary::ZERO => {
                 self.state += BalancedTrit::Positive;
                 self.next()
             }
             current_state => {
                 // `BalancedTernary` is `Copy` i.e. we can already increment `self.state` and use `current_state`
                 self.state += BalancedTrit::Positive;
-
                 //TODO: waiting for stabilization of
                 //TODO: https://doc.rust-lang.org/std/primitive.array.html#method.try_map or
                 //TODO: https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.try_collect
                 //TODO: I'm working around this using mutable state and try_for_each (try_fold would be awkward in this case)
-                let mut new_index = [0usize; 3];
+                let mut new_index = [0usize; N];
 
                 // For convenience
                 let shape = self.center.grid.index.grid_info.shape;
@@ -199,7 +200,7 @@ impl<'c> Iterator for CellNeighbors<'c> {
                     })
                     .map(|()| GridCell {
                         grid: self.center.grid,
-                        head: &self.center.grid.cells[new_index],
+                        head: &self.center.grid.cells[new_index.as_slice()],
                     })
                     .or_else(|| self.next())
             }

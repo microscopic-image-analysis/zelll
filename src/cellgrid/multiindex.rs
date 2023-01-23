@@ -7,20 +7,20 @@
 use crate::cellgrid::util::*;
 
 #[derive(Debug)]
-pub struct MultiIndex {
-    pub(crate) grid_info: GridInfo,
-    pub(crate) index: Vec<[usize; 3]>,
+pub struct MultiIndex<const N: usize> {
+    pub(crate) grid_info: GridInfo<N>,
+    pub(crate) index: Vec<[usize; N]>,
 }
 
-impl MultiIndex {
-    pub fn with_capacity(info: GridInfo, capacity: usize) -> Self {
+impl<const N: usize> MultiIndex<N> {
+    pub fn with_capacity(info: GridInfo<N>, capacity: usize) -> Self {
         Self {
             grid_info: info,
             index: Vec::with_capacity(capacity),
         }
     }
 
-    pub fn from_pointcloud(point_cloud: &PointCloud, cutoff: f64) -> Self {
+    pub fn from_pointcloud(point_cloud: &PointCloud<N>, cutoff: f64) -> Self {
         let aabb = Aabb::from_pointcloud(point_cloud);
         let grid_info = GridInfo::new(aabb, cutoff);
 
@@ -37,7 +37,7 @@ impl MultiIndex {
     //TODO: might be nice and save some allocations
     //TODO: but one could argue changing the cutoff would justify constructing a new multi index
     //TODO: but I copy grid info any way, so might as well change it
-    pub fn update_indices(&mut self, point_cloud: &PointCloud) {
+    pub fn update_indices(&mut self, point_cloud: &PointCloud<N>) {
         //`GridInfo` is `Copy`
         // we need to copy here since partial borrowing is not possible
         //TODO: this really depends on which struct should handle cell_index() computation
