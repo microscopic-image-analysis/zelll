@@ -30,7 +30,7 @@ impl<const N: usize> PointCloud<N> {
 //TODO: at some point, if I mutate points in a point cloud and do not rebuild the cell grid entirely,
 //TODO: I'd probably need to check against the concrete Aabb instance to make sure points stay in the grid
 //TODO: or rather: if points stay in the grid, I won't have to rebuild the cell grid
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Aabb<const N: usize> {
     inf: Point<f64, N>,
     sup: Point<f64, N>,
@@ -54,7 +54,7 @@ impl<const N: usize> Aabb<N> {
 }
 
 /// The grid described by `GridInfo` may be slightly larger than the underlying bounding box `aabb`.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GridInfo<const N: usize> {
     aabb: Aabb<N>,
     cutoff: f64,
@@ -87,6 +87,7 @@ impl<const N: usize> GridInfo<N> {
     //TODO: not sure where it fits better
     //TODO: GridInfo knows enough to do compute the cell index for an arbitrary point
     //TODO: but MultiIndex seems more fitting semantically?
+    //TODO: sth. like Lattice trait maybe
     pub fn cell_index(&self, point: &Point<f64, N>) -> [usize; N] {
         let mut idx = [0; N];
 
@@ -100,17 +101,104 @@ impl<const N: usize> GridInfo<N> {
     }
 }
 
+/// Generate generate 3-dimensional point arrays for testing purposes in the following fashion:
+/// In a grid with cells of length `cutoff` only cells with even linear index contain points (chessboard pattern).
+/// These non-empty cells contain two points each:
+/// - the first at the origin of the cell (equivalent to the cell's multi-index + the origin of the grid)
+/// - the second at the center of the cell
+// We'll stay in 3D for simplicity here
+pub(crate) fn generate_points(shape: [usize; 3], cutoff: f64, origin: [f64; 3]) -> Vec<[f64; 3]> {
+    let mut points = Vec::with_capacity(((shape.iter().product::<usize>() + 1) / 2) * 2);
+
+    for x in 0..shape[0] {
+        for y in 0..shape[1] {
+            for z in 0..shape[2] {
+                if (x + y + z) % 2 == 0 {
+                    points.push([
+                        cutoff.mul_add(x as f64, origin[0]),
+                        cutoff.mul_add(y as f64, origin[1]),
+                        cutoff.mul_add(z as f64, origin[2]),
+                    ]);
+                    points.push([
+                        cutoff.mul_add(x as f64, cutoff.mul_add(0.5, origin[0])),
+                        cutoff.mul_add(y as f64, cutoff.mul_add(0.5, origin[1])),
+                        cutoff.mul_add(z as f64, cutoff.mul_add(0.5, origin[2])),
+                    ]);
+                }
+            }
+        }
+    }
+
+    points
+}
+
 #[cfg(test)]
 mod tests {
-    //use super::*;
+    use super::*;
 
     #[test]
-    fn test_gridinfo() {
-        /*let point_cloud = PointCloud::from_points(&POINTS);
+    fn test_generate_points() {
+        let points = vec![
+            [0.0, 0.0, 0.0],
+            [0.5, 0.5, 0.5],
+            [0.0, 0.0, 2.0],
+            [0.5, 0.5, 2.5],
+            [0.0, 1.0, 1.0],
+            [0.5, 1.5, 1.5],
+            [0.0, 2.0, 0.0],
+            [0.5, 2.5, 0.5],
+            [0.0, 2.0, 2.0],
+            [0.5, 2.5, 2.5],
+            [1.0, 0.0, 1.0],
+            [1.5, 0.5, 1.5],
+            [1.0, 1.0, 0.0],
+            [1.5, 1.5, 0.5],
+            [1.0, 1.0, 2.0],
+            [1.5, 1.5, 2.5],
+            [1.0, 2.0, 1.0],
+            [1.5, 2.5, 1.5],
+            [2.0, 0.0, 0.0],
+            [2.5, 0.5, 0.5],
+            [2.0, 0.0, 2.0],
+            [2.5, 0.5, 2.5],
+            [2.0, 1.0, 1.0],
+            [2.5, 1.5, 1.5],
+            [2.0, 2.0, 0.0],
+            [2.5, 2.5, 0.5],
+            [2.0, 2.0, 2.0],
+            [2.5, 2.5, 2.5],
+        ];
+        assert_eq!(points, generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]));
+    }
+
+    #[test]
+    fn test_utils() {
+        let points = generate_points([3, 3, 3], 1.0, [0.2, 0.25, 0.3]);
+        let point_cloud = PointCloud::from_points(&points);
+        assert_eq!(point_cloud.len(), 28, "testing PointCloud.len()");
+
         let aabb = Aabb::from_pointcloud(&point_cloud);
-        let grid_info = GridInfo::new(aabb, 5.0);
-        println!("{:?}", grid_info);*/
-        todo!("test");
+        assert_eq!(
+            aabb,
+            Aabb {
+                inf: [0.2, 0.25, 0.3].into(),
+                sup: [2.7, 2.75, 2.8].into()
+            },
+            "testing Aabb::from_pointcloud()"
+        );
+
+        let grid_info = GridInfo::new(aabb, 1.0);
+        assert_eq!(
+            grid_info.origin(),
+            &Point::from([0.2, 0.25, 0.3]),
+            "testing GridInfo.origin()"
+        );
+        assert_eq!(grid_info.shape, [3, 3, 3], "testing GridInfo.shape");
+        assert_eq!(
+            grid_info.cell_index(&Point::from([2.7, 2.75, 2.8])),
+            [2, 2, 2],
+            "testing GrindInfo.cell_index()"
+        );
     }
 }
 
