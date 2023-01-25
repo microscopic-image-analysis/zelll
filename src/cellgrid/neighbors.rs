@@ -137,6 +137,8 @@ impl<'c, const N: usize> CellNeighbors<'c, N> {
 
 //TODO: sum type/bool for boundary conditions would evaluated during runtime (pro: could change behavior during runtime)
 //TODO: type states for boundary conditions would be during compiletime (pro: no runtime cost, con: slightly less flexible)
+//TODO: could override size_hint() method relatively easily
+//TODO: could implement DoubleEndedIterator but that would need extra state and currently there's no reason
 impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
     type Item = GridCell<'c, N>;
 
