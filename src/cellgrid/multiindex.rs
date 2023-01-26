@@ -1,10 +1,11 @@
 //TODO: impl Deref/AsRef? to index
-//TODO: maybe MultiIndex should own a point cloud and I should provide methods to deref to point cloud
-//TODO: and/or deconstruct to underlying point cloud
-//TODO: implementing From/Into is not trivial here because point cloud has no knowledge about the cutoff
-//TODO: Also: this currently assumes that the order of points in point cloud does not change
+//TODO: maybe MultiIndex should know about a point cloud (i.e. store a reference?)
+//TODO: Also: currently assuming that the order of points in point cloud does not change
 //TODO: i.e. index in multiindex corresponds to index in point cloud
+//TODO: maybe CellGrid should have this (immutable reference), therefore enforcing that
+//TODO: changes to a pointcloud can only be done if CellGrid is out of scope (all references are dropped)
 use crate::cellgrid::util::*;
+use nalgebra::Point;
 
 #[derive(Debug)]
 pub struct MultiIndex<const N: usize> {
@@ -20,12 +21,11 @@ impl<const N: usize> MultiIndex<N> {
         }
     }
 
-    pub fn from_pointcloud(point_cloud: &PointCloud<N>, cutoff: f64) -> Self {
-        let aabb = Aabb::from_pointcloud(point_cloud);
+    pub fn from_points(points: &[Point<f64, N>], cutoff: f64) -> Self {
+        let aabb = Aabb::from_points(points);
         let grid_info = GridInfo::new(aabb, cutoff);
 
-        let index = point_cloud
-            .0
+        let index = points
             .iter()
             .map(|point| grid_info.cell_index(point))
             .collect();
@@ -37,7 +37,7 @@ impl<const N: usize> MultiIndex<N> {
     //TODO: might be nice and save some allocations
     //TODO: but one could argue changing the cutoff would justify constructing a new multi index
     //TODO: but I copy grid info any way, so might as well change it
-    pub fn update_indices(&mut self, point_cloud: &PointCloud<N>) {
+    pub fn update_indices(&mut self, points: &[Point<f64, N>]) {
         //`GridInfo` is `Copy`
         // we need to copy here since partial borrowing is not possible
         //TODO: this really depends on which struct should handle cell_index() computation
@@ -47,7 +47,7 @@ impl<const N: usize> MultiIndex<N> {
         let info = self.grid_info;
         self.index
             .iter_mut()
-            .zip(point_cloud.0.iter())
+            .zip(points.iter())
             .for_each(|(idx, point)| *idx = info.cell_index(point));
     }
 }

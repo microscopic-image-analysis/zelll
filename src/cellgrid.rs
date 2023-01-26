@@ -1,3 +1,7 @@
+//TODO: handle updating of CellGrid and inner fields with point cloud data of different sizes
+//TODO: - currently assuming particle indices are stable
+//TODO: - handle removal/addition of particles -> handle update or enforce new construction of CellGrid
+//TODO: - allow both &[Point<f64, N>] and impl Iterator<Item = Point<f64, N>> (or IntoIterator)?
 #[allow(dead_code)]
 pub mod iters;
 #[allow(dead_code)]
@@ -9,6 +13,7 @@ pub mod util;
 
 pub use iters::*;
 pub use multiindex::*;
+use nalgebra::Point;
 use ndarray::ArrayD;
 pub use neighbors::*;
 pub use util::*;
@@ -16,7 +21,6 @@ pub use util::*;
 //TODO: I don't like this so far but a builder pattern is a bit overkill right now
 #[derive(Debug)]
 pub struct CellGrid<const N: usize> {
-    points: PointCloud<N>,
     cells: ArrayD<Option<usize>>,
     //TODO: see https://crates.io/crates/stable-vec and https://crates.io/crates/slab
     cell_lists: Vec<Option<usize>>,
@@ -24,9 +28,8 @@ pub struct CellGrid<const N: usize> {
 }
 
 impl<const N: usize> CellGrid<N> {
-    pub fn new(points: &[[f64; N]], cutoff: f64) -> Self {
-        let points = PointCloud::from_points(points);
-        let index = MultiIndex::from_pointcloud(&points, cutoff);
+    pub fn new(points: &[Point<f64, N>], cutoff: f64) -> Self {
+        let index = MultiIndex::from_points(points, cutoff);
 
         let mut cell_lists: Vec<Option<usize>> = [None].repeat(points.len());
         let mut cells: ArrayD<Option<usize>> = ArrayD::default(index.grid_info.shape.as_slice());
@@ -39,7 +42,6 @@ impl<const N: usize> CellGrid<N> {
         });
 
         Self {
-            points,
             cells,
             cell_lists,
             index,

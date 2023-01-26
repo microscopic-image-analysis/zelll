@@ -1,31 +1,7 @@
 #![allow(dead_code)]
 use nalgebra::*;
 
-//TODO: For now we're just copying into our own struct for simplicity
-//TODO: There's not much use to this yet
-//TODO: maybe I should just keep this a type alias
-//TODO: which would allow me to just use &[Point<f64, N>] in function signatures
-//TODO: also keep in mind https://rust-unofficial.github.io/patterns/anti_patterns/deref.html
-//TODO: rather impl AsRef https://doc.rust-lang.org/std/convert/trait.AsRef.html
-//TODO: #[repr(transparent)]?
-//TODO: see https://doc.rust-lang.org/nomicon/other-reprs.html#reprtransparent
-#[derive(Debug)]
-pub struct PointCloud<const N: usize>(pub(crate) Vec<Point<f64, N>>);
-
-impl<const N: usize> PointCloud<N> {
-    //TODO: we'll want a more generic way for this (maybe impl Deref/AsRef)
-    pub fn from_points(points: &[[f64; N]]) -> Self {
-        Self(points.iter().map(|p| Point::from(*p)).collect())
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
+pub type PointCloud<const N: usize> = Vec<Point<f64, N>>;
 
 //TODO: at some point, if I mutate points in a point cloud and do not rebuild the cell grid entirely,
 //TODO: I'd probably need to check against the concrete Aabb instance to make sure points stay in the grid
@@ -37,15 +13,14 @@ pub struct Aabb<const N: usize> {
 }
 
 impl<const N: usize> Aabb<N> {
-    pub fn from_pointcloud(point_cloud: &PointCloud<N>) -> Self {
-        let init = if point_cloud.is_empty() {
+    pub fn from_points(points: &[Point<f64, N>]) -> Self {
+        let init = if points.is_empty() {
             Point::<f64, N>::default()
         } else {
-            point_cloud.0[0]
+            points[0]
         };
 
-        let (inf, sup) = point_cloud
-            .0
+        let (inf, sup) = points
             .iter()
             .fold((init, init), |(i, s), point| (i.inf(point), s.sup(point)));
 
@@ -107,23 +82,23 @@ impl<const N: usize> GridInfo<N> {
 /// - the first at the origin of the cell (equivalent to the cell's multi-index + the origin of the grid)
 /// - the second at the center of the cell
 // We'll stay in 3D for simplicity here
-pub(crate) fn generate_points(shape: [usize; 3], cutoff: f64, origin: [f64; 3]) -> Vec<[f64; 3]> {
+pub(crate) fn generate_points(shape: [usize; 3], cutoff: f64, origin: [f64; 3]) -> PointCloud<3> {
     let mut points = Vec::with_capacity(((shape.iter().product::<usize>() + 1) / 2) * 2);
 
     for x in 0..shape[0] {
         for y in 0..shape[1] {
             for z in 0..shape[2] {
                 if (x + y + z) % 2 == 0 {
-                    points.push([
+                    points.push(Point::from([
                         cutoff.mul_add(x as f64, origin[0]),
                         cutoff.mul_add(y as f64, origin[1]),
                         cutoff.mul_add(z as f64, origin[2]),
-                    ]);
-                    points.push([
+                    ]));
+                    points.push(Point::from([
                         cutoff.mul_add(x as f64, cutoff.mul_add(0.5, origin[0])),
                         cutoff.mul_add(y as f64, cutoff.mul_add(0.5, origin[1])),
                         cutoff.mul_add(z as f64, cutoff.mul_add(0.5, origin[2])),
-                    ]);
+                    ]));
                 }
             }
         }
@@ -139,34 +114,34 @@ mod tests {
     #[test]
     fn test_generate_points() {
         let points = vec![
-            [0.0, 0.0, 0.0],
-            [0.5, 0.5, 0.5],
-            [0.0, 0.0, 2.0],
-            [0.5, 0.5, 2.5],
-            [0.0, 1.0, 1.0],
-            [0.5, 1.5, 1.5],
-            [0.0, 2.0, 0.0],
-            [0.5, 2.5, 0.5],
-            [0.0, 2.0, 2.0],
-            [0.5, 2.5, 2.5],
-            [1.0, 0.0, 1.0],
-            [1.5, 0.5, 1.5],
-            [1.0, 1.0, 0.0],
-            [1.5, 1.5, 0.5],
-            [1.0, 1.0, 2.0],
-            [1.5, 1.5, 2.5],
-            [1.0, 2.0, 1.0],
-            [1.5, 2.5, 1.5],
-            [2.0, 0.0, 0.0],
-            [2.5, 0.5, 0.5],
-            [2.0, 0.0, 2.0],
-            [2.5, 0.5, 2.5],
-            [2.0, 1.0, 1.0],
-            [2.5, 1.5, 1.5],
-            [2.0, 2.0, 0.0],
-            [2.5, 2.5, 0.5],
-            [2.0, 2.0, 2.0],
-            [2.5, 2.5, 2.5],
+            Point::from([0.0, 0.0, 0.0]),
+            Point::from([0.5, 0.5, 0.5]),
+            Point::from([0.0, 0.0, 2.0]),
+            Point::from([0.5, 0.5, 2.5]),
+            Point::from([0.0, 1.0, 1.0]),
+            Point::from([0.5, 1.5, 1.5]),
+            Point::from([0.0, 2.0, 0.0]),
+            Point::from([0.5, 2.5, 0.5]),
+            Point::from([0.0, 2.0, 2.0]),
+            Point::from([0.5, 2.5, 2.5]),
+            Point::from([1.0, 0.0, 1.0]),
+            Point::from([1.5, 0.5, 1.5]),
+            Point::from([1.0, 1.0, 0.0]),
+            Point::from([1.5, 1.5, 0.5]),
+            Point::from([1.0, 1.0, 2.0]),
+            Point::from([1.5, 1.5, 2.5]),
+            Point::from([1.0, 2.0, 1.0]),
+            Point::from([1.5, 2.5, 1.5]),
+            Point::from([2.0, 0.0, 0.0]),
+            Point::from([2.5, 0.5, 0.5]),
+            Point::from([2.0, 0.0, 2.0]),
+            Point::from([2.5, 0.5, 2.5]),
+            Point::from([2.0, 1.0, 1.0]),
+            Point::from([2.5, 1.5, 1.5]),
+            Point::from([2.0, 2.0, 0.0]),
+            Point::from([2.5, 2.5, 0.5]),
+            Point::from([2.0, 2.0, 2.0]),
+            Point::from([2.5, 2.5, 2.5]),
         ];
         assert_eq!(points, generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]));
     }
@@ -174,10 +149,9 @@ mod tests {
     #[test]
     fn test_utils() {
         let points = generate_points([3, 3, 3], 1.0, [0.2, 0.25, 0.3]);
-        let point_cloud = PointCloud::from_points(&points);
-        assert_eq!(point_cloud.len(), 28, "testing PointCloud.len()");
+        assert_eq!(points.len(), 28, "testing PointCloud.len()");
 
-        let aabb = Aabb::from_pointcloud(&point_cloud);
+        let aabb = Aabb::from_points(&points);
         assert_eq!(
             aabb,
             Aabb {
