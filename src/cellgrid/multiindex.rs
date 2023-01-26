@@ -52,3 +52,31 @@ impl<const N: usize> MultiIndex<N> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_multiindex() {
+        // using 0-origin for simplicity and to avoid floating point errors
+        let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
+
+        let mut idx = Vec::with_capacity(points.len());
+
+        for x in 0..3 {
+            for y in 0..3 {
+                for z in 0..3 {
+                    if (x + y + z) % 2 == 0 {
+                        idx.push([x, y, z]);
+                        idx.push([x, y, z]);
+                    }
+                }
+            }
+        }
+
+        let index = MultiIndex::from_points(&points, 1.0);
+
+        assert_eq!(index.index, idx, "testing MultiIndex::from_points()")
+    }
+}
+

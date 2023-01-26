@@ -4,7 +4,7 @@ use super::{CellGrid, CellNeighbors};
 #[cfg(feature = "rayon")]
 use ndarray::parallel::prelude::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct GridCell<'g, const N: usize> {
     //TODO: maybe provide proper accessors to these fields for neighbors.rs to use?
     pub(crate) grid: &'g CellGrid<N>,
@@ -36,6 +36,7 @@ impl<const N: usize> GridCell<'_, N> {
     /// Returns None if the cell is empty.
     //TODO: Again, empty cells shouldn't be accessible via the public API
     //TODO: I don't think I need it but let's keep it anyway
+    //TODO: Semantically, Result<> would make more sense
     pub fn on_boundary(&self) -> Option<bool> {
         let idx = self.index()?;
         let shape = self.grid.index.grid_info.shape;
@@ -56,7 +57,7 @@ impl<const N: usize> GridCell<'_, N> {
     }
 }
 /// Iterates over all points (or rather their indices) in the [`GridCell`] this `GridCellIterator` was created from.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct GridCellIterator<'g, const N: usize> {
     grid: &'g CellGrid<N>,
@@ -93,6 +94,7 @@ impl<const N: usize> CellGrid<N> {
         self.cells
             .iter()
             // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
+            // TODO: but this makes nested iteration a bit combersome...?
             .filter_map(move |head| {
                 if head.is_some() {
                     Some(GridCell { grid: self, head })
@@ -121,41 +123,45 @@ impl<const N: usize> CellGrid<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    const points: &[[f64; 3]] = &[[0.0, 0.0, 0.0], [1.0, 2.0, 0.0], [0.0, 0.1, 0.2]];
+    use crate::cellgrid::util::generate_points;
 
     #[test]
     fn test_cellgrid_iter() {
-        let cell_grid: CellGrid<3> = CellGrid::new(points, 1.0);
+        // Using 0-origin to avoid floating point errors
+        let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
+        let cell_grid: CellGrid<3> = CellGrid::new(&points, 1.0);
 
-        for cell in cell_grid.iter() {
-            println!("{:?}", cell);
-        }
+        assert_eq!(cell_grid.iter().count(), 14, "testing iter()");
 
-        // Doing it twice to check if there were issues with moving &self
-        for cell in cell_grid.iter() {
-            println!("{:?}", cell);
-        }
+        #[cfg(feature = "rayon")]
+        assert_eq!(cell_grid.par_iter().count(), 14, "testing par_iter()");
     }
 
     #[test]
     fn test_gridcell_iter() {
-        let cell_grid: CellGrid<3> = CellGrid::new(points, 1.0);
+        // Using 0-origin to avoid floating point errors
+        let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
+        let cell_grid: CellGrid<3> = CellGrid::new(&points, 1.0);
 
-        for cell in cell_grid.iter() {
-            for point in cell.iter() {
-                println!("{}", point);
-            }
-        }
-    }
+        //TODO: make this work using flat_map(|cell|  cell.iter()).count()
+        assert_eq!(
+            cell_grid
+                .iter()
+                .map(|cell| cell.iter().count())
+                .sum::<usize>(),
+            points.len(),
+            "testing iter()"
+        );
 
-    #[cfg(feature = "rayon")]
-    #[test]
-    fn test_cellgrid_par_iter() {
-        let cell_grid: CellGrid = CellGrid::new(points, 1.0);
-
-        for cell in cell_grid.iter() {
-            println!("{:?}", cell);
-        }
+        #[cfg(feature = "rayon")]
+        assert_eq!(
+            cell_grid
+                .par_iter()
+                .map(|cell| cell.iter().count())
+                .sum::<usize>(),
+            points.len(),
+            "testing iter()"
+        );
     }
 }
 

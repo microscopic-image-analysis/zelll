@@ -168,6 +168,16 @@ mod tests {
             "testing GridInfo.origin()"
         );
         assert_eq!(grid_info.shape, [3, 3, 3], "testing GridInfo.shape");
+
+        // Intuitively you'd expect [2, 2, 2] for this
+        // but we're having floating point imprecision:
+        // 2.3 - 0.3 = 1.9999999999999998
+        // This is not an issue though because the index is still uniquely determined
+        assert_eq!(
+            grid_info.cell_index(&Point::from([2.7, 2.75, 2.3])),
+            [2, 2, 1],
+            "testing GrindInfo.cell_index()"
+        );
         assert_eq!(
             grid_info.cell_index(&Point::from([2.7, 2.75, 2.8])),
             [2, 2, 2],
