@@ -12,7 +12,7 @@ pub struct GridCell<'g, const N: usize> {
     pub(crate) head: &'g Option<usize>,
 }
 
-impl<const N: usize> GridCell<'_, N> {
+impl<'g, const N: usize> GridCell<'g, N> {
     pub fn is_empty(&self) -> bool {
         self.head.is_none()
     }
@@ -25,7 +25,7 @@ impl<const N: usize> GridCell<'_, N> {
         Some(self.grid.index.index[idx])
     }
 
-    pub fn iter(&self) -> GridCellIterator<N> {
+    pub fn iter(&self) -> GridCellIterator<'g, N> {
         GridCellIterator {
             grid: self.grid,
             state: self.head,
@@ -94,7 +94,6 @@ impl<const N: usize> CellGrid<N> {
         self.cells
             .iter()
             // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
-            // TODO: but this makes nested iteration a bit combersome...?
             .filter_map(move |head| {
                 if head.is_some() {
                     Some(GridCell { grid: self, head })
@@ -143,12 +142,8 @@ mod tests {
         let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
         let cell_grid: CellGrid<3> = CellGrid::new(&points, 1.0);
 
-        //TODO: make this work using flat_map(|cell|  cell.iter()).count()
         assert_eq!(
-            cell_grid
-                .iter()
-                .map(|cell| cell.iter().count())
-                .sum::<usize>(),
+            cell_grid.iter().flat_map(|cell| cell.iter()).count(),
             points.len(),
             "testing iter()"
         );
@@ -157,10 +152,10 @@ mod tests {
         assert_eq!(
             cell_grid
                 .par_iter()
-                .map(|cell| cell.iter().count())
-                .sum::<usize>(),
+                .flat_map_iter(|cell| cell.iter())
+                .count(),
             points.len(),
-            "testing iter()"
+            "testing par_iter()"
         );
     }
 }
