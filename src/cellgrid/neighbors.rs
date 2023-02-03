@@ -11,7 +11,9 @@
 // This is equivalent to the cartesian product (-1, 0, 1)^N for which we could use itertools.
 // Long story short: Using balanced ternary numbers saves us a (single) dependency.
 // Might fall back to itertools if we end up needing it anyway
-// (or ndarray::indices(3,3), which has split_at() which might parallel iteration simpler?)
+//TODO: turns out I'll use itertools anyway but actually I started liking the manual BalancedTernary approach better
+//TODO: Itertools::multi_cartesian_product() uses Vec<> and BalancedTernary is const generic
+// (or ndarray::indices(3,3), which has split_at() which might make parallel iteration simpler?)
 // (or just ArrayBase.windows() + empty (for half-space)/opposite (for full-space) margin around grid or manual edge case handling).
 // Balanced ternary numbers are probably not more performant anyway. It's just a bit convoluted and arguably more fun.
 //TODO: would be nice to have a minimal example of these approaches to have a look at on godbolt.org
@@ -110,7 +112,8 @@ impl<const N: usize> Add<BalancedTrit> for BalancedTernary<N> {
     }
 }
 
-#[derive(Debug)]
+//TODO: impl FusedIterator
+#[derive(Debug, Clone, Copy)]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct CellNeighbors<'c, const N: usize> {
     center: &'c GridCell<'c, N>,

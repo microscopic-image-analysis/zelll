@@ -2,6 +2,7 @@
 //TODO: - currently assuming particle indices are stable
 //TODO: - handle removal/addition of particles -> handle update or enforce new construction of CellGrid
 //TODO: - allow both &[Point<f64, N>] and impl Iterator<Item = Point<f64, N>> (or IntoIterator)?
+//TODO: - possible approach: require impl Iterator and then .take(usize::MAX) to ensure we have only finite point clouds
 #[allow(dead_code)]
 pub mod iters;
 #[allow(dead_code)]

@@ -1,6 +1,8 @@
 //TODO iterate over all neighboured cells (full/half space), pairs of particles
 //TODO: perhaps move parallel iteration into separate submodule
 use super::{CellGrid, CellNeighbors};
+//TODO: hide this behind a featureflag?
+use itertools::Itertools;
 #[cfg(feature = "rayon")]
 use ndarray::parallel::prelude::*;
 
@@ -55,8 +57,27 @@ impl<'g, const N: usize> GridCell<'g, N> {
     pub fn neighbors(&self) -> CellNeighbors<N> {
         CellNeighbors::half_space(self)
     }
+
+    /// Iterate over all unique pairs of points in this `GridCell`.
+    fn intra_cell_pairs(&self) -> impl Iterator<Item = (usize, usize)> + 'g {
+        self.iter().tuple_combinations::<(usize, usize)>()
+    }
+
+    /// Iterate over all unique pairs of points in this `GridCell` with points of the neighboring cells.
+    fn inter_cell_pairs(&'g self) -> impl Iterator<Item = (usize, usize)> + 'g {
+        self.iter()
+            .cartesian_product(self.neighbors().flat_map(|neighbor| neighbor.iter()))
+    }
+
+    /// Iterate over all "relevant" pairs of points within in the neighborhood of this `GridCell`.
+    //TODO: explain what "relevant" means here.
+    //TODO: handle full-space as well
+    pub fn point_pairs(&'g self) -> impl Iterator<Item = (usize, usize)> + 'g {
+        self.intra_cell_pairs().chain(self.inter_cell_pairs())
+    }
 }
 /// Iterates over all points (or rather their indices) in the [`GridCell`] this `GridCellIterator` was created from.
+//TODO: impl FusedIterator
 #[derive(Debug, Clone, Copy)]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct GridCellIterator<'g, const N: usize> {
@@ -69,6 +90,7 @@ impl<const N: usize> Iterator for GridCellIterator<'_, N> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
+        //TODO: use Option.map()?
         if let Some(index) = self.state {
             self.state = &self.grid.cell_lists[*index];
             Some(*index)
@@ -148,6 +170,8 @@ mod tests {
             "testing iter()"
         );
 
+        //TODO: test GridCell.index() and GridCell.on_boundary()
+
         #[cfg(feature = "rayon")]
         assert_eq!(
             cell_grid
@@ -156,6 +180,21 @@ mod tests {
                 .count(),
             points.len(),
             "testing par_iter()"
+        );
+    }
+
+    #[test]
+    fn test_neighborcell_pointpairs() {
+        // Using 0-origin to avoid floating point errors
+        let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
+        let cell_grid: CellGrid<3> = CellGrid::new(&points, 1.0);
+
+        //TODO: test intra and inter cell pairs
+
+        assert_eq!(
+            cell_grid.iter().flat_map(|cell| cell.iter()).count(),
+            points.len(),
+            "testing iter()"
         );
     }
 }
