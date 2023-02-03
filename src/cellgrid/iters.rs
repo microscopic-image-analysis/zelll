@@ -1,6 +1,7 @@
 //TODO iterate over all neighboured cells (full/half space), pairs of particles
 //TODO: perhaps move parallel iteration into separate submodule
 use super::{CellGrid, CellNeighbors};
+use core::iter::FusedIterator;
 //TODO: hide this behind a featureflag?
 use itertools::Itertools;
 #[cfg(feature = "rayon")]
@@ -77,7 +78,6 @@ impl<'g, const N: usize> GridCell<'g, N> {
     }
 }
 /// Iterates over all points (or rather their indices) in the [`GridCell`] this `GridCellIterator` was created from.
-//TODO: impl FusedIterator
 #[derive(Debug, Clone, Copy)]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct GridCellIterator<'g, const N: usize> {
@@ -99,6 +99,8 @@ impl<const N: usize> Iterator for GridCellIterator<'_, N> {
         }
     }
 }
+
+impl<const N: usize> FusedIterator for GridCellIterator<'_, N> {}
 
 impl<const N: usize> CellGrid<N> {
     /// Returns an iterator over all [`GridCell`]s in this `CellGrid`, excluding empty cells.

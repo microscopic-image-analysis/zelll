@@ -19,6 +19,7 @@
 //TODO: would be nice to have a minimal example of these approaches to have a look at on godbolt.org
 
 use super::GridCell;
+use core::iter::FusedIterator;
 use core::ops::{Add, AddAssign};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
@@ -112,7 +113,6 @@ impl<const N: usize> Add<BalancedTrit> for BalancedTernary<N> {
     }
 }
 
-//TODO: impl FusedIterator
 #[derive(Debug, Clone, Copy)]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct CellNeighbors<'c, const N: usize> {
@@ -206,6 +206,8 @@ impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
         }
     }
 }
+
+impl<const N: usize> FusedIterator for CellNeighbors<'_, N> {}
 
 #[cfg(test)]
 mod tests {
