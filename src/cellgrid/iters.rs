@@ -90,13 +90,10 @@ impl<const N: usize> Iterator for GridCellIterator<'_, N> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
-        //TODO: use Option.map()?
-        if let Some(index) = self.state {
-            self.state = &self.grid.cell_lists[*index];
-            Some(*index)
-        } else {
-            None
-        }
+        self.state.map(|index| {
+            self.state = &self.grid.cell_lists[index];
+            index
+        })
     }
 }
 
