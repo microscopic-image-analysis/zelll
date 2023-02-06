@@ -62,6 +62,7 @@ impl<const N: usize> CellGrid<N> {
     /// Iterate over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`
     pub fn point_pairs(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
         //TODO: Find a way to handle cell lifetimes instead of collecting into a Vec?
+        //TODO: seems to be related to flat_map()
         self.iter()
             .flat_map(|cell| cell.point_pairs().collect::<Vec<_>>())
     }

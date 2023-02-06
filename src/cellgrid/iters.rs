@@ -185,15 +185,25 @@ mod tests {
     #[test]
     fn test_neighborcell_pointpairs() {
         // Using 0-origin to avoid floating point errors
-        let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
+        let points = generate_points([2, 2, 2], 1.0, [0.0, 0.0, 0.0]);
         let cell_grid: CellGrid<3> = CellGrid::new(&points, 1.0);
 
-        //TODO: test intra and inter cell pairs
+        assert_eq!(
+            cell_grid
+                .iter()
+                .map(|cell| cell.intra_cell_pairs().count())
+                .sum::<usize>(),
+            4,
+            "testing intra_cell_pairs()"
+        );
 
         assert_eq!(
-            cell_grid.iter().flat_map(|cell| cell.iter()).count(),
-            points.len(),
-            "testing iter()"
+            cell_grid
+                .iter()
+                .map(|cell| cell.inter_cell_pairs().count())
+                .sum::<usize>(),
+            24,
+            "testing inter_cell_pairs()"
         );
     }
 }
