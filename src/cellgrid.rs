@@ -27,14 +27,14 @@ pub struct CellGrid<const N: usize> {
 
 impl<const N: usize> CellGrid<N> {
     pub fn new(points: &[Point<f64, N>], cutoff: f64) -> Self {
-        CellGrid::default().update(points, cutoff)
+        CellGrid::default().rebuild(points, cutoff)
     }
 
-    //TODO: Documentation: update does not really update because it does not make a lot of sense:
+    //TODO: Documentation: rebuild does not really update because it does not make a lot of sense:
     //TODO: If MultiIndex did change, we have to re-allocate (or re-initialize) almost everything anyway;
     //TODO: If MultiIndex did not change, we don't need to update.
-    //TODO: Therefore we check for that and make CellGrid::new() just a wrapper around CellGrid::update (with an initially empty MultiIndex)
-    pub fn update(self, points: &[Point<f64, N>], cutoff: f64) -> Self {
+    //TODO: Therefore we check for that and make CellGrid::new() just a wrapper around CellGrid::rebuild (with an initially empty MultiIndex)
+    pub fn rebuild(self, points: &[Point<f64, N>], cutoff: f64) -> Self {
         let index = MultiIndex::from_points(points, cutoff);
 
         if index == self.index {
