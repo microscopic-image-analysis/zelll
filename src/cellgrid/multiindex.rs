@@ -2,12 +2,10 @@
 //TODO: maybe MultiIndex should know about a point cloud (i.e. store a reference?)
 //TODO: Also: currently assuming that the order of points in point cloud does not change
 //TODO: i.e. index in multiindex corresponds to index in point cloud
-//TODO: maybe CellGrid should have this (immutable reference), therefore enforcing that
-//TODO: changes to a pointcloud can only be done if CellGrid is out of scope (all references are dropped)
 use crate::cellgrid::util::*;
 use nalgebra::Point;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Default)]
 pub struct MultiIndex<const N: usize> {
     pub(crate) grid_info: GridInfo<N>,
     pub(crate) index: Vec<[usize; N]>,
@@ -31,24 +29,6 @@ impl<const N: usize> MultiIndex<N> {
             .collect();
 
         Self { grid_info, index }
-    }
-
-    //TODO: should I allow to change the cutoff in this or a similar method?
-    //TODO: might be nice and save some allocations
-    //TODO: but one could argue changing the cutoff would justify constructing a new multi index
-    //TODO: but I copy grid info any way, so might as well change it
-    pub fn update_indices(&mut self, points: &[Point<f64, N>]) {
-        //`GridInfo` is `Copy`
-        // we need to copy here since partial borrowing is not possible
-        //TODO: this really depends on which struct should handle cell_index() computation
-        //TODO: but I probably shouldn't think about it too much, rustc will probably optimize it away
-        //TODO: but we might have to benchmark it at some point
-        //TODO: also see: https://www.forrestthewoods.com/blog/should-small-rust-structs-be-passed-by-copy-or-by-borrow/
-        let info = self.grid_info;
-        self.index
-            .iter_mut()
-            .zip(points.iter())
-            .for_each(|(idx, point)| *idx = info.cell_index(point));
     }
 }
 

@@ -3,10 +3,7 @@ use nalgebra::*;
 
 pub type PointCloud<const N: usize> = Vec<Point<f64, N>>;
 
-//TODO: at some point, if I mutate points in a point cloud and do not rebuild the cell grid entirely,
-//TODO: I'd probably need to check against the concrete Aabb instance to make sure points stay in the grid
-//TODO: or rather: if points stay in the grid, I won't have to rebuild the cell grid
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct Aabb<const N: usize> {
     inf: Point<f64, N>,
     sup: Point<f64, N>,
@@ -73,6 +70,12 @@ impl<const N: usize> GridInfo<N> {
         );
 
         idx
+    }
+}
+
+impl<const N: usize> Default for GridInfo<N> {
+    fn default() -> Self {
+        GridInfo::new(Aabb::default(), 1.0)
     }
 }
 
