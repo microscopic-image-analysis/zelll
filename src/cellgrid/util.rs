@@ -29,7 +29,7 @@ impl<const N: usize> Aabb<N> {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GridInfo<const N: usize> {
     aabb: Aabb<N>,
-    cutoff: f64,
+    pub(crate) cutoff: f64,
     //TODO: probably should implement a method instead of using pub/pub(crate)
     pub(crate) shape: [usize; N],
 }

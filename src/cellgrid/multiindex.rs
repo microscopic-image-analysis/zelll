@@ -30,6 +30,33 @@ impl<const N: usize> MultiIndex<N> {
 
         Self { grid_info, index }
     }
+    // there is no rebuild(), named it rebuild_mut() to match CellGrid::rebuild_mut()
+    //TODO: Documentation: return bool indicating whether the index changed at all (in length or any individual entry)
+    pub fn rebuild_mut(&mut self, points: &[Point<f64, N>], cutoff: Option<f64>) -> bool {
+        let cutoff = cutoff.unwrap_or(self.grid_info.cutoff);
+        let aabb = Aabb::from_points(points);
+        let grid_info = GridInfo::new(aabb, cutoff);
+
+        self.index.resize(points.len(), [0; N]);
+
+        let new_index = points.iter().map(|point| grid_info.cell_index(point));
+
+        // Using `|` here because `||` is lazy and we always need to run the iterator
+        let index_changed = (points.len() != self.index.len())
+            | self
+                .index
+                .iter_mut()
+                .zip(new_index)
+                .fold(false, |has_changed, (old, new)| {
+                    if *old != new {
+                        *old = new;
+                        true
+                    } else {
+                        has_changed
+                    }
+                });
+        index_changed
+    }
 }
 
 #[cfg(test)]

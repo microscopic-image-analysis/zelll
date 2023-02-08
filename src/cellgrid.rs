@@ -27,20 +27,21 @@ pub struct CellGrid<const N: usize> {
 
 impl<const N: usize> CellGrid<N> {
     pub fn new(points: &[Point<f64, N>], cutoff: f64) -> Self {
-        CellGrid::default().rebuild(points, cutoff)
+        CellGrid::default().rebuild(points, Some(cutoff))
     }
 
     //TODO: Documentation: rebuild does not really update because it does not make a lot of sense:
     //TODO: If MultiIndex did change, we have to re-allocate (or re-initialize) almost everything anyway;
     //TODO: If MultiIndex did not change, we don't need to update.
     //TODO: Therefore we check for that and make CellGrid::new() just a wrapper around CellGrid::rebuild (with an initially empty MultiIndex)
-    pub fn rebuild(self, points: &[Point<f64, N>], cutoff: f64) -> Self {
+    pub fn rebuild(self, points: &[Point<f64, N>], cutoff: Option<f64>) -> Self {
+        let cutoff = cutoff.unwrap_or(self.index.grid_info.cutoff);
         let index = MultiIndex::from_points(points, cutoff);
 
         if index == self.index {
             self
         } else {
-            let mut cell_lists: Vec<Option<usize>> = [None].repeat(points.len());
+            let mut cell_lists: Vec<Option<usize>> = vec![None; points.len()];
             let mut cells: ArrayD<Option<usize>> =
                 ArrayD::default(index.grid_info.shape.as_slice());
 
@@ -56,6 +57,49 @@ impl<const N: usize> CellGrid<N> {
                 cell_lists,
                 index,
             }
+        }
+    }
+
+    pub fn rebuild_mut(mut self, points: &[Point<f64, N>], cutoff: Option<f64>) -> Self {
+        if self.index.rebuild_mut(points, cutoff) {
+            self.cell_lists.clear();
+            self.cell_lists.resize(points.len(), None);
+            self.cell_lists.shrink_to_fit();
+
+            //TODO: see https://docs.rs/ndarray/latest/ndarray/type.ArrayView.html#method.from_shape
+            //TODO: and https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html#method.from_shape_vec
+            //TODO: and https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html#method.into_raw_vec
+            //TODO: and https://github.com/rust-ndarray/ndarray/issues/433#issuecomment-377288065
+            //TODO: I need to do rebuild_mut(mut self, ...) (vs. &mut self) in this case and return the consumed struct
+            //TODO: this should be documented.
+            let mut cells = self.cells.into_raw_vec();
+
+            cells.clear();
+            cells.resize(self.index.grid_info.shape.iter().product(), None);
+            cells.shrink_to_fit();
+
+            // Panicking is okay here. But this *should* not happen 😬
+            let mut cells = ArrayD::from_shape_vec(self.index.grid_info.shape.as_slice(), cells)
+                .expect("ArrayD::from_shape_vec() failed");
+
+            // complete the partial move out of `self`
+            let index = self.index;
+            let mut cell_lists = self.cell_lists;
+
+            index.index.iter().enumerate().for_each(|(i, cell)| {
+                if let Some(head) = cells[cell.as_slice()] {
+                    cell_lists[i] = Some(head);
+                }
+                cells[cell.as_slice()] = Some(i);
+            });
+
+            Self {
+                cells,
+                cell_lists,
+                index,
+            }
+        } else {
+            self
         }
     }
 
