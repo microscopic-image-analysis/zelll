@@ -69,6 +69,8 @@ impl<const N: usize> GridInfo<N> {
                 .as_slice(),
         );
 
+        assert!(idx < self.shape, "cell index out of bounds");
+
         idx
     }
 }
