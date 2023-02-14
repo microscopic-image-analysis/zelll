@@ -1,17 +1,20 @@
-use zelll::cellgrid::*;
-
 use kiss3d::camera::ArcBall;
 use kiss3d::light::Light;
 use kiss3d::nalgebra::{distance, Point3, UnitVector3, Vector3};
 use kiss3d::window::Window;
 use soa_derive::StructOfArray;
+use std::sync::{Arc, RwLock};
+use zelll::cellgrid::*;
 
-const NBORBS: usize = 10000;
-const SPEED: f64 = 0.2;
-const OUTER_RADIUS: f64 = 5.0;
-const INNER_RADIUS: f64 = 2.0;
-const ALIGNMENT: f64 = 0.05;
-const SEPARATION: f64 = 0.7;
+const NBORBS: usize = 25000;
+const SPEED: f64 = 0.25;
+const FOV: f64 = 1.7;
+const OUTER_RADIUS: f64 = 6.0;
+const ALIGNMENT: f64 = 0.85;
+//TODO: mixed up some signs, behaves more like COHESION
+const SEPARATION: f64 = 0.2;
+const STUBBORNESS: f64 = 0.4;
+const HOME: f64 = 0.04;
 
 fn main() {
     let mut borbs = BorbVec::with_capacity(NBORBS);
@@ -29,7 +32,7 @@ fn main() {
         std::f32::consts::PI / 4.0,
         0.1,
         3072.0,
-        Point3::new(500.0, 0.0, 0.0),
+        Point3::new(350.0, 0.0, 0.0),
         Point3::new(0.0, 0.0, 0.0),
     );
 
@@ -37,44 +40,58 @@ fn main() {
 
     let mut cell_grid = CellGrid::new(&borbs.position, OUTER_RADIUS);
 
-    // average neighbor position (center of mass)
-    // with weighted contributions for separation and cohesion
-    let mut neighbor_com: Vec<Point3<f64>> = vec![Point3::default(); NBORBS];
-    // neighbor direction sum (i.e. not normalized)
-    let mut neighbor_dir: Vec<Vector3<f64>> = borbs
-        .direction
-        .iter()
-        .map(|uvec| (*uvec).into_inner())
-        .collect();
-
     while window.render_with_camera(&mut cam) {
+        // average neighbor position (center of mass)
+        // with weighted contributions for separation and cohesion
+        let mut neighbor_com: Vec<Arc<RwLock<Point3<f64>>>> = Vec::with_capacity(NBORBS);
+        (0..NBORBS).for_each(|_| neighbor_com.push(Arc::new(RwLock::new(Point3::default()))));
+        // neighbor direction sum (i.e. not normalized)
+        let neighbor_dir: Vec<Arc<RwLock<Vector3<f64>>>> = borbs
+            .direction
+            .iter()
+            .map(|uvec| Arc::new(RwLock::new((*uvec).into_inner())))
+            .collect();
         //TODO: this is definetly not correct yet
         //TODO: and it's ugly
-        for (borb, other) in cell_grid.point_pairs() {
+        cell_grid.par_point_pairs().for_each(|(borb, other)| {
             let dist = distance(&borbs.position[borb], &borbs.position[other]);
-            if dist <= OUTER_RADIUS {
-                if dist < INNER_RADIUS {
-                    neighbor_com[borb] -= borbs.position[other].coords * SEPARATION;
-                    neighbor_dir[borb] -= borbs.direction[other].into_inner() * SEPARATION;
+            let is_behind = borbs.direction[borb]
+                .angle(&(&borbs.position[borb] - &borbs.position[other]))
+                > FOV;
+            if dist <= OUTER_RADIUS && !is_behind {
+                let mut com_lock = neighbor_com[borb].write().unwrap();
+                let mut dir_lock = neighbor_dir[borb].write().unwrap();
+                if dist < OUTER_RADIUS * SEPARATION {
+                    *com_lock -= borbs.position[other].coords;
                 } else {
-                    neighbor_com[borb] += borbs.position[other].coords * (1.0 - SEPARATION);
-                    neighbor_dir[borb] += borbs.direction[other].into_inner() * (1.0 - SEPARATION);
+                    *com_lock += borbs.position[other].coords;
                 }
+                *dir_lock += borbs.direction[other].into_inner();
             }
-        }
-
+        });
         for (i, borb) in borbs.iter_mut().enumerate() {
             //TODO: proper error handling
-            let new_direction = (1.0 - ALIGNMENT)
-                * (neighbor_com[i] - *borb.position)
-                    .try_normalize(f64::EPSILON)
-                    .unwrap_or(**borb.direction)
-                + ALIGNMENT
-                    * neighbor_dir[i]
-                        .try_normalize(f64::EPSILON)
-                        .unwrap_or(**borb.direction);
+            let cohesion_separation = (*neighbor_com[i].read().unwrap() - *borb.position)
+                .try_normalize(f64::EPSILON)
+                .unwrap_or(Vector3::default());
+            let alignment = neighbor_dir[i]
+                .read()
+                .unwrap()
+                .try_normalize(f64::EPSILON)
+                .unwrap_or(**borb.direction);
 
-            *borb.direction = UnitVector3::new_normalize(new_direction);
+            let home = borb
+                .position
+                .coords
+                .try_normalize(f64::EPSILON)
+                .unwrap_or(Vector3::default());
+
+            *borb.direction = UnitVector3::new_normalize(*borb.direction.slerp(
+                &UnitVector3::new_normalize(
+                    (1.0 - ALIGNMENT) * cohesion_separation + ALIGNMENT * alignment - HOME * home,
+                ),
+                1.0 - STUBBORNESS,
+            ));
         }
 
         for mut borb in borbs.iter_mut() {
@@ -84,8 +101,8 @@ fn main() {
 
         cell_grid = cell_grid.rebuild_mut(&borbs.position, None);
 
-        neighbor_dir.fill_with(Default::default);
-        neighbor_com.fill_with(Default::default);
+        //neighbor_dir.fill_with(Default::default);
+        //neighbor_com.fill_with(Default::default);
     }
 }
 
