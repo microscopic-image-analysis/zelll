@@ -12,6 +12,8 @@ pub mod util;
 pub use iters::*;
 pub use multiindex::*;
 use nalgebra::Point;
+#[cfg(feature = "rayon")]
+pub use ndarray::parallel::prelude::*;
 use ndarray::ArrayD;
 pub use neighbors::*;
 pub use util::*;
@@ -104,10 +106,20 @@ impl<const N: usize> CellGrid<N> {
     }
 
     /// Iterate over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`
+    #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn point_pairs(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
         //TODO: Find a way to handle cell lifetimes instead of collecting into a Vec?
         //TODO: seems to be related to flat_map()
         self.iter()
+            .flat_map(|cell| cell.point_pairs().collect::<Vec<_>>())
+    }
+
+    #[cfg(feature = "rayon")]
+    #[must_use = "iterators are lazy and do nothing unless consumed"]
+    pub fn par_point_pairs(&self) -> impl ParallelIterator<Item = (usize, usize)> + '_ {
+        //TODO: Find a way to handle cell lifetimes instead of collecting into a Vec?
+        //TODO: seems to be related to flat_map()
+        self.par_iter()
             .flat_map(|cell| cell.point_pairs().collect::<Vec<_>>())
     }
 }
