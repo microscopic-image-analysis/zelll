@@ -3,9 +3,10 @@ use kiss3d::light::Light;
 use kiss3d::nalgebra::{distance, Point3, UnitVector3, Vector3};
 use kiss3d::window::Window;
 use soa_derive::StructOfArray;
+use std::sync::{Arc, RwLock};
 use zelll::cellgrid::*;
 
-const NBORBS: usize = 10000;
+const NBORBS: usize = 25000;
 const SPEED: f64 = 0.25;
 const FOV: f64 = 1.7;
 const OUTER_RADIUS: f64 = 6.0;
@@ -14,11 +15,6 @@ const ALIGNMENT: f64 = 0.85;
 const SEPARATION: f64 = 0.2;
 const STUBBORNESS: f64 = 0.4;
 const HOME: f64 = 0.04;
-
-//TODO: lessons from flamegraph:
-//TODO: nalgebra::Matrix::angle() is expensive
-//TODO: flattenign in point_pairs() is expensive due to allocating Vecs for nested iterators
-//TODO: par_point_pairs() in this naive implementation is inefficient
 
 fn main() {
     let mut borbs = BorbVec::with_capacity(NBORBS);
@@ -45,39 +41,43 @@ fn main() {
 
     let mut cell_grid = CellGrid::new(&borbs.position, OUTER_RADIUS);
 
-    // average neighbor position (center of mass)
-    // with weighted contributions for separation and cohesion
-    let mut neighbor_com: Vec<Point3<f64>> = vec![Point3::default(); NBORBS];
-    // neighbor direction sum (i.e. not normalized)
-    let mut neighbor_dir: Vec<Vector3<f64>> = borbs
-        .direction
-        .iter()
-        .map(|uvec| (*uvec).into_inner())
-        .collect();
-
     while window.render_with_camera(&mut cam) {
+        // average neighbor position (center of mass)
+        // with weighted contributions for separation and cohesion
+        let mut neighbor_com: Vec<Arc<RwLock<Point3<f64>>>> = Vec::with_capacity(NBORBS);
+        (0..NBORBS).for_each(|_| neighbor_com.push(Arc::new(RwLock::new(Point3::default()))));
+        // neighbor direction sum (i.e. not normalized)
+        let neighbor_dir: Vec<Arc<RwLock<Vector3<f64>>>> = borbs
+            .direction
+            .iter()
+            .map(|uvec| Arc::new(RwLock::new((*uvec).into_inner())))
+            .collect();
         //TODO: this is definetly not correct yet
         //TODO: and it's ugly
-        cell_grid.point_pairs().for_each(|(borb, other)| {
+        cell_grid.par_point_pairs().for_each(|(borb, other)| {
             let dist = distance(&borbs.position[borb], &borbs.position[other]);
-            //TODO: angle() is surprisingly expensive
-            let is_behind =
-                borbs.direction[borb].angle(&(borbs.position[borb] - borbs.position[other])) > FOV;
+            let is_behind = borbs.direction[borb]
+                .angle(&(&borbs.position[borb] - &borbs.position[other]))
+                > FOV;
             if dist <= OUTER_RADIUS && !is_behind {
+                let mut com_lock = neighbor_com[borb].write().unwrap();
+                let mut dir_lock = neighbor_dir[borb].write().unwrap();
                 if dist < OUTER_RADIUS * SEPARATION {
-                    neighbor_com[borb] -= borbs.position[other].coords;
+                    *com_lock -= borbs.position[other].coords;
                 } else {
-                    neighbor_com[borb] += borbs.position[other].coords;
+                    *com_lock += borbs.position[other].coords;
                 }
-                neighbor_dir[borb] += borbs.direction[other].into_inner();
+                *dir_lock += borbs.direction[other].into_inner();
             }
         });
         for (i, borb) in borbs.iter_mut().enumerate() {
             //TODO: proper error handling
-            let cohesion_separation = (neighbor_com[i] - *borb.position)
+            let cohesion_separation = (*neighbor_com[i].read().unwrap() - *borb.position)
                 .try_normalize(f64::EPSILON)
                 .unwrap_or(Vector3::default());
             let alignment = neighbor_dir[i]
+                .read()
+                .unwrap()
                 .try_normalize(f64::EPSILON)
                 .unwrap_or(**borb.direction);
 
@@ -102,8 +102,8 @@ fn main() {
 
         cell_grid = cell_grid.rebuild_mut(&borbs.position, None);
 
-        neighbor_dir.fill_with(Default::default);
-        neighbor_com.fill_with(Default::default);
+        //neighbor_dir.fill_with(Default::default);
+        //neighbor_com.fill_with(Default::default);
     }
 }
 
