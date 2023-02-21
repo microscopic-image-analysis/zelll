@@ -105,6 +105,14 @@ impl<const N: usize> CellGrid<N> {
         }
     }
 
+    pub fn shape(&self) -> &[usize; N] {
+        &self.index.grid_info.shape
+    }
+
+    pub fn bounding_box(&self) -> &Aabb<N> {
+        &self.index.grid_info.aabb
+    }
+
     /// Iterate over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn point_pairs(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
