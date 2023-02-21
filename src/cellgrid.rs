@@ -113,13 +113,33 @@ impl<const N: usize> CellGrid<N> {
         &self.index.grid_info.aabb
     }
 
-    /// Iterate over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`
+    /// Iterate over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`.
+    /// This has some overhead due to internal use of [`flat_map`].
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn point_pairs(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
-        //TODO: Find a way to handle cell lifetimes instead of collecting into a Vec?
-        //TODO: seems to be related to flat_map()
         self.iter()
             .flat_map(|cell| cell.point_pairs().collect::<Vec<_>>())
+    }
+
+    /// Call a closure on each relevant (i.e. within cutoff threshold + some extra) unique pair of points in this `CellGrid`.
+    /// This should be preferred over [`CellGrid::point_pairs()`].
+    /// `for_each_point_pair()` is equivalent to a nested loop:
+    /// ```ignore
+    /// for cell in cell_grid.iter() {
+    ///     for (borb, other) in cell.point_pairs() {
+    ///         ...
+    ///     }
+    /// }
+    /// ```
+    pub fn for_each_point_pair<F>(&self, mut f: F)
+    where
+        F: FnMut(usize, usize),
+    {
+        for cell in self.iter() {
+            for (i, j) in cell.point_pairs() {
+                f(i, j);
+            }
+        }
     }
 
     #[cfg(feature = "rayon")]
