@@ -12,18 +12,14 @@ const OUTER_RADIUS: f64 = 1.0;
 const ALIGNMENT: f64 = 0.35;
 const SEPARATION: f64 = 0.45;
 const COHESION: f64 = 0.3;
-//const STUBBORNNESS: f64 = 1.0;
 
-//TODO: draw bounding box/ individual cells
 //TODO: lessons from flamegraph:
-//TODO: flattening in point_pairs() is expensive due to allocating Vecs for nested iterators
+//TODO: flattening in point_pairs() is expensive due to allocating Vecs for nested iterators -> lifetime shuffling? CellGridIterator has owned items but references CellGrid internally (should be fine actually)
 //TODO: par_point_pairs() in this naive implementation is inefficient
 //TODO: lessons from cachegrind:
-//TODO: most cache misses  apparently due to indexing cells ArrayD?
 //TODO: AddAssign<BalancedTrit> for BalancedTernary<N> no cache misses BUT: of course a lot of memory writes (maybe we can generate relative neighbors just once because BalancedTernary is const anyway?)
 //TODO: Copying CellNeighbors not expensive but happens often (a lot of writes/reads but no cache misses)
-//TODO: CellGrid::rebuild_mut() apparently a lot of cache misses (see ArrayD)
-//TODO: would be good to have   /rustc/d5a82bbd26e1ad8b7401f6a718a9c57c96905483/library/core/src/ptr/mod.rs to annotate
+//TODO: CellGrid::rebuild_mut() apparently a lot of cache misses (relatively speaking, need minimal benchmark code) (also consider indexing into ArrayD)
 //TODO: Itertools::adaptors::product() a lot of misses?
 //TODO: some misses with Iterator::fold()?
 
@@ -31,7 +27,8 @@ fn aabb_vertices(aabb: &Aabb<3>) -> Vec<(Point3<f64>, Point3<f64>)> {
     let inf = aabb.inf;
     let sup = aabb.sup;
 
-    // cube edges in python python: list(itertools.filterfalse(lambda edge: sum(a!=b for a,b in zip(*edge))!=1 ,itertools.combinations(itertools.product(*zip((0,0,0),(1,1,1))), 2)))
+    // cube edges in python python:
+    // list(itertools.filterfalse(lambda edge: sum(a!=b for a,b in zip(*edge))!=1 ,itertools.combinations(itertools.product(*zip((0,0,0),(1,1,1))), 2)))
     vec![
         (
             Point3::new(inf[0], inf[1], inf[2]),
@@ -110,7 +107,6 @@ fn main() {
 
     let mut cell_grid = CellGrid::new(&borbs.position, OUTER_RADIUS);
 
-    //TODO: scale by number of neighbors for each boid
     let mut cohesion: Vec<Point3<f64>> = vec![Point3::default(); NBORBS];
     let mut separation: Vec<Vector3<f64>> = vec![Vector3::default(); NBORBS];
     let mut alignment: Vec<Vector3<f64>> = vec![Vector3::default(); NBORBS];
@@ -131,7 +127,6 @@ fn main() {
             }
         });
         for (i, borb) in borbs.iter_mut().enumerate() {
-            //TODO: proper error handling
             let borb_cohesion = cohesion[i] / neighborhood[i].max(1) as f64 - *borb.position;
             let borb_separation = separation[i];
             let borb_alignment = alignment[i] / neighborhood[i].max(1) as f64;
