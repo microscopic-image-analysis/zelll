@@ -40,6 +40,7 @@ impl<const N: usize> MultiIndex<N> {
         self.index.resize(points.len(), [0; N]);
 
         let new_index = points.iter().map(|point| grid_info.cell_index(point));
+        self.grid_info = grid_info;
 
         // Using `|` here because `||` is lazy and we always need to run the iterator
         let index_changed = (points.len() != self.index.len())

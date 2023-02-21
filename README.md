@@ -21,3 +21,10 @@
     * more general lattices
     * lattice boundary conditions?
     
+## Examples
+
+Caution, this is not very polished yet.
+Parameters are hard-coded atm and memory usage isn't profiled yet.
+```
+cargo run --example borbs --release
+```

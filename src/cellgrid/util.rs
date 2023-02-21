@@ -5,8 +5,8 @@ pub type PointCloud<const N: usize> = Vec<Point<f64, N>>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct Aabb<const N: usize> {
-    inf: Point<f64, N>,
-    sup: Point<f64, N>,
+    pub inf: Point<f64, N>,
+    pub sup: Point<f64, N>,
 }
 
 impl<const N: usize> Aabb<N> {
@@ -28,7 +28,7 @@ impl<const N: usize> Aabb<N> {
 /// The grid described by `GridInfo` may be slightly larger than the underlying bounding box `aabb`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GridInfo<const N: usize> {
-    aabb: Aabb<N>,
+    pub(crate) aabb: Aabb<N>,
     pub(crate) cutoff: f64,
     //TODO: probably should implement a method instead of using pub/pub(crate)
     pub(crate) shape: [usize; N],
@@ -68,6 +68,8 @@ impl<const N: usize> GridInfo<N> {
                 .map(|coord| coord.floor() as usize)
                 .as_slice(),
         );
+
+        assert!(idx < self.shape, "cell index out of bounds");
 
         idx
     }
