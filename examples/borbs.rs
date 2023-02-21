@@ -13,9 +13,6 @@ const ALIGNMENT: f64 = 0.35;
 const SEPARATION: f64 = 0.45;
 const COHESION: f64 = 0.3;
 
-//TODO: lessons from flamegraph:
-//TODO: flattening in point_pairs() is expensive due to allocating Vecs for nested iterators -> lifetime shuffling? CellGridIterator has owned items but references CellGrid internally (should be fine actually)
-//TODO: par_point_pairs() in this naive implementation is inefficient
 //TODO: lessons from cachegrind:
 //TODO: AddAssign<BalancedTrit> for BalancedTernary<N> no cache misses BUT: of course a lot of memory writes (maybe we can generate relative neighbors just once because BalancedTernary is const anyway?)
 //TODO: Copying CellNeighbors not expensive but happens often (a lot of writes/reads but no cache misses)
@@ -113,7 +110,7 @@ fn main() {
     let mut neighborhood: Vec<usize> = vec![0; NBORBS];
 
     while window.render_with_camera(&mut cam) {
-        cell_grid.point_pairs().for_each(|(borb, other)| {
+        cell_grid.for_each_point_pair(|borb, other| {
             let relative_pos = borbs.position[borb] - borbs.position[other];
 
             if relative_pos.norm() <= OUTER_RADIUS
@@ -126,6 +123,7 @@ fn main() {
                 alignment[borb] += borbs.direction[other];
             }
         });
+
         for (i, borb) in borbs.iter_mut().enumerate() {
             let borb_cohesion = cohesion[i] / neighborhood[i].max(1) as f64 - *borb.position;
             let borb_separation = separation[i];
