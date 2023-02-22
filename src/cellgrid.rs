@@ -62,6 +62,7 @@ impl<const N: usize> CellGrid<N> {
         }
     }
 
+    #[must_use = "rebuild_mut() consumes `self` and returns the mutated `CellGrid`"]
     pub fn rebuild_mut(mut self, points: &[Point<f64, N>], cutoff: Option<f64>) -> Self {
         if self.index.rebuild_mut(points, cutoff) {
             self.cell_lists.clear();
@@ -161,4 +162,5 @@ mod tests {
         todo!()
     }
 }
+
 
