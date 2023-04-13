@@ -176,6 +176,16 @@ impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
                 // For convenience
                 let shape = self.center.grid.index.grid_info.shape;
 
+                //TODO: move this into a (private?) method: impl CellNeighbors
+                //TODO: Also there's probably a less convoluted way
+                //TODO: (essentially want custom saturating/wrapping add for  [usize; N])
+                //TODO: (or maybe rather som modulo arithmetic would be better?)
+                //TODO: see https://docs.rs/nalgebra/latest/nalgebra/fn.wrap.html
+                //TODO: and https://docs.rs/nalgebra/latest/nalgebra/fn.clamp.html
+                //TODO: and https://doc.rust-lang.org/std/cmp/trait.Ord.html#method.clamp
+                //TODO: --> should work for [usize; N] but try_clamp() on a wrapper type would be nicer...
+                //TODO: maybe follow the std source code and make this myself
+                //TODO: and https://docs.rs/num/latest/num/fn.clamp.html
                 new_index
                     .iter_mut()
                     .zip(center.iter())
