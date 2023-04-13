@@ -120,7 +120,7 @@ pub struct CellNeighbors<'c, const N: usize> {
     state: BalancedTernary<N>,
 }
 
-// This probably the only slightly relevant advantage of using balanced ternary numbers;
+// This is probably the only slightly relevant advantage of using balanced ternary numbers;
 // The distinction between half and full space is simply given by the initial state of the iterator
 impl<'c, const N: usize> CellNeighbors<'c, N> {
     pub(crate) fn half_space(center: &'c GridCell<'c, N>) -> Self {
@@ -149,6 +149,9 @@ impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
         // stop the iterator (by returning None) if the center cell is empty
         // Semantically, empty cells could have non-empty neighbors but we don't need them in that case
         // and empty cells should not be accessible using the public API anyway
+        //TODO: although some might be accessible currently, precisely via this impl Iterator
+        //TODO: we should be able to omit this check now and make everything related to empty cells obsolete
+        //TODO: i.e. remove Option<usize> etc. because now it shouldn't be possible anymore to create empty GridCells
         let center = self.center.index()?;
 
         //TODO: Note the recursive calls to self.next().
@@ -207,9 +210,14 @@ impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
                             None
                         }
                     })
-                    .map(|()| GridCell {
+                    .and_then(|()| self.center.grid.cells.get(&new_index).copied())
+                    .map(|head| GridCell {
                         grid: self.center.grid,
-                        head: self.center.grid.cells.get(&new_index).copied(),
+                        //TODO: currently head is Option<usize>
+                        //TODO: but maybe we should let this be just a usize
+                        //TODO: the returned Option from HashMap::get() is handled using and_then() a few lines above
+                        //TODO: i.e. i.e. we don't need to consider empty cells anymore
+                        head: Some(head),
                     })
                     .or_else(|| self.next())
             }

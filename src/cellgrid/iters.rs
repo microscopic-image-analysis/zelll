@@ -84,7 +84,6 @@ impl<'g, const N: usize> GridCell<'g, N> {
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct GridCellIterator<'g, const N: usize> {
     grid: &'g CellGrid<N>,
-    //TODO: I guess I could just store Option<usize> directly as well
     state: Option<usize>,
 }
 
@@ -127,8 +126,8 @@ impl<const N: usize> CellGrid<N> {
     //TODO: parallel iteration is broken, now that we use std::collections::HashMap instead of ndarray::ArrayD...
     //TODO: However, if we instead switch to the crate hashbrown, we can still have that
     //TODO: (also gives us AHash with potentially better performance than SipHash?)
-    //TODO: hashbrown does seem to spend less time hashing (using AHash)
-    //TODO: but slightly increases cache misses...
+    //TODO: hashbrown does seem to spend less time hashing (using AHash) (although no noticably performance difference overall?)
+    //TODO: but increases cache misses slightly (1.1% vs 0.6% on average)... (still less than using ArrayD (1.7%))
     #[cfg(feature = "rayon")]
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<N>> {
