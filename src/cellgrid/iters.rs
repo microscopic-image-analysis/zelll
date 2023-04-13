@@ -7,51 +7,41 @@ use itertools::Itertools;
 #[cfg(feature = "rayon")]
 use rayon::prelude::ParallelIterator;
 
+/// `GridCell` represents a non-empty (by construction) cell of a `CellGrid`.
+//TODO: maybe should add assertions that the stored `head`is valid, e.g. in GridCell::index()
+//TODO: In principle, could have out-ouf-bounds head indices there.
 #[derive(Debug, Clone, Copy)]
 pub struct GridCell<'g, const N: usize> {
     //TODO: maybe provide proper accessors to these fields for neighbors.rs to use?
     pub(crate) grid: &'g CellGrid<N>,
-    //TODO: don't really need Option<> here but it makes it easier to distinguish non-empty from empty cells
-    //TODO: although I could do this at another place using HashMaps Entry API
-    pub(crate) head: Option<usize>,
+    pub(crate) head: usize,
 }
 
 impl<'g, const N: usize> GridCell<'g, N> {
-    //TODO: remove or emulate by storing Option<usize> in GridCell
-    pub fn is_empty(&self) -> bool {
-        self.head.is_none()
-    }
-
     /// Return the (multi-)index of this (non-empty) `GridCell`.
-    /// Returns `None` if the cell is empty.
-    //TODO: However, the public API should not provide a way to address empty cells
-    pub(crate) fn index(&self) -> Option<[usize; N]> {
-        let idx = self.head?;
-        Some(self.grid.index.index[idx])
+    pub(crate) fn index(&self) -> [usize; N] {
+        self.grid.index.index[self.head]
     }
 
     pub fn iter(&self) -> GridCellIterator<'g, N> {
         GridCellIterator {
             grid: self.grid,
-            state: self.head,
+            state: Some(self.head),
         }
     }
 
     /// Check whether this `GridCell` is on the boundary of the [`CellGrid`].
-    /// Returns None if the cell is empty.
-    //TODO: Again, empty cells shouldn't be accessible via the public API
     //TODO: I don't think I need it but let's keep it anyway
-    //TODO: Semantically, Result<> would make more sense
-    pub fn on_boundary(&self) -> Option<bool> {
-        let idx = self.index()?;
+    pub fn on_boundary(&self) -> bool {
+        let idx = self.index();
         let shape = self.grid.index.grid_info.shape;
 
         for (i, dim) in shape.iter().enumerate() {
             if idx[i] == 0 || idx[i] + 1 == *dim {
-                return Some(true);
+                return true;
             }
         }
-        Some(false)
+        false
     }
 
     /// Return [`CellNeighbors`], an iterator over all (currently half-space) non-empty neighboring cells.
@@ -118,10 +108,7 @@ impl<const N: usize> CellGrid<N> {
         self.cells
             .values()
             // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
-            .map(move |&head| GridCell {
-                grid: self,
-                head: Some(head),
-            })
+            .map(move |&head| GridCell { grid: self, head })
     }
     //TODO: parallel iteration is broken, now that we use std::collections::HashMap instead of ndarray::ArrayD...
     //TODO: However, if we instead switch to the crate hashbrown, we can still have that
