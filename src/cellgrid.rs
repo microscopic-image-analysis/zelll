@@ -9,13 +9,13 @@ pub mod neighbors;
 #[allow(dead_code)]
 pub mod util;
 
+use hashbrown::HashMap;
 pub use iters::*;
 pub use multiindex::*;
 use nalgebra::Point;
-#[cfg(feature = "rayon")]
-pub use ndarray::parallel::prelude::*;
 pub use neighbors::*;
-use std::collections::HashMap;
+#[cfg(feature = "rayon")]
+use rayon::prelude::ParallelIterator;
 pub use util::*;
 
 //TODO: I don't like this so far but a builder pattern is a bit overkill right now

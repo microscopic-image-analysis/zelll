@@ -5,7 +5,7 @@ use core::iter::FusedIterator;
 //TODO: hide this behind a featureflag?
 use itertools::Itertools;
 #[cfg(feature = "rayon")]
-use ndarray::parallel::prelude::*;
+use rayon::prelude::ParallelIterator;
 
 #[derive(Debug, Clone, Copy)]
 pub struct GridCell<'g, const N: usize> {
@@ -127,18 +127,17 @@ impl<const N: usize> CellGrid<N> {
     //TODO: parallel iteration is broken, now that we use std::collections::HashMap instead of ndarray::ArrayD...
     //TODO: However, if we instead switch to the crate hashbrown, we can still have that
     //TODO: (also gives us AHash with potentially better performance than SipHash?)
+    //TODO: hashbrown does seem to spend less time hashing (using AHash)
+    //TODO: but slightly increases cache misses...
     #[cfg(feature = "rayon")]
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<N>> {
         self.cells
-            .par_iter()
+            .par_values()
             // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
-            .filter_map(move |head| {
-                if head.is_some() {
-                    Some(GridCell { grid: self, head })
-                } else {
-                    None
-                }
+            .map(move |&head| GridCell {
+                grid: self,
+                head: Some(head),
             })
     }
 }
