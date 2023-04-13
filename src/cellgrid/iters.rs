@@ -11,11 +11,13 @@ use ndarray::parallel::prelude::*;
 pub struct GridCell<'g, const N: usize> {
     //TODO: maybe provide proper accessors to these fields for neighbors.rs to use?
     pub(crate) grid: &'g CellGrid<N>,
-    //TODO: I guess I could just store Option<usize> directly as well
-    pub(crate) head: &'g Option<usize>,
+    //TODO: don't really need Option<> here but it makes it easier to distinguish non-empty from empty cells
+    //TODO: although I could do this at another place using HashMaps Entry API
+    pub(crate) head: Option<usize>,
 }
 
 impl<'g, const N: usize> GridCell<'g, N> {
+    //TODO: remove or emulate by storing Option<usize> in GridCell
     pub fn is_empty(&self) -> bool {
         self.head.is_none()
     }
@@ -24,7 +26,7 @@ impl<'g, const N: usize> GridCell<'g, N> {
     /// Returns `None` if the cell is empty.
     //TODO: However, the public API should not provide a way to address empty cells
     pub(crate) fn index(&self) -> Option<[usize; N]> {
-        let idx = (*self.head)?;
+        let idx = self.head?;
         Some(self.grid.index.index[idx])
     }
 
@@ -83,7 +85,7 @@ impl<'g, const N: usize> GridCell<'g, N> {
 pub struct GridCellIterator<'g, const N: usize> {
     grid: &'g CellGrid<N>,
     //TODO: I guess I could just store Option<usize> directly as well
-    state: &'g Option<usize>,
+    state: Option<usize>,
 }
 
 impl<const N: usize> Iterator for GridCellIterator<'_, N> {
@@ -91,7 +93,7 @@ impl<const N: usize> Iterator for GridCellIterator<'_, N> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.state.map(|index| {
-            self.state = &self.grid.cell_lists[index];
+            self.state = self.grid.cell_lists[index];
             index
         })
     }
@@ -101,9 +103,11 @@ impl<const N: usize> FusedIterator for GridCellIterator<'_, N> {}
 
 impl<const N: usize> CellGrid<N> {
     /// Returns an iterator over all [`GridCell`]s in this `CellGrid`, excluding empty cells.
+    /// A particular iteration order is not guaranteed.
     ///
     /// # Examples
     ///
+    //TODO: this example should still work but it's nonsensical
     /// ```
     /// # use zelll::cellgrid::CellGrid;
     /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
@@ -113,17 +117,16 @@ impl<const N: usize> CellGrid<N> {
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn iter(&self) -> impl Iterator<Item = GridCell<N>> {
         self.cells
-            .iter()
+            .values()
             // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
-            .filter_map(move |head| {
-                if head.is_some() {
-                    Some(GridCell { grid: self, head })
-                } else {
-                    None
-                }
+            .map(move |&head| GridCell {
+                grid: self,
+                head: Some(head),
             })
     }
-
+    //TODO: parallel iteration is broken, now that we use std::collections::HashMap instead of ndarray::ArrayD...
+    //TODO: However, if we instead switch to the crate hashbrown, we can still have that
+    //TODO: (also gives us AHash with potentially better performance than SipHash?)
     #[cfg(feature = "rayon")]
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<N>> {

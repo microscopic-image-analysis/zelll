@@ -209,7 +209,7 @@ impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
                     })
                     .map(|()| GridCell {
                         grid: self.center.grid,
-                        head: &self.center.grid.cells[new_index.as_slice()],
+                        head: self.center.grid.cells.get(&new_index).copied(),
                     })
                     .or_else(|| self.next())
             }
@@ -224,7 +224,7 @@ mod tests {
     //use super::*;
 
     #[test]
-    fn test_skeleton() {
+    fn test_neighbors() {
         todo!();
     }
 }

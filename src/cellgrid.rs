@@ -14,14 +14,14 @@ pub use multiindex::*;
 use nalgebra::Point;
 #[cfg(feature = "rayon")]
 pub use ndarray::parallel::prelude::*;
-use ndarray::ArrayD;
 pub use neighbors::*;
+use std::collections::HashMap;
 pub use util::*;
 
 //TODO: I don't like this so far but a builder pattern is a bit overkill right now
 #[derive(Debug, Default)]
 pub struct CellGrid<const N: usize> {
-    cells: ArrayD<Option<usize>>,
+    cells: HashMap<[usize; N], usize>,
     //TODO: see https://crates.io/crates/stable-vec and https://crates.io/crates/slab
     cell_lists: Vec<Option<usize>>,
     index: MultiIndex<N>,
@@ -44,14 +44,16 @@ impl<const N: usize> CellGrid<N> {
             self
         } else {
             let mut cell_lists: Vec<Option<usize>> = vec![None; points.len()];
-            let mut cells: ArrayD<Option<usize>> =
-                ArrayD::default(index.grid_info.shape.as_slice());
+            let mut cells = HashMap::with_capacity(points.len());
 
             index.index.iter().enumerate().for_each(|(i, cell)| {
-                if let Some(head) = cells[cell.as_slice()] {
+                //TODO: I think this can be more clear using the entry API of HashMap?
+                //TODO: Or, rather, do I have to use if let? indexing hashmap always gives an Option<> and we only visit each (i, cell) once
+                //TODO: so there shouldn't be any overwrites we don't want
+                if let Some(&head) = cells.get(cell) {
                     cell_lists[i] = Some(head);
                 }
-                cells[cell.as_slice()] = Some(i);
+                cells.insert(*cell, i);
             });
 
             Self {
@@ -67,33 +69,24 @@ impl<const N: usize> CellGrid<N> {
         if self.index.rebuild_mut(points, cutoff) {
             self.cell_lists.clear();
             self.cell_lists.resize(points.len(), None);
-            self.cell_lists.shrink_to_fit();
+            //TODO: shrink_to_fit here makes no sense?
+            //self.cell_lists.shrink_to_fit();
 
-            //TODO: see https://docs.rs/ndarray/latest/ndarray/type.ArrayView.html#method.from_shape
-            //TODO: and https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html#method.from_shape_vec
-            //TODO: and https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html#method.into_raw_vec
-            //TODO: and https://github.com/rust-ndarray/ndarray/issues/433#issuecomment-377288065
-            //TODO: I need to do rebuild_mut(mut self, ...) (vs. &mut self) in this case and return the consumed struct
-            //TODO: this should be documented.
-            let mut cells = self.cells.into_raw_vec();
+            self.cells.clear();
+            // We're not `reserve()`ing or `shrink_to_fit()`ing here
+            // HashMap should be sufficiently smart about reallocating in chunks
+            // Also this does not happen that often
 
-            cells.clear();
-            cells.resize(self.index.grid_info.shape.iter().product(), None);
-            cells.shrink_to_fit();
-
-            // Panicking is okay here. But this *should* not happen 😬
-            let mut cells = ArrayD::from_shape_vec(self.index.grid_info.shape.as_slice(), cells)
-                .expect("ArrayD::from_shape_vec() failed");
-
-            // complete the partial move out of `self`
+            //move out of `self`
             let index = self.index;
             let mut cell_lists = self.cell_lists;
+            let mut cells = self.cells;
 
             index.index.iter().enumerate().for_each(|(i, cell)| {
-                if let Some(head) = cells[cell.as_slice()] {
+                if let Some(&head) = cells.get(cell) {
                     cell_lists[i] = Some(head);
                 }
-                cells[cell.as_slice()] = Some(i);
+                cells.insert(*cell, i);
             });
 
             Self {
@@ -162,5 +155,4 @@ mod tests {
         todo!()
     }
 }
-
 

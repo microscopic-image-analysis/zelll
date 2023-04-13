@@ -16,7 +16,6 @@ edition = "2018"
 [dependencies]
 itertools = "0.10"
 nalgebra = "0.30"
-ndarray = "0.15"
 
 [dev-dependencies]
 kiss3d = "0.35"
@@ -25,4 +24,4 @@ soa_derive = "0.12"
 
 [features]
 default = []
-rayon = ["ndarray/rayon"]
+rayon = []
