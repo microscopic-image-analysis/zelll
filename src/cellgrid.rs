@@ -18,11 +18,9 @@ pub use neighbors::*;
 use rayon::prelude::ParallelIterator;
 pub use util::*;
 
-//TODO: I don't like this so far but a builder pattern is a bit overkill right now
 #[derive(Debug, Default)]
 pub struct CellGrid<const N: usize> {
     cells: HashMap<[usize; N], usize>,
-    //TODO: see https://crates.io/crates/stable-vec and https://crates.io/crates/slab
     cell_lists: Vec<Option<usize>>,
     index: MultiIndex<N>,
 }
@@ -43,18 +41,14 @@ impl<const N: usize> CellGrid<N> {
         if index == self.index {
             self
         } else {
-            let mut cell_lists: Vec<Option<usize>> = vec![None; points.len()];
             let mut cells = HashMap::with_capacity(points.len());
 
-            index.index.iter().enumerate().for_each(|(i, cell)| {
-                //TODO: I think this can be more clear using the entry API of HashMap?
-                //TODO: Or, rather, do I have to use if let? indexing hashmap always gives an Option<> and we only visit each (i, cell) once
-                //TODO: so there shouldn't be any overwrites we don't want
-                if let Some(&head) = cells.get(cell) {
-                    cell_lists[i] = Some(head);
-                }
-                cells.insert(*cell, i);
-            });
+            let cell_lists = index
+                .index
+                .iter()
+                .enumerate()
+                .map(|(i, cell)| cells.insert(*cell, i))
+                .collect();
 
             Self {
                 cells,
@@ -67,26 +61,23 @@ impl<const N: usize> CellGrid<N> {
     #[must_use = "rebuild_mut() consumes `self` and returns the mutated `CellGrid`"]
     pub fn rebuild_mut(mut self, points: &[Point<f64, N>], cutoff: Option<f64>) -> Self {
         if self.index.rebuild_mut(points, cutoff) {
-            self.cell_lists.clear();
             self.cell_lists.resize(points.len(), None);
-            //TODO: shrink_to_fit here makes no sense?
-            //self.cell_lists.shrink_to_fit();
 
             self.cells.clear();
-            // We're not `reserve()`ing or `shrink_to_fit()`ing here
-            // HashMap should be sufficiently smart about reallocating in chunks
-            // Also this does not happen that often
+            // We're not `reserve()`ing or `shrink_to_fit()`ing here.
+            // HashMap should be sufficiently smart about reallocating in chunks.
+            // Also this does not happen that often.
 
-            //move out of `self`
+            // move out of `self`
             let index = self.index;
             let mut cell_lists = self.cell_lists;
             let mut cells = self.cells;
 
             index.index.iter().enumerate().for_each(|(i, cell)| {
-                if let Some(&head) = cells.get(cell) {
-                    cell_lists[i] = Some(head);
-                }
-                cells.insert(*cell, i);
+                // see https://docs.rs/hashbrown/latest/hashbrown/struct.HashMap.html#method.insert
+                // HashMap::insert() returns the old value or None, therefore we don't have to clear
+                // cell_lists before refilling as long as cells is cleared.
+                cell_lists[i] = cells.insert(*cell, i);
             });
 
             Self {
