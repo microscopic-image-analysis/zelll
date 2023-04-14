@@ -144,7 +144,7 @@ impl<'c, const N: usize> CellNeighbors<'c, N> {
 //TODO: could implement DoubleEndedIterator but that would need extra state and currently there's no reason
 impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
     type Item = GridCell<'c, N>;
-
+    //TODO: cachegrind attributes many D1mr misses here (related to copy_nonoverlapping, AddAssign, intrinsics.rs ptr alignment?, mixed_integer_ops, checked add?, equality.rs)
     fn next(&mut self) -> Option<Self::Item> {
         //TODO: Note the recursive calls to self.next().
         //TODO: I'm okay with that (for now) since in practice the number of neighbor cells is pretty limited.

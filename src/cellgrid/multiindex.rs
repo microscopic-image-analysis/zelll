@@ -43,6 +43,7 @@ impl<const N: usize> MultiIndex<N> {
         self.grid_info = grid_info;
 
         // Using `|` here because `||` is lazy and we always need to run the iterator
+        //TODO: currently the first condition is always false? We already resized self.index
         let index_changed = (points.len() != self.index.len())
             | self
                 .index

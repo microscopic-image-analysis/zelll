@@ -77,7 +77,7 @@ impl<const N: usize> CellGrid<N> {
                 // see https://docs.rs/hashbrown/latest/hashbrown/struct.HashMap.html#method.insert
                 // HashMap::insert() returns the old value or None, therefore we don't have to clear
                 // cell_lists before refilling as long as cells is cleared.
-                cell_lists[i] = cells.insert(*cell, i);
+                cell_lists[i] = cells.insert(*cell, i); //TODO: cachegrind attributes 6.28% of D1mw misses to this line
             });
 
             Self {

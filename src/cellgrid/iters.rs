@@ -82,7 +82,7 @@ impl<const N: usize> Iterator for GridCellIterator<'_, N> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.state.map(|index| {
-            self.state = self.grid.cell_lists[index];
+            self.state = self.grid.cell_lists[index]; //TODO: cachegrind attributes 11.71% of D1mr misses to this line
             index
         })
     }

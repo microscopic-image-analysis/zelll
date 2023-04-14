@@ -15,6 +15,7 @@ const COHESION: f64 = 0.3;
 
 //TODO: lessons from cachegrind:
 //TODO: AddAssign<BalancedTrit> for BalancedTernary<N> no cache misses BUT: of course a lot of memory writes (maybe we can generate relative neighbors just once because BalancedTernary is const anyway?)
+//TODO: it seems AddAssign<BalancedTrit> actually has quite a few cache misses (not dramatically but also not negligable)
 //TODO: Copying CellNeighbors not expensive but happens often (a lot of writes/reads but no cache misses)
 //TODO: CellGrid::rebuild_mut() apparently a lot of cache misses (relatively speaking, need minimal benchmark code) (also consider indexing into ArrayD)
 //TODO: Itertools::adaptors::product() a lot of misses?
