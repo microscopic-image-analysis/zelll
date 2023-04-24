@@ -223,6 +223,7 @@ impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
                         grid: self.center.grid,
                         head,
                     })
+                    .or_else(|| self.next())
             }
         }
     }
