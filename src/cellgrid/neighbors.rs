@@ -21,6 +21,7 @@
 use super::GridCell;
 use core::iter::FusedIterator;
 use core::ops::{Add, AddAssign};
+use nalgebra::wrap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 #[repr(i8)]
@@ -88,6 +89,7 @@ impl<const N: usize> From<BalancedTernary<N>> for isize {
         })
     }
 }
+
 //TODO: note that this does not over-/underflow but caps at MAX and MIN respectively
 impl<const N: usize> AddAssign<BalancedTrit> for BalancedTernary<N> {
     fn add_assign(&mut self, rhs: BalancedTrit) {
@@ -136,6 +138,57 @@ impl<'c, const N: usize> CellNeighbors<'c, N> {
             state: BalancedTernary::MIN,
         }
     }
+
+    //TODO: Ideally, I'd use something like Either<L, R>?
+    //TODO: we can always compute a new index (i.e. using periodic boundaries)
+    //TODO: but would need to indicate if it was wrapped around the boundary
+    //TODO: and decide later to omit this if we have aperiodic boundaries?
+    fn absolute_index(&self) -> Option<[usize; N]> {
+        let shape = self.center.grid.index.grid_info.shape;
+        let mut index = [0usize; N];
+        //TODO: this is really ugly...
+        self.center
+            .index()
+            .iter()
+            .zip(self.state.0.iter().map(|trit| *trit as isize))
+            .map(|(coord, relative)| coord.checked_add_signed(relative))
+            .zip(shape.iter())
+            .zip(index.iter_mut())
+            //TODO: waiting for stabilization of
+            //TODO: https://doc.rust-lang.org/std/primitive.array.html#method.try_map or
+            //TODO: https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.try_collect
+            //TODO: I'm working around this using mutable state and try_for_each (try_fold would be awkward in this case)
+            .try_for_each(|((coord, dim), new_coord)| {
+                if let Some(coord) = coord {
+                    if coord < *dim {
+                        *new_coord = coord;
+                        Some(())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .map(|()| index)
+    }
+
+    fn absolute_index_periodic(&self) -> [usize; N] {
+        let shape = self.center.grid.index.grid_info.shape;
+        let mut index = [0usize; N];
+        //TODO: this is really ugly...
+        self.center
+            .index()
+            .iter()
+            .zip(self.state.0.iter().map(|trit| *trit as isize))
+            .map(|(coord, relative)| relative.saturating_add_unsigned(*coord))
+            .zip(shape.iter())
+            .map(|(new_coord, dim)| wrap(new_coord, 0, *dim as isize - 1))
+            .zip(index.iter_mut())
+            .for_each(|(new_coord, coord)| *coord = new_coord as usize);
+
+        index
+    }
 }
 
 //TODO: sum type/bool for boundary conditions would evaluated during runtime (pro: could change behavior during runtime)
@@ -159,55 +212,17 @@ impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
                 self.state += BalancedTrit::Positive;
                 self.next()
             }
-            current_state => {
-                // `BalancedTernary` is `Copy` i.e. we can already increment `self.state` and use `current_state`
+            _ => {
+                let new_index = self.absolute_index();
+
                 self.state += BalancedTrit::Positive;
-                //TODO: waiting for stabilization of
-                //TODO: https://doc.rust-lang.org/std/primitive.array.html#method.try_map or
-                //TODO: https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.try_collect
-                //TODO: I'm working around this using mutable state and try_for_each (try_fold would be awkward in this case)
-                let mut new_index = [0usize; N];
 
-                // For convenience
-                let shape = self.center.grid.index.grid_info.shape;
-
-                //TODO: move this into a (private?) method: impl CellNeighbors
-                //TODO: Also there's probably a less convoluted way
-                //TODO: (essentially want custom saturating/wrapping add for  [usize; N])
-                //TODO: (or maybe rather som modulo arithmetic would be better?)
-                //TODO: see https://docs.rs/nalgebra/latest/nalgebra/fn.wrap.html
-                //TODO: and https://docs.rs/nalgebra/latest/nalgebra/fn.clamp.html
-                //TODO: and https://doc.rust-lang.org/std/cmp/trait.Ord.html#method.clamp
-                //TODO: --> should work for [usize; N] but try_clamp() on a wrapper type would be nicer...
-                //TODO: maybe follow the std source code and make this myself
-                //TODO: and https://docs.rs/num/latest/num/fn.clamp.html
                 new_index
-                    .iter_mut()
-                    .zip(self.center.index().iter())
-                    .zip(current_state.0.iter())
-                    .zip(shape.iter())
-                    .try_for_each(|(((i, c), s), sh)| {
-                        if let Some(new_i) = c.checked_add_signed(*s as isize) {
-                            if new_i < *sh {
-                                *i = new_i;
-                                Some(())
-                            } else {
-                                // upper grid bound violated, skip this cell
-                                //TODO: periodic boundaries: wrap around instead
-                                None
-                            }
-                        } else {
-                            // Lower grid bound violated, skip this cell
-                            //TODO: periodic boundaries: see above
-                            None
-                        }
-                    })
-                    .and_then(|()| self.center.grid.cells.get(&new_index).copied())
+                    .and_then(|idx| self.center.grid.cells.get(&idx).copied())
                     .map(|head| GridCell {
                         grid: self.center.grid,
                         head,
                     })
-                    .or_else(|| self.next())
             }
         }
     }
