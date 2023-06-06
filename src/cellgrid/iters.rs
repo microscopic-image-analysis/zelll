@@ -123,7 +123,7 @@ impl<const N: usize> CellGrid<N> {
             // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
             .map(move |&head| GridCell {
                 grid: self,
-                head: Some(head),
+                head: head,
             })
     }
 }
