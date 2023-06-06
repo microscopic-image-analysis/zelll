@@ -19,7 +19,7 @@ pub struct GridCell<'g, const N: usize> {
 
 impl<'g, const N: usize> GridCell<'g, N> {
     /// Return the (multi-)index of this (non-empty) `GridCell`.
-    pub(crate) fn index(&self) -> [usize; N] {
+    pub(crate) fn index(&self) -> [i32; N] {
         self.grid.index.index[self.head]
     }
 

@@ -17,10 +17,10 @@ pub use neighbors::*;
 #[cfg(feature = "rayon")]
 use rayon::prelude::ParallelIterator;
 pub use util::*;
-
+//TODO: crate-global type alias for [i32/isize; N] (or [usize; N] if I revert back)
 #[derive(Debug, Default)]
 pub struct CellGrid<const N: usize> {
-    cells: HashMap<[usize; N], usize>,
+    cells: HashMap<[i32; N], usize>,
     cell_lists: Vec<Option<usize>>,
     index: MultiIndex<N>,
 }
@@ -90,7 +90,7 @@ impl<const N: usize> CellGrid<N> {
         }
     }
 
-    pub fn shape(&self) -> &[usize; N] {
+    pub fn shape(&self) -> &[i32; N] {
         &self.index.grid_info.shape
     }
 

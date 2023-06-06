@@ -143,15 +143,17 @@ impl<'c, const N: usize> CellNeighbors<'c, N> {
     //TODO: we can always compute a new index (i.e. using periodic boundaries)
     //TODO: but would need to indicate if it was wrapped around the boundary
     //TODO: and decide later to omit this if we have aperiodic boundaries?
-    fn absolute_index(&self) -> Option<[usize; N]> {
+    fn absolute_index(&self) -> Option<[i32; N]> {
         let shape = self.center.grid.index.grid_info.shape;
-        let mut index = [0usize; N];
+        let mut index = [0; N];
         //TODO: this is really ugly...
+        //TODO: would like to use nalgebra::clamp() or PartialOrd::clamp()
+        //TODO: but I don't really clamp but check if it is in the clamping interval
         self.center
             .index()
             .iter()
-            .zip(self.state.0.iter().map(|trit| *trit as isize))
-            .map(|(coord, relative)| coord.checked_add_signed(relative))
+            .zip(self.state.0.iter())
+            .map(|(coord, relative)| coord + *relative as i32)
             .zip(shape.iter())
             .zip(index.iter_mut())
             //TODO: waiting for stabilization of
@@ -159,13 +161,9 @@ impl<'c, const N: usize> CellNeighbors<'c, N> {
             //TODO: https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.try_collect
             //TODO: I'm working around this using mutable state and try_for_each (try_fold would be awkward in this case)
             .try_for_each(|((coord, dim), new_coord)| {
-                if let Some(coord) = coord {
-                    if coord < *dim {
-                        *new_coord = coord;
-                        Some(())
-                    } else {
-                        None
-                    }
+                if coord < *dim && coord >= 0 {
+                    *new_coord = coord;
+                    Some(())
                 } else {
                     None
                 }
@@ -173,19 +171,19 @@ impl<'c, const N: usize> CellNeighbors<'c, N> {
             .map(|()| index)
     }
 
-    fn absolute_index_periodic(&self) -> [usize; N] {
+    fn absolute_index_periodic(&self) -> [i32; N] {
         let shape = self.center.grid.index.grid_info.shape;
-        let mut index = [0usize; N];
+        let mut index = [0; N];
         //TODO: this is really ugly...
         self.center
             .index()
             .iter()
-            .zip(self.state.0.iter().map(|trit| *trit as isize))
-            .map(|(coord, relative)| relative.saturating_add_unsigned(*coord))
+            .zip(self.state.0.iter())
+            .map(|(coord, relative)| coord + *relative as i32)
             .zip(shape.iter())
-            .map(|(new_coord, dim)| wrap(new_coord, 0, *dim as isize - 1))
+            .map(|(coord, dim)| wrap(coord, 0, *dim - 1))
             .zip(index.iter_mut())
-            .for_each(|(new_coord, coord)| *coord = new_coord as usize);
+            .for_each(|(coord, new_coord)| *new_coord = coord);
 
         index
     }

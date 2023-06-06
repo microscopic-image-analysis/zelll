@@ -8,7 +8,7 @@ use nalgebra::Point;
 #[derive(Debug, PartialEq, Default)]
 pub struct MultiIndex<const N: usize> {
     pub(crate) grid_info: GridInfo<N>,
-    pub(crate) index: Vec<[usize; N]>,
+    pub(crate) index: Vec<[i32; N]>,
 }
 
 impl<const N: usize> MultiIndex<N> {
@@ -18,7 +18,10 @@ impl<const N: usize> MultiIndex<N> {
             index: Vec::with_capacity(capacity),
         }
     }
-
+    //TODO: this is a candidate for SIMD AoSoA
+    //TODO: see https://www.rustsim.org/blog/2020/03/23/simd-aosoa-in-nalgebra/#using-simd-aosoa-for-linear-algebra-in-rust-ultraviolet-and-nalgebra
+    //TODO: or can I chunk iterators such that rustc auto-vectorizes?
+    //TODO: see https://www.nickwilcox.com/blog/autovec/
     pub fn from_points(points: &[Point<f64, N>], cutoff: f64) -> Self {
         let aabb = Aabb::from_points(points);
         let grid_info = GridInfo::new(aabb, cutoff);

@@ -31,7 +31,7 @@ pub struct GridInfo<const N: usize> {
     pub(crate) aabb: Aabb<N>,
     pub(crate) cutoff: f64,
     //TODO: probably should implement a method instead of using pub/pub(crate)
-    pub(crate) shape: [usize; N],
+    pub(crate) shape: [i32; N],
 }
 
 impl<const N: usize> GridInfo<N> {
@@ -41,7 +41,7 @@ impl<const N: usize> GridInfo<N> {
         // TODO: This is not very nice yet. We'll figure the precise types out later
         shape.copy_from_slice(
             ((aabb.sup - aabb.inf) / cutoff)
-                .map(|coord| coord.floor() as usize + 1)
+                .map(|coord| coord.floor() as i32 + 1)
                 .as_slice(),
         );
 
@@ -60,12 +60,12 @@ impl<const N: usize> GridInfo<N> {
     //TODO: GridInfo knows enough to do compute the cell index for an arbitrary point
     //TODO: but MultiIndex seems more fitting semantically?
     //TODO: sth. like Lattice trait maybe
-    pub fn cell_index(&self, point: &Point<f64, N>) -> [usize; N] {
+    pub fn cell_index(&self, point: &Point<f64, N>) -> [i32; N] {
         let mut idx = [0; N];
 
         idx.copy_from_slice(
             ((point - self.origin()) / self.cutoff)
-                .map(|coord| coord.floor() as usize)
+                .map(|coord| coord.floor() as i32)
                 .as_slice(),
         );
 
