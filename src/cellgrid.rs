@@ -26,7 +26,7 @@ pub struct CellGrid<const N: usize> {
 }
 
 impl<const N: usize> CellGrid<N> {
-    pub fn new(points: &[Point<f64, N>], cutoff: f64) -> Self {
+    pub fn new<'p>(points: impl Iterator<Item = &'p Point<f64, N>> + Clone, cutoff: f64) -> Self {
         CellGrid::default().rebuild(points, Some(cutoff))
     }
 
@@ -34,14 +34,18 @@ impl<const N: usize> CellGrid<N> {
     //TODO: If MultiIndex did change, we have to re-allocate (or re-initialize) almost everything anyway;
     //TODO: If MultiIndex did not change, we don't need to update.
     //TODO: Therefore we check for that and make CellGrid::new() just a wrapper around CellGrid::rebuild (with an initially empty MultiIndex)
-    pub fn rebuild(self, points: &[Point<f64, N>], cutoff: Option<f64>) -> Self {
+    pub fn rebuild<'p>(
+        self,
+        points: impl Iterator<Item = &'p Point<f64, N>> + Clone,
+        cutoff: Option<f64>,
+    ) -> Self {
         let cutoff = cutoff.unwrap_or(self.index.grid_info.cutoff);
         let index = MultiIndex::from_points(points, cutoff);
 
         if index == self.index {
             self
         } else {
-            let mut cells = HashMap::with_capacity(points.len());
+            let mut cells = HashMap::with_capacity(index.index.len());
 
             let cell_lists = index
                 .index
@@ -59,9 +63,13 @@ impl<const N: usize> CellGrid<N> {
     }
 
     #[must_use = "rebuild_mut() consumes `self` and returns the mutated `CellGrid`"]
-    pub fn rebuild_mut(mut self, points: &[Point<f64, N>], cutoff: Option<f64>) -> Self {
+    pub fn rebuild_mut<'p>(
+        mut self,
+        points: impl Iterator<Item = &'p Point<f64, N>> + Clone,
+        cutoff: Option<f64>,
+    ) -> Self {
         if self.index.rebuild_mut(points, cutoff) {
-            self.cell_lists.resize(points.len(), None);
+            self.cell_lists.resize(self.index.index.len(), None);
 
             self.cells.clear();
             // We're not `reserve()`ing or `shrink_to_fit()`ing here.
@@ -134,6 +142,19 @@ impl<const N: usize> CellGrid<N> {
         //TODO: seems to be related to flat_map()
         self.par_iter()
             .flat_map(|cell| cell.point_pairs().collect::<Vec<_>>())
+    }
+
+    #[cfg(feature = "rayon")]
+    #[must_use = "iterators are lazy and do nothing unless consumed"]
+    pub fn par_for_each_point_pair<F>(&self, mut f: F)
+    where
+        F: Fn(usize, usize) + Send + Sync,
+    {
+        self.par_iter().for_each(|cell| {
+            for (i, j) in cell.point_pairs() {
+                f(i, j);
+            }
+        });
     }
 }
 

@@ -22,12 +22,14 @@ impl<const N: usize> MultiIndex<N> {
     //TODO: see https://www.rustsim.org/blog/2020/03/23/simd-aosoa-in-nalgebra/#using-simd-aosoa-for-linear-algebra-in-rust-ultraviolet-and-nalgebra
     //TODO: or can I chunk iterators such that rustc auto-vectorizes?
     //TODO: see https://www.nickwilcox.com/blog/autovec/
-    pub fn from_points(points: &[Point<f64, N>], cutoff: f64) -> Self {
-        let aabb = Aabb::from_points(points);
+    pub fn from_points<'p>(
+        points: impl Iterator<Item = &'p Point<f64, N>> + Clone,
+        cutoff: f64,
+    ) -> Self {
+        let aabb = Aabb::from_points(points.clone());
         let grid_info = GridInfo::new(aabb, cutoff);
-
         let index = points
-            .iter()
+            .take(i32::MAX as usize)
             .map(|point| grid_info.cell_index(point))
             .collect();
 
@@ -35,21 +37,26 @@ impl<const N: usize> MultiIndex<N> {
     }
     // there is no rebuild(), named it rebuild_mut() to match CellGrid::rebuild_mut()
     //TODO: Documentation: return bool indicating whether the index changed at all (in length or any individual entry)
-    pub fn rebuild_mut(&mut self, points: &[Point<f64, N>], cutoff: Option<f64>) -> bool {
+    pub fn rebuild_mut<'p>(
+        &mut self,
+        points: impl Iterator<Item = &'p Point<f64, N>> + Clone,
+        cutoff: Option<f64>,
+    ) -> bool {
         let cutoff = cutoff.unwrap_or(self.grid_info.cutoff);
-        let aabb = Aabb::from_points(points);
+        let aabb = Aabb::from_points(points.clone());
         let grid_info = GridInfo::new(aabb, cutoff);
 
-        self.index.resize(points.len(), [0; N]);
+        //TODO:
+        self.index
+            .resize(points.clone().take(i32::MAX as usize).count(), [0; N]);
 
-        let new_index = points.iter().map(|point| grid_info.cell_index(point));
+        let new_index = points
+            .take(i32::MAX as usize)
+            .map(|point| grid_info.cell_index(point));
         self.grid_info = grid_info;
 
-        // Using `|` here because `||` is lazy and we always need to run the iterator
-        //TODO: currently the first condition is always false? We already resized self.index
-        let index_changed = (points.len() != self.index.len())
-            | self
-                .index
+        let index_changed =
+            self.index
                 .iter_mut()
                 .zip(new_index)
                 .fold(false, |has_changed, (old, new)| {
@@ -86,7 +93,7 @@ mod tests {
             }
         }
 
-        let index = MultiIndex::from_points(&points, 1.0);
+        let index = MultiIndex::from_points(points.iter(), 1.0);
 
         assert_eq!(index.index, idx, "testing MultiIndex::from_points()")
     }

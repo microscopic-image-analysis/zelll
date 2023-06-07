@@ -10,15 +10,18 @@ pub struct Aabb<const N: usize> {
 }
 
 impl<const N: usize> Aabb<N> {
-    pub fn from_points(points: &[Point<f64, N>]) -> Self {
-        let init = if points.is_empty() {
+    pub fn from_points<'p>(mut points: impl Iterator<Item = &'p Point<f64, N>>) -> Self {
+        /*let  init = if points.is_empty() {
             Point::<f64, N>::default()
         } else {
             points[0]
-        };
+        };*/
+
+        //let mut points = points.copied();
+        let init = points.next().copied().unwrap_or_default();
 
         let (inf, sup) = points
-            .iter()
+            .take(i32::MAX as usize) //TODO: this works but maybe explicit try_into() would be better?
             .fold((init, init), |(i, s), point| (i.inf(point), s.sup(point)));
 
         Self { inf, sup }
@@ -161,7 +164,7 @@ mod tests {
         let points = generate_points([3, 3, 3], 1.0, [0.2, 0.25, 0.3]);
         assert_eq!(points.len(), 28, "testing PointCloud.len()");
 
-        let aabb = Aabb::from_points(&points);
+        let aabb = Aabb::from_points(points.iter());
         assert_eq!(
             aabb,
             Aabb {
