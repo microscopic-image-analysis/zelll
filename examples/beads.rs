@@ -59,6 +59,32 @@ impl BeadRefMut<'_> {
     }
 }
 
+/// potentials are using global constants for now
+mod pairpotentials {
+    /// Lennard-Jones potential
+    #[inline]
+    pub fn lennard_jones(radius: f64) -> f64 {
+        12.0 * super::LJA / radius.powi(13) - 6.0 * super::LJB / radius.powi(7)
+    }
+
+    /// Lennard Jones, truncated and shifted
+    /// EPSILON, SIGMA are global constants currently
+    #[inline]
+    pub fn lennard_jones_ts(radius: f64, cutoff: f64) -> f64 {
+        if radius < cutoff {
+            lennard_jones(radius) - lennard_jones(cutoff)
+        } else {
+            0.0
+        }
+    }
+    /// Harmonic Oscillator with Bond Stretching
+    /// spring constant is a global constant currently
+    #[inline]
+    pub fn harmonic_oscillator(radius: f64, bond_length: f64) -> f64 {
+        super::KSPRING * (radius - bond_length)
+    }
+}
+
 fn main() {
     let mut window = Window::new_with_size("[zelll] beads-on-a-chain", 1920, 1080);
     window.set_light(Light::StickToCamera);
@@ -99,7 +125,7 @@ fn main() {
         for i in 0..NBEADS - 1 {
             let mut acc = beads.position[i + 1] - beads.position[i];
             let radius = acc.norm();
-            let magnitude = KSPRING * (radius - LINK_LENGTH);
+            let magnitude = pairpotentials::harmonic_oscillator(radius, LINK_LENGTH);
             acc.set_magnitude(magnitude);
             accelerations.alter(&i, |_, a| a + acc);
             accelerations.alter(&(i + 1), |_, a| a - acc);
@@ -111,8 +137,7 @@ fn main() {
             let radius = acc.norm();
 
             if radius <= CUTOFF {
-                //TODO: LJTS instead of LJ
-                let mut magnitude = 12.0 * LJA / radius.powi(13) - 6.0 * LJB / radius.powi(7);
+                let magnitude = pairpotentials::lennard_jones_ts(radius, CUTOFF);
 
                 acc.set_magnitude(magnitude);
                 accelerations.alter(&bead, |_, a| a + acc);
@@ -125,8 +150,7 @@ fn main() {
             let radius = acc.norm();
 
             if radius <= CUTOFF {
-                //TODO: LJTS instead of LJ
-                let magnitude = 12.0 * LJA / radius.powi(13) - 6.0 * LJB / radius.powi(7);
+                let magnitude = pairpotentials::lennard_jones_ts(radius, CUTOFF);
 
                 acc.set_magnitude(magnitude);
                 accelerations.alter(&bead, |_, a| a + acc);
