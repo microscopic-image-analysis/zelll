@@ -4,8 +4,6 @@ use kiss3d::camera::ArcBall;
 use kiss3d::light::Light;
 use kiss3d::window::Window;
 use nalgebra::{Point3, Vector3};
-#[cfg(feature = "rayon")]
-use rayon::prelude::ParallelIterator;
 use soa_derive::StructOfArray;
 use zelll::cellgrid::*;
 
@@ -88,17 +86,14 @@ fn main() {
     let mut cell_grid = CellGrid::new(beads.position.iter(), CUTOFF);
 
     while window.render_with_camera(&mut cam) {
-        //TODO use rayon to do velocity-verlet integration in parallel (1st & 2nd step)
-        //#[cfg(feature = "rayon")]
-        //TODO: unfortunately, soa_derive doesn't support rayon, I'd have to iterate the zipped individual arrays...
+        //TODO: unfortunately, soa_derive doesn't support rayon directly
         for (i, mut bead) in beads.iter_mut().enumerate() {
             if let Some(acceleration) = accelerations.insert(i, Vector3::new(0.0, 0.0, 0.0)) {
                 bead.update_velocity_halfstep(acceleration);
             }
             bead.update_position();
         }
-        //TODO: use for_each_point_pair_par() here
-        //TODO: in closure, write to DashMap
+
         //TODO: this is the 3rd verlet step
         // 3a. bonded interactions:
         for i in 0..NBEADS - 1 {
@@ -110,6 +105,7 @@ fn main() {
             accelerations.alter(&(i + 1), |_, a| a - acc);
         }
         // 3b. non-bonded interactions:
+        #[cfg(not(feature = "rayon"))]
         cell_grid.for_each_point_pair(|bead, other| {
             let mut acc = beads.position[other] - beads.position[bead];
             let radius = acc.norm();
@@ -117,6 +113,20 @@ fn main() {
             if radius <= CUTOFF {
                 //TODO: LJTS instead of LJ
                 let mut magnitude = 12.0 * LJA / radius.powi(13) - 6.0 * LJB / radius.powi(7);
+
+                acc.set_magnitude(magnitude);
+                accelerations.alter(&bead, |_, a| a + acc);
+                accelerations.alter(&other, |_, a| a - acc);
+            }
+        });
+        #[cfg(feature = "rayon")]
+        cell_grid.par_for_each_point_pair(|bead, other| {
+            let mut acc = beads.position[other] - beads.position[bead];
+            let radius = acc.norm();
+
+            if radius <= CUTOFF {
+                //TODO: LJTS instead of LJ
+                let magnitude = 12.0 * LJA / radius.powi(13) - 6.0 * LJB / radius.powi(7);
 
                 acc.set_magnitude(magnitude);
                 accelerations.alter(&bead, |_, a| a + acc);
