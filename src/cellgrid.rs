@@ -145,7 +145,6 @@ impl<const N: usize> CellGrid<N> {
     }
 
     #[cfg(feature = "rayon")]
-    #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn par_for_each_point_pair<F>(&self, mut f: F)
     where
         F: Fn(usize, usize) + Send + Sync,
