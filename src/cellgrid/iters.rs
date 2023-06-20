@@ -58,8 +58,11 @@ impl<'g, const N: usize> GridCell<'g, N> {
 
     /// Iterate over all unique pairs of points in this `GridCell` with points of the neighboring cells.
     fn inter_cell_pairs(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
-        self.iter()
-            .cartesian_product(self.neighbors().flat_map(|neighbor| neighbor.iter()))
+        self.iter().flat_map(move |i| {
+            self.neighbors()
+                .flat_map(|cell| cell.iter())
+                .map(move |j| (i, j))
+        })
     }
 
     /// Iterate over all "relevant" pairs of points within in the neighborhood of this `GridCell`.
