@@ -48,7 +48,7 @@ impl<'g, const N: usize> GridCell<'g, N> {
     //TODO: currently only half-space and aperiodic boundaries
     //TODO: handle half-/full-space  and (a-)periodic boundary conditions
     pub fn neighbors(&self) -> CellNeighbors<N> {
-        CellNeighbors::half_space(self)
+        CellNeighbors::half_space(&self)
     }
 
     /// Iterate over all unique pairs of points in this `GridCell`.
