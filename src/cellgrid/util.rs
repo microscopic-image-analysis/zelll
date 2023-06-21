@@ -35,6 +35,7 @@ pub struct GridInfo<const N: usize> {
     pub(crate) cutoff: f64,
     //TODO: probably should implement a method instead of using pub/pub(crate)
     pub(crate) shape: [i32; N],
+    pub(crate) strides: [i32; N],
 }
 
 impl<const N: usize> GridInfo<N> {
@@ -48,10 +49,18 @@ impl<const N: usize> GridInfo<N> {
                 .as_slice(),
         );
 
+        let mut strides = shape.clone();
+        strides.iter_mut().fold(1, |prev, curr| {
+            let next = prev * *curr;
+            *curr = prev;
+            next
+        });
+
         Self {
             aabb,
             cutoff,
             shape,
+            strides,
         }
     }
 
@@ -81,6 +90,18 @@ impl<const N: usize> GridInfo<N> {
 
         idx
     }
+
+    pub fn flat_cell_index(&self, point: &Point<f64, N>) -> i32 {
+        let idx = self.cell_index(point);
+        self.flatten_index(&idx)
+    }
+
+    pub fn flatten_index(&self, idx: &[i32; N]) -> i32 {
+        idx.iter()
+            .zip(self.strides)
+            .map(|(i, s)| *i * s)
+            .sum::<i32>()
+    }
 }
 
 impl<const N: usize> Default for GridInfo<N> {
@@ -95,7 +116,7 @@ impl<const N: usize> Default for GridInfo<N> {
 /// - the first at the origin of the cell (equivalent to the cell's multi-index + the origin of the grid)
 /// - the second at the center of the cell
 // We'll stay in 3D for simplicity here
-pub(crate) fn generate_points(shape: [usize; 3], cutoff: f64, origin: [f64; 3]) -> PointCloud<3> {
+pub fn generate_points(shape: [usize; 3], cutoff: f64, origin: [f64; 3]) -> PointCloud<3> {
     let mut points = Vec::with_capacity(((shape.iter().product::<usize>() + 1) / 2) * 2);
 
     for x in 0..shape[0] {
@@ -118,6 +139,17 @@ pub(crate) fn generate_points(shape: [usize; 3], cutoff: f64, origin: [f64; 3]) 
     }
 
     points
+}
+
+/// Generate a uniformly random 3D point cloud of size `n` in a cube of edge lengths `len` centered around `origin`.
+pub fn generate_points_random(n: usize, len: f64, origin: [f64; 3]) -> PointCloud<3> {
+    std::iter::repeat_with(|| {
+        Point3::<f64>::from(
+            Vector3::new_random() - Vector3::new(0.5, 0.5, 0.5) + Vector3::from(origin),
+        ) * len
+    })
+    .take(n)
+    .collect()
 }
 
 #[cfg(test)]
@@ -181,6 +213,7 @@ mod tests {
             "testing GridInfo.origin()"
         );
         assert_eq!(grid_info.shape, [3, 3, 3], "testing GridInfo.shape");
+        assert_eq!(grid_info.strides, [1, 3, 9], "testing GridInfo.strides");
 
         // Intuitively you'd expect [2, 2, 2] for this
         // but we're having floating point imprecision:
@@ -192,9 +225,19 @@ mod tests {
             "testing GrindInfo.cell_index()"
         );
         assert_eq!(
+            grid_info.flat_cell_index(&Point::from([2.7, 2.75, 2.3])),
+            17,
+            "testing GrindInfo.flat_cell_index()"
+        );
+        assert_eq!(
             grid_info.cell_index(&Point::from([2.7, 2.75, 2.8])),
             [2, 2, 2],
             "testing GrindInfo.cell_index()"
+        );
+        assert_eq!(
+            grid_info.flat_cell_index(&Point::from([2.7, 2.75, 2.8])),
+            26,
+            "testing GrindInfo.flat_cell_index()"
         );
     }
 }
