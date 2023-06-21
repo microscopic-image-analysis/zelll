@@ -11,13 +11,6 @@ pub struct Aabb<const N: usize> {
 
 impl<const N: usize> Aabb<N> {
     pub fn from_points<'p>(mut points: impl Iterator<Item = &'p Point<f64, N>>) -> Self {
-        /*let  init = if points.is_empty() {
-            Point::<f64, N>::default()
-        } else {
-            points[0]
-        };*/
-
-        //let mut points = points.copied();
         let init = points.next().copied().unwrap_or_default();
 
         let (inf, sup) = points
