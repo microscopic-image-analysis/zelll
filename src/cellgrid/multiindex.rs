@@ -5,7 +5,7 @@
 use crate::cellgrid::util::*;
 use nalgebra::Point;
 
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, PartialEq, Default, Clone)]
 pub struct MultiIndex<const N: usize> {
     pub(crate) grid_info: GridInfo<N>,
     pub(crate) index: Vec<[i32; N]>,

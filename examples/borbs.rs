@@ -149,7 +149,7 @@ fn main() {
             window.draw_line(&a.cast::<f32>(), &b.cast::<f32>(), &red);
         }
 
-        cell_grid = cell_grid.rebuild_mut(borbs.position.iter(), None);
+        cell_grid.rebuild_mut(borbs.position.iter(), None);
 
         cohesion.fill_with(Default::default);
         separation.fill_with(Default::default);

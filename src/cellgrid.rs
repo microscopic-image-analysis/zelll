@@ -18,7 +18,7 @@ pub use neighbors::*;
 use rayon::prelude::ParallelIterator;
 pub use util::*;
 //TODO: crate-global type alias for [i32/isize; N] (or [usize; N] if I revert back)
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct CellGrid<const N: usize> {
     cells: HashMap<[i32; N], usize>,
     cell_lists: Vec<Option<usize>>,
@@ -34,6 +34,7 @@ impl<const N: usize> CellGrid<N> {
     //TODO: If MultiIndex did change, we have to re-allocate (or re-initialize) almost everything anyway;
     //TODO: If MultiIndex did not change, we don't need to update.
     //TODO: Therefore we check for that and make CellGrid::new() just a wrapper around CellGrid::rebuild (with an initially empty MultiIndex)
+    #[must_use = "rebuild() consumes `self` and returns the rebuilt `CellGrid`"]
     pub fn rebuild<'p>(
         self,
         points: impl Iterator<Item = &'p Point<f64, N>> + Clone,
@@ -62,12 +63,11 @@ impl<const N: usize> CellGrid<N> {
         }
     }
 
-    #[must_use = "rebuild_mut() consumes `self` and returns the mutated `CellGrid`"]
     pub fn rebuild_mut<'p>(
-        mut self,
+        &mut self,
         points: impl Iterator<Item = &'p Point<f64, N>> + Clone,
         cutoff: Option<f64>,
-    ) -> Self {
+    ) {
         if self.index.rebuild_mut(points, cutoff) {
             self.cell_lists.resize(self.index.index.len(), None);
 
@@ -76,25 +76,9 @@ impl<const N: usize> CellGrid<N> {
             // HashMap should be sufficiently smart about reallocating in chunks.
             // Also this does not happen that often.
 
-            // move out of `self`
-            let index = self.index;
-            let mut cell_lists = self.cell_lists;
-            let mut cells = self.cells;
-
-            index.index.iter().enumerate().for_each(|(i, cell)| {
-                // see https://docs.rs/hashbrown/latest/hashbrown/struct.HashMap.html#method.insert
-                // HashMap::insert() returns the old value or None, therefore we don't have to clear
-                // cell_lists before refilling as long as cells is cleared.
-                cell_lists[i] = cells.insert(*cell, i); //TODO: cachegrind attributes 6.28% of D1mw misses to this line
-            });
-
-            Self {
-                cells,
-                cell_lists,
-                index,
+            for (i, cell) in self.index.index.iter().enumerate() {
+                self.cell_lists[i] = self.cells.insert(*cell, i); //TODO: cachegrind attributes 6.28% of D1mw misses to this line
             }
-        } else {
-            self
         }
     }
 
