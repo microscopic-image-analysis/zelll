@@ -215,13 +215,4 @@ impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
 
 impl<const N: usize> FusedIterator for CellNeighbors<'_, N> {}
 
-#[cfg(test)]
-mod tests {
-    //use super::*;
-
-    #[test]
-    fn test_neighbors() {
-        todo!();
-    }
-}
 

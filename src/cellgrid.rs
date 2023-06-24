@@ -141,13 +141,3 @@ impl<const N: usize> CellGrid<N> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    //use super::*;
-
-    #[test]
-    fn test_cellgrid() {
-        todo!()
-    }
-}
-

@@ -107,9 +107,10 @@ impl<const N: usize> CellGrid<N> {
     //TODO: this example should still work but it's nonsensical
     /// ```
     /// # use zelll::cellgrid::CellGrid;
-    /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
-    /// # let cell_grid = CellGrid::new(&points, 1.0);
-    /// cell_grid.iter().filter(|cell| !cell.is_empty());
+    /// # use nalgebra::Point;
+    /// # let points = [Point::from([0.0, 0.0, 0.0]), Point::from([1.0,2.0,0.0]), Point::from([0.0, 0.1, 0.2])];
+    /// # let cell_grid = CellGrid::new(points.iter(), 1.0);
+    /// cell_grid.iter().filter(|cell| !cell.on_boundary());
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn iter(&self) -> impl Iterator<Item = GridCell<N>> {
