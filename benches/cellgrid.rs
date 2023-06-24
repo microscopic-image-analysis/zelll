@@ -12,7 +12,34 @@ pub fn bench_cellgrid_random(c: &mut Criterion) {
         .sampling_mode(SamplingMode::Flat)
         .plot_config(plot_config.clone());
 
-    for size in (0..=6).map(|exp| 10usize.pow(exp)) {
+    group.bench_with_input(
+            BenchmarkId::new("Gonnet2007", 1000),
+            &1000,
+            |b, size| {
+                let pointcloud = generate_points_random(*size, 3.166, [0.0, 0.0, 0.0]);
+                                   let cg = CellGrid::new(pointcloud.iter(), 1.0);
+                b.iter(|| {
+                    cg.for_each_point_pair(|_, _| {
+                    });
+                })
+            },
+        );
+
+    #[cfg(feature = "rayon")]
+    group.bench_with_input(
+            BenchmarkId::new("Gonnet2007_par", 1000),
+            &1000,
+            |b, size| {
+                let pointcloud = generate_points_random(*size, 3.166, [0.0, 0.0, 0.0]);
+                                   let cg = CellGrid::new(pointcloud.iter(), 1.0);
+                b.iter(|| {
+                    cg.par_for_each_point_pair(|_, _| {
+                    });
+                })
+            },
+        );
+
+    for size in (0..=5).map(|exp| 10usize.pow(exp)) {
         let pointcloud = generate_points_random(size, 100.0, [0.0, 0.0, 0.0]);
 
         group.bench_with_input(
@@ -20,7 +47,7 @@ pub fn bench_cellgrid_random(c: &mut Criterion) {
             &pointcloud,
             |b, pointcloud| {
                 b.iter(|| {
-                    CellGrid::new(pointcloud.iter(), 1.0);
+                    CellGrid::new(pointcloud.iter(), 10.0);
                 })
             },
         );
@@ -30,9 +57,9 @@ pub fn bench_cellgrid_random(c: &mut Criterion) {
     //TODO: compare iteration against Itertools::tuple_combinations() (as naive N^2 version)
     //TODO: Also: count interactions, benchmark other iteration variants
     //TODO: also: benchmark with constant density instead of constant volume
-    for size in (0..=6).map(|exp| 10usize.pow(exp)) {
+    for size in (0..=5).map(|exp| 10usize.pow(exp)) {
         let pointcloud = generate_points_random(size, 100.0, [0.0, 0.0, 0.0]);
-        let cg = CellGrid::new(pointcloud.iter(), 1.0);
+        let cg = CellGrid::new(pointcloud.iter(), 10.0);
 
         group.bench_with_input(
             BenchmarkId::new("::for_each_point_pair()", size),
@@ -66,6 +93,7 @@ pub fn bench_cellgrid_random(c: &mut Criterion) {
             })
         });
     }
+
     group.finish();
 }
 
