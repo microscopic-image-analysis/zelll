@@ -63,6 +63,11 @@ impl<'g, const N: usize> GridCell<'g, N> {
                 .flat_map(|cell| cell.iter())
                 .map(move |j| (i, j))
         })
+        //TODO: might actually revert to this
+        /*self.iter().cartesian_product(
+            self.neighbors()
+                .flat_map(|cell| cell.iter())
+        )*/
     }
 
     /// Iterate over all "relevant" pairs of points within in the neighborhood of this `GridCell`.
