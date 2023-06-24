@@ -143,38 +143,22 @@ impl<'c, const N: usize> CellNeighbors<'c, N> {
     //TODO: we can always compute a new index (i.e. using periodic boundaries)
     //TODO: but would need to indicate if it was wrapped around the boundary
     //TODO: and decide later to omit this if we have aperiodic boundaries?
-    fn absolute_index(&self) -> Option<[i32; N]> {
-        let shape = self.center.grid.index.grid_info.shape;
+    fn absolute_index(&self) -> [i32; N] {
         let mut index = [0; N];
-        //TODO: this is really ugly...
-        //TODO: would like to use nalgebra::clamp() or PartialOrd::clamp()
-        //TODO: but I don't really clamp but check if it is in the clamping interval
         self.center
             .index()
             .iter()
             .zip(self.state.0.iter())
             .map(|(coord, relative)| coord + *relative as i32)
-            .zip(shape.iter())
             .zip(index.iter_mut())
-            //TODO: waiting for stabilization of
-            //TODO: https://doc.rust-lang.org/std/primitive.array.html#method.try_map or
-            //TODO: https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.try_collect
-            //TODO: I'm working around this using mutable state and try_for_each (try_fold would be awkward in this case)
-            .try_for_each(|((coord, dim), new_coord)| {
-                if coord < *dim && coord >= 0 {
-                    *new_coord = coord;
-                    Some(())
-                } else {
-                    None
-                }
-            })
-            .map(|()| index)
+            .for_each(|(coord, new_coord)| *new_coord = coord);
+        index
     }
 
     fn absolute_index_periodic(&self) -> [i32; N] {
         let shape = self.center.grid.index.grid_info.shape;
         let mut index = [0; N];
-        //TODO: this is really ugly...
+        //TODO: this is still a bit ugly...
         self.center
             .index()
             .iter()
@@ -215,9 +199,11 @@ impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
 
                 self.state += BalancedTrit::Positive;
 
-                new_index
-                    .and_then(|idx| self.center.grid.cells.get(&idx).copied())
-                    .map(|head| GridCell {
+                self.center
+                    .grid
+                    .cells
+                    .get(&new_index)
+                    .map(|&head| GridCell {
                         grid: self.center.grid,
                         head,
                     })
