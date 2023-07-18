@@ -18,7 +18,7 @@
 // Balanced ternary numbers are probably not more performant anyway. It's just a bit convoluted and arguably more fun.
 //TODO: would be nice to have a minimal example of these approaches to have a look at on godbolt.org
 
-use super::GridCell;
+use super::{GridCell, GridInfo};
 use core::iter::FusedIterator;
 use core::ops::{Add, AddAssign};
 use nalgebra::wrap;
@@ -57,6 +57,11 @@ impl<const N: usize> BalancedTernary<N> {
 
     pub const fn trit_len(&self) -> usize {
         self.0.len()
+    }
+
+    //TODO: document that gridinfo contains strides
+    pub fn flatten_with_info(&self, info: &GridInfo<N>) -> i32 {
+        info.flatten_index(self.0.map(|trit| trit as i32))
     }
 }
 
@@ -117,9 +122,55 @@ impl<const N: usize> Add<BalancedTrit> for BalancedTernary<N> {
 
 #[derive(Debug, Clone, Copy)]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
+pub struct RelativeNeighborIndices<const N: usize> {
+    state: BalancedTernary<N>,
+}
+
+// This is probably the only slightly relevant advantage of using balanced ternary numbers;
+// The distinction between half and full space is simply given by the initial state of the iterator
+impl<const N: usize> RelativeNeighborIndices<N> {
+    pub(crate) fn half_space() -> Self {
+        Self {
+            state: BalancedTernary::default(),
+        }
+    }
+
+    pub(crate) fn full_space() -> Self {
+        Self {
+            state: BalancedTernary::MIN,
+        }
+    }
+}
+
+impl<const N: usize> Iterator for RelativeNeighborIndices<N> {
+    type Item = [i32; N];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.state {
+            // Iterator stops if the current state is already the last (which is always BalancedTernary::MAX)
+            max if max == BalancedTernary::MAX => None,
+            // Skip the center cell
+            zero if zero == BalancedTernary::ZERO => {
+                self.state += BalancedTrit::Positive;
+                self.next()
+            }
+            _ => {
+                let new_index = self.state.0.map(|trit| trit as i32);
+                self.state += BalancedTrit::Positive;
+                Some(new_index)
+            }
+        }
+    }
+}
+
+impl<const N: usize> FusedIterator for RelativeNeighborIndices<N> {}
+
+#[derive(Debug, Clone, Copy)]
+#[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct CellNeighbors<'c, const N: usize> {
     center: &'c GridCell<'c, N>,
-    state: BalancedTernary<N>,
+    //state: BalancedTernary<N>,
+    state: usize,
 }
 
 // This is probably the only slightly relevant advantage of using balanced ternary numbers;
@@ -128,14 +179,16 @@ impl<'c, const N: usize> CellNeighbors<'c, N> {
     pub(crate) fn half_space(center: &'c GridCell<'c, N>) -> Self {
         Self {
             center,
-            state: BalancedTernary::default(),
+            //state: BalancedTernary::default(),
+            state: 0,
         }
     }
 
     pub(crate) fn full_space(center: &'c GridCell<'c, N>) -> Self {
         Self {
             center,
-            state: BalancedTernary::MIN,
+            //state: BalancedTernary::MIN,
+            state: 0,
         }
     }
 
@@ -143,8 +196,8 @@ impl<'c, const N: usize> CellNeighbors<'c, N> {
     //TODO: we can always compute a new index (i.e. using periodic boundaries)
     //TODO: but would need to indicate if it was wrapped around the boundary
     //TODO: and decide later to omit this if we have aperiodic boundaries?
-    fn absolute_index(&self) -> [i32; N] {
-        let mut index = [0; N];
+    fn absolute_index(&self) -> i32 {
+        /*let mut index = [0; N];
         self.center
             .index()
             .iter()
@@ -152,10 +205,26 @@ impl<'c, const N: usize> CellNeighbors<'c, N> {
             .map(|(coord, relative)| coord + *relative as i32)
             .zip(index.iter_mut())
             .for_each(|(coord, new_coord)| *new_coord = coord);
-        index
+        index*/
+        /*let rel_idx = self
+            .state
+            .flatten_with_info(&self.center.grid.index.grid_info);
+        self.center.index() + rel_idx*/
+        //self.center.index() + self.center.grid.index.neighbor_indices[self.state]
+        //TODO: re-check whether this is sound and makes a difference
+        self.center.index()
+            + unsafe {
+                *self
+                    .center
+                    .grid
+                    .index
+                    .neighbor_indices
+                    .get_unchecked(self.state)
+            }
     }
 
-    fn absolute_index_periodic(&self) -> [i32; N] {
+    //TODO: This is probably a bit tricky with flat indices (+ the strides+1 hack?)
+    /*fn absolute_index_periodic(&self) -> [i32; N] {
         let shape = self.center.grid.index.grid_info.shape;
         let mut index = [0; N];
         //TODO: this is still a bit ugly...
@@ -170,7 +239,7 @@ impl<'c, const N: usize> CellNeighbors<'c, N> {
             .for_each(|(coord, new_coord)| *new_coord = coord);
 
         index
-    }
+    }*/
 }
 
 //TODO: sum type/bool for boundary conditions would evaluated during runtime (pro: could change behavior during runtime)
@@ -186,7 +255,7 @@ impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
         //TODO: I'm sure the call stack won't mind too much.
         // See https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#matching-named-variables
         // and https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#extra-conditionals-with-match-guards
-        match self.state {
+        /*match self.state {
             // Iterator stops if the current state is already the last (which is always BalancedTernary::MAX)
             max if max == BalancedTernary::MAX => None,
             // Skip the center cell
@@ -209,10 +278,24 @@ impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
                     })
                     .or_else(|| self.next())
             }
+        }*/
+        if self.state < self.center.grid.index.neighbor_indices.len() {
+            let new_index = self.absolute_index();
+            self.state += 1;
+            self.center
+                .grid
+                .cells
+                .get(&new_index)
+                .map(|&head| GridCell {
+                    grid: self.center.grid,
+                    head,
+                })
+                .or_else(|| self.next())
+        } else {
+            None
         }
     }
 }
 
 impl<const N: usize> FusedIterator for CellNeighbors<'_, N> {}
-
 

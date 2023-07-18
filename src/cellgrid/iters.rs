@@ -19,8 +19,10 @@ pub struct GridCell<'g, const N: usize> {
 
 impl<'g, const N: usize> GridCell<'g, N> {
     /// Return the (multi-)index of this (non-empty) `GridCell`.
-    pub(crate) fn index(&self) -> [i32; N] {
-        self.grid.index.index[self.head]
+    pub(crate) fn index(&self) -> i32 {
+        //self.grid.index.index[self.head]
+        //TODO: re-check whether this is sound and makes a difference
+        unsafe { *self.grid.index.index.get_unchecked(self.head) }
     }
 
     pub fn iter(&self) -> GridCellIterator<'g, N> {
@@ -29,7 +31,7 @@ impl<'g, const N: usize> GridCell<'g, N> {
             state: Some(self.head),
         }
     }
-
+    /*
     /// Check whether this `GridCell` is on the boundary of the [`CellGrid`].
     //TODO: I don't think I need it but let's keep it anyway
     pub fn on_boundary(&self) -> bool {
@@ -42,13 +44,13 @@ impl<'g, const N: usize> GridCell<'g, N> {
             }
         }
         false
-    }
+    }*/
 
     /// Return [`CellNeighbors`], an iterator over all (currently half-space) non-empty neighboring cells.
     //TODO: currently only half-space and aperiodic boundaries
     //TODO: handle half-/full-space  and (a-)periodic boundary conditions
     pub fn neighbors(&self) -> CellNeighbors<N> {
-        CellNeighbors::half_space(&self)
+        CellNeighbors::half_space(self)
     }
 
     /// Iterate over all unique pairs of points in this `GridCell`.
@@ -58,16 +60,16 @@ impl<'g, const N: usize> GridCell<'g, N> {
 
     /// Iterate over all unique pairs of points in this `GridCell` with points of the neighboring cells.
     fn inter_cell_pairs(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
-        self.iter().flat_map(move |i| {
+        /*self.iter().flat_map(move |i| {
             self.neighbors()
                 .flat_map(|cell| cell.iter())
                 .map(move |j| (i, j))
-        })
+        })*/
         //TODO: might actually revert to this
-        /*self.iter().cartesian_product(
-            self.neighbors()
-                .flat_map(|cell| cell.iter())
-        )*/
+        //self.iter()
+        //    .cartesian_product(self.neighbors().flat_map(|cell| cell.iter()))
+        let others: Vec<_> = self.neighbors().flat_map(|cell| cell.iter()).collect();
+        self.iter().cartesian_product(others)
     }
 
     /// Iterate over all "relevant" pairs of points within in the neighborhood of this `GridCell`.
@@ -90,7 +92,9 @@ impl<const N: usize> Iterator for GridCellIterator<'_, N> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.state.map(|index| {
-            self.state = self.grid.cell_lists[index]; //TODO: cachegrind attributes 11.71% of D1mr misses to this line
+            //assert!(index < self.grid.cell_lists.len());
+            //self.state = self.grid.cell_lists[index]; //TODO: cachegrind attributes 11.71% of D1mr misses to this line
+            self.state = unsafe { *self.grid.cell_lists.get_unchecked(index) };
             index
         })
     }
@@ -110,7 +114,7 @@ impl<const N: usize> CellGrid<N> {
     /// # use nalgebra::Point;
     /// # let points = [Point::from([0.0, 0.0, 0.0]), Point::from([1.0,2.0,0.0]), Point::from([0.0, 0.1, 0.2])];
     /// # let cell_grid = CellGrid::new(points.iter(), 1.0);
-    /// cell_grid.iter().filter(|cell| !cell.on_boundary());
+    /// cell_grid.iter().flat_map(|cell| cell.iter()).count();
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn iter(&self) -> impl Iterator<Item = GridCell<N>> {
@@ -119,11 +123,7 @@ impl<const N: usize> CellGrid<N> {
             // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
             .map(move |&head| GridCell { grid: self, head })
     }
-    //TODO: parallel iteration is broken, now that we use std::collections::HashMap instead of ndarray::ArrayD...
-    //TODO: However, if we instead switch to the crate hashbrown, we can still have that
-    //TODO: (also gives us AHash with potentially better performance than SipHash?)
-    //TODO: hashbrown does seem to spend less time hashing (using AHash) (although no noticably performance difference overall?)
-    //TODO: but increases cache misses slightly (1.1% vs 0.6% on average)... (still less than using ArrayD (1.7%))
+
     #[cfg(feature = "rayon")]
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<N>> {

@@ -2,13 +2,15 @@
 //TODO: maybe MultiIndex should know about a point cloud (i.e. store a reference?)
 //TODO: Also: currently assuming that the order of points in point cloud does not change
 //TODO: i.e. index in multiindex corresponds to index in point cloud
+use crate::cellgrid::neighbors::RelativeNeighborIndices;
 use crate::cellgrid::util::*;
 use nalgebra::Point;
 
 #[derive(Debug, PartialEq, Default, Clone)]
 pub struct MultiIndex<const N: usize> {
     pub(crate) grid_info: GridInfo<N>,
-    pub(crate) index: Vec<[i32; N]>,
+    pub(crate) index: Vec<i32>,
+    pub(crate) neighbor_indices: Vec<i32>,
 }
 
 impl<const N: usize> MultiIndex<N> {
@@ -16,6 +18,9 @@ impl<const N: usize> MultiIndex<N> {
         Self {
             grid_info: info,
             index: Vec::with_capacity(capacity),
+            neighbor_indices: RelativeNeighborIndices::half_space()
+                .map(|idx| info.flatten_index(idx))
+                .collect(),
         }
     }
     //TODO: this is a candidate for SIMD AoSoA
@@ -30,10 +35,16 @@ impl<const N: usize> MultiIndex<N> {
         let grid_info = GridInfo::new(aabb, cutoff);
         let index = points
             .take(i32::MAX as usize)
-            .map(|point| grid_info.cell_index(point))
+            .map(|point| grid_info.flat_cell_index(point))
             .collect();
 
-        Self { grid_info, index }
+        Self {
+            grid_info,
+            index,
+            neighbor_indices: RelativeNeighborIndices::half_space()
+                .map(|idx| grid_info.flatten_index(idx))
+                .collect(),
+        }
     }
     // there is no rebuild(), named it rebuild_mut() to match CellGrid::rebuild_mut()
     //TODO: Documentation: return bool indicating whether the index changed at all (in length or any individual entry)
@@ -48,12 +59,16 @@ impl<const N: usize> MultiIndex<N> {
 
         //TODO:
         self.index
-            .resize(points.clone().take(i32::MAX as usize).count(), [0; N]);
+            .resize(points.clone().take(i32::MAX as usize).count(), 0);
 
         let new_index = points
             .take(i32::MAX as usize)
-            .map(|point| grid_info.cell_index(point));
+            .map(|point| grid_info.flat_cell_index(point));
         self.grid_info = grid_info;
+
+        self.neighbor_indices = RelativeNeighborIndices::half_space()
+            .map(|idx| grid_info.flatten_index(idx))
+            .collect();
 
         let index_changed =
             self.index
@@ -79,21 +94,19 @@ mod tests {
     fn test_multiindex() {
         // using 0-origin for simplicity and to avoid floating point errors
         let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
-
+        let index = MultiIndex::from_points(points.iter(), 1.0);
         let mut idx = Vec::with_capacity(points.len());
 
         for x in 0..3 {
             for y in 0..3 {
                 for z in 0..3 {
                     if (x + y + z) % 2 == 0 {
-                        idx.push([x, y, z]);
-                        idx.push([x, y, z]);
+                        idx.push(index.grid_info.flatten_index([x, y, z]));
+                        idx.push(index.grid_info.flatten_index([x, y, z]));
                     }
                 }
             }
         }
-
-        let index = MultiIndex::from_points(points.iter(), 1.0);
 
         assert_eq!(index.index, idx, "testing MultiIndex::from_points()")
     }

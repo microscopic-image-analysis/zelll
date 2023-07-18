@@ -20,7 +20,7 @@ pub use util::*;
 //TODO: crate-global type alias for [i32/isize; N] (or [usize; N] if I revert back)
 #[derive(Debug, Default, Clone)]
 pub struct CellGrid<const N: usize> {
-    cells: HashMap<[i32; N], usize>,
+    cells: HashMap<i32, usize>,
     cell_lists: Vec<Option<usize>>,
     index: MultiIndex<N>,
 }
@@ -112,14 +112,40 @@ impl<const N: usize> CellGrid<N> {
     where
         F: FnMut(usize, usize),
     {
-        for cell in self.iter() {
+        /*for cell in self.iter() {
             for (i, j) in cell.point_pairs() {
                 f(i, j);
             }
-        }
+        }*/
+        self.iter().for_each(|cell| {
+            cell.point_pairs().for_each(|(i, j)| {
+                f(i, j);
+            })
+        });
     }
 
-    #[cfg(feature = "rayon")]
+    pub fn filter_point_pairs<F, P>(&self, mut f: F, p: P)
+    where
+        F: FnMut(usize, usize),
+        P: Fn(usize, usize) -> bool,
+    {
+        /*for cell in self.iter() {
+            for (i, j) in cell.point_pairs().filter(|(i, j)| p(*i, *j)) {
+                f(i, j);
+            }
+        }*/
+        self.iter().for_each(|cell| {
+            cell.point_pairs()
+                .filter(|(i, j)| p(*i, *j))
+                .for_each(|(i, j)| {
+                    f(i, j);
+                })
+        });
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<const N: usize> CellGrid<N> {
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn par_point_pairs(&self) -> impl ParallelIterator<Item = (usize, usize)> + '_ {
         //TODO: Find a way to handle cell lifetimes instead of collecting into a Vec?
@@ -128,15 +154,31 @@ impl<const N: usize> CellGrid<N> {
             .flat_map(|cell| cell.point_pairs().collect::<Vec<_>>())
     }
 
-    #[cfg(feature = "rayon")]
-    pub fn par_for_each_point_pair<F>(&self, mut f: F)
+    pub fn par_for_each_point_pair<F>(&self, f: F)
     where
         F: Fn(usize, usize) + Send + Sync,
     {
         self.par_iter().for_each(|cell| {
-            for (i, j) in cell.point_pairs() {
+            /*for (i, j) in cell.point_pairs() {
                 f(i, j);
-            }
+            }*/
+            cell.point_pairs().for_each(|(i, j)| {
+                f(i, j);
+            })
+        });
+    }
+
+    pub fn par_filter_point_pairs<F, P>(&self, f: F, p: P)
+    where
+        F: Fn(usize, usize) + Send + Sync,
+        P: Fn(usize, usize) -> bool + Send + Sync,
+    {
+        self.par_iter().for_each(|cell| {
+            cell.point_pairs()
+                .filter(|(i, j)| p(*i, *j))
+                .for_each(|(i, j)| {
+                    f(i, j);
+                })
         });
     }
 }

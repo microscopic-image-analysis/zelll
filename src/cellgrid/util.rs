@@ -42,9 +42,17 @@ impl<const N: usize> GridInfo<N> {
                 .as_slice(),
         );
 
-        let mut strides = shape.clone();
+        let mut strides = shape;
         strides.iter_mut().fold(1, |prev, curr| {
-            let next = prev * *curr;
+            //TODO: simulating larger shape to increase strides; this allows for relative negative indices,
+            //TODO: at least those represented by BalancedTernary<N>
+            //TODO: could also simply increase the shape, maybe that's less confusing
+            //TODO: and it doesn't affect memory since we're using a hash map anyway
+            //TODO: the better approach would be:
+            //TODO: padded shape (i.e. (2,3,4) -> (4,5,6))
+            //TODO: compute strides from padded shape
+            //TODO: compute cell index (MultiIndex) 1-based instead of 0-based, i.e. lower left corner is [1; N] instead of [0; N]
+            let next = prev * (*curr + 1);
             *curr = prev;
             next
         });
@@ -85,11 +93,11 @@ impl<const N: usize> GridInfo<N> {
     }
 
     pub fn flat_cell_index(&self, point: &Point<f64, N>) -> i32 {
-        let idx = self.cell_index(point);
-        self.flatten_index(&idx)
+        self.flatten_index(self.cell_index(point))
     }
 
-    pub fn flatten_index(&self, idx: &[i32; N]) -> i32 {
+    pub fn flatten_index(&self, idx: [i32; N]) -> i32 {
+        //TODO: benchmark if nalgebra dot product might be faster (due to SIMD)
         idx.iter()
             .zip(self.strides)
             .map(|(i, s)| *i * s)
@@ -135,11 +143,12 @@ pub fn generate_points(shape: [usize; 3], cutoff: f64, origin: [f64; 3]) -> Poin
 }
 
 /// Generate a uniformly random 3D point cloud of size `n` in a cube of edge lengths `len` centered around `origin`.
-pub fn generate_points_random(n: usize, len: f64, origin: [f64; 3]) -> PointCloud<3> {
+pub fn generate_points_random(n: usize, vol: [f64; 3], origin: [f64; 3]) -> PointCloud<3> {
     std::iter::repeat_with(|| {
         Point3::<f64>::from(
-            Vector3::new_random() - Vector3::new(0.5, 0.5, 0.5) + Vector3::from(origin),
-        ) * len
+            (Vector3::new_random() - Vector3::new(0.5, 0.5, 0.5) + Vector3::from(origin))
+                .component_mul(&Vector3::from(vol)),
+        )
     })
     .take(n)
     .collect()
@@ -206,7 +215,9 @@ mod tests {
             "testing GridInfo.origin()"
         );
         assert_eq!(grid_info.shape, [3, 3, 3], "testing GridInfo.shape");
-        assert_eq!(grid_info.strides, [1, 3, 9], "testing GridInfo.strides");
+        //TODO: note that these are the strides for grid_info.shape + [1, 1, 1]
+        //TODO: this allows us to use negative relative indices representable by BalancedTernary<N>
+        assert_eq!(grid_info.strides, [1, 4, 16], "testing GridInfo.strides");
 
         // Intuitively you'd expect [2, 2, 2] for this
         // but we're having floating point imprecision:
@@ -219,7 +230,7 @@ mod tests {
         );
         assert_eq!(
             grid_info.flat_cell_index(&Point::from([2.7, 2.75, 2.3])),
-            17,
+            26,
             "testing GrindInfo.flat_cell_index()"
         );
         assert_eq!(
@@ -229,7 +240,7 @@ mod tests {
         );
         assert_eq!(
             grid_info.flat_cell_index(&Point::from([2.7, 2.75, 2.8])),
-            26,
+            42,
             "testing GrindInfo.flat_cell_index()"
         );
     }
