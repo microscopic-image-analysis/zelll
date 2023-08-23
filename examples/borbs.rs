@@ -117,11 +117,21 @@ fn main() {
             if relative_pos.norm() <= OUTER_RADIUS
             //&& borbs.direction[borb].angle(&relative_pos) < 1.7
             {
-                neighborhood[borb] += 1;
+                if borbs.direction[borb].angle(&relative_pos) < 1.7 {
+                    neighborhood[borb] += 1;
 
-                separation[borb] += relative_pos;
-                cohesion[borb] += borbs.position[other].coords;
-                alignment[borb] += borbs.direction[other];
+                    separation[borb] += relative_pos;
+                    cohesion[borb] += borbs.position[other].coords;
+                    alignment[borb] += borbs.direction[other];
+                }
+                //TODO: this block can be removed once full-space neighbor enumeration is properly implemented
+                if borbs.direction[other].angle(&-relative_pos) < 1.7 {
+                    neighborhood[other] += 1;
+
+                    separation[other] -= relative_pos;
+                    cohesion[other] += borbs.position[borb].coords;
+                    alignment[other] += borbs.direction[borb];
+                }
             }
         });
 
@@ -130,6 +140,7 @@ fn main() {
             let borb_separation = separation[i];
             let borb_alignment = alignment[i] / neighborhood[i].max(1) as f64;
 
+            //TODO: velocity verlet
             *borb.direction += COHESION * borb_cohesion
                 + SEPARATION * borb_separation
                 + ALIGNMENT * borb_alignment;
