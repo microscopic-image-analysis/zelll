@@ -167,6 +167,8 @@ impl<const N: usize> FusedIterator for RelativeNeighborIndices<N> {}
 
 #[derive(Debug, Clone, Copy)]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
+#[deprecated(note = "Please use GridCell::neighbors() directly.")]
+//TODO: make sure neighbors() handles half-/full-space and (a)periodic boundaries
 pub struct CellNeighbors<'c, const N: usize> {
     center: &'c GridCell<'c, N>,
     //state: BalancedTernary<N>,
@@ -175,6 +177,9 @@ pub struct CellNeighbors<'c, const N: usize> {
 
 // This is probably the only slightly relevant advantage of using balanced ternary numbers;
 // The distinction between half and full space is simply given by the initial state of the iterator
+//TODO: The distinction between half and full-space now happens in RelativeNeighborIndices<N>
+//TODO: Which is done in FlatIndex computation, although this is a bit annoying too
+//TODO: could always compute full space neighbors in FlatIndex construction and then start from (number-of-neighbors)/2 in half_space() here
 impl<'c, const N: usize> CellNeighbors<'c, N> {
     pub(crate) fn half_space(center: &'c GridCell<'c, N>) -> Self {
         Self {
@@ -196,31 +201,14 @@ impl<'c, const N: usize> CellNeighbors<'c, N> {
     //TODO: we can always compute a new index (i.e. using periodic boundaries)
     //TODO: but would need to indicate if it was wrapped around the boundary
     //TODO: and decide later to omit this if we have aperiodic boundaries?
-    fn absolute_index(&self) -> i32 {
-        /*let mut index = [0; N];
+    /// TODO: Returns None if self.state is out of bounds
+    fn absolute_index(&self) -> Option<i32> {
         self.center
-            .index()
-            .iter()
-            .zip(self.state.0.iter())
-            .map(|(coord, relative)| coord + *relative as i32)
-            .zip(index.iter_mut())
-            .for_each(|(coord, new_coord)| *new_coord = coord);
-        index*/
-        /*let rel_idx = self
-            .state
-            .flatten_with_info(&self.center.grid.index.grid_info);
-        self.center.index() + rel_idx*/
-        //self.center.index() + self.center.grid.index.neighbor_indices[self.state]
-        //TODO: re-check whether this is sound and makes a difference
-        self.center.index()
-            + unsafe {
-                *self
-                    .center
-                    .grid
-                    .index
-                    .neighbor_indices
-                    .get_unchecked(self.state)
-            }
+            .grid
+            .index
+            .neighbor_indices
+            .get(self.state)
+            .map(|rel| *rel + self.center.index())
     }
 
     //TODO: This is probably a bit tricky with flat indices (+ the strides+1 hack?)
@@ -248,47 +236,23 @@ impl<'c, const N: usize> CellNeighbors<'c, N> {
 //TODO: could implement DoubleEndedIterator but that would need extra state and currently there's no reason
 impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
     type Item = GridCell<'c, N>;
-    //TODO: cachegrind attributes many D1mr misses here (related to copy_nonoverlapping, AddAssign, intrinsics.rs ptr alignment?, mixed_integer_ops, checked add?, equality.rs)
+    //TODO: cachegrind attributes most D1mr misses here (likely related to matching the Option, or failed lookup in hashbrown)
+    //TODO: Now that we just have a simple Vec containing the relative indices, we probably should just iterate over that
+    //TODO: to compute absolute indices, instead of having CellNeighbors manually incrementing self.state
     fn next(&mut self) -> Option<Self::Item> {
         //TODO: Note the recursive calls to self.next().
         //TODO: I'm okay with that (for now) since in practice the number of neighbor cells is pretty limited.
         //TODO: I'm sure the call stack won't mind too much.
-        // See https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#matching-named-variables
-        // and https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#extra-conditionals-with-match-guards
-        /*match self.state {
-            // Iterator stops if the current state is already the last (which is always BalancedTernary::MAX)
-            max if max == BalancedTernary::MAX => None,
-            // Skip the center cell
-            zero if zero == BalancedTernary::ZERO => {
-                self.state += BalancedTrit::Positive;
-                self.next()
-            }
-            _ => {
-                let new_index = self.absolute_index();
-
-                self.state += BalancedTrit::Positive;
-
-                self.center
-                    .grid
-                    .cells
-                    .get(&new_index)
-                    .map(|&head| GridCell {
-                        grid: self.center.grid,
-                        head,
-                    })
-                    .or_else(|| self.next())
-            }
-        }*/
-        if self.state < self.center.grid.index.neighbor_indices.len() {
-            let new_index = self.absolute_index();
+        if let Some(new_index) = self.absolute_index() {
             self.state += 1;
+            //TODO: maybe make this more clear, we're just checking if cells[&new_index] is occupied
             self.center
                 .grid
                 .cells
                 .get(&new_index)
-                .map(|&head| GridCell {
+                .map(|_| GridCell {
                     grid: self.center.grid,
-                    head,
+                    index: new_index,
                 })
                 .or_else(|| self.next())
         } else {

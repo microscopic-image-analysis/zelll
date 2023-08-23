@@ -1,28 +1,32 @@
 //TODO: - allow both &[Point<f64, N>] and impl Iterator<Item = Point<f64, N>> (or IntoIterator)?
 //TODO: - possible approach: require impl Iterator and then .take(usize::MAX) to ensure we have only finite point clouds
 #[allow(dead_code)]
-pub mod iters;
+pub mod flatindex;
 #[allow(dead_code)]
-pub mod multiindex;
+pub mod iters;
 #[allow(dead_code)]
 pub mod neighbors;
 #[allow(dead_code)]
+pub mod storage;
+#[allow(dead_code)]
 pub mod util;
 
+pub use flatindex::*;
 use hashbrown::HashMap;
 pub use iters::*;
-pub use multiindex::*;
 use nalgebra::Point;
 pub use neighbors::*;
 #[cfg(feature = "rayon")]
+//TODO: should do a re-export of rayon?
 use rayon::prelude::ParallelIterator;
+pub use storage::*;
 pub use util::*;
 //TODO: crate-global type alias for [i32/isize; N] (or [usize; N] if I revert back)
 #[derive(Debug, Default, Clone)]
 pub struct CellGrid<const N: usize> {
-    cells: HashMap<i32, usize>,
-    cell_lists: Vec<Option<usize>>,
-    index: MultiIndex<N>,
+    cells: HashMap<i32, CellSliceMeta>,
+    cell_lists: CellStorage<usize>,
+    index: FlatIndex<N>,
 }
 
 impl<const N: usize> CellGrid<N> {
@@ -31,9 +35,9 @@ impl<const N: usize> CellGrid<N> {
     }
 
     //TODO: Documentation: rebuild does not really update because it does not make a lot of sense:
-    //TODO: If MultiIndex did change, we have to re-allocate (or re-initialize) almost everything anyway;
-    //TODO: If MultiIndex did not change, we don't need to update.
-    //TODO: Therefore we check for that and make CellGrid::new() just a wrapper around CellGrid::rebuild (with an initially empty MultiIndex)
+    //TODO: If FlatIndex did change, we have to re-allocate (or re-initialize) almost everything anyway;
+    //TODO: If FlatIndex did not change, we don't need to update.
+    //TODO: Therefore we check for that and make CellGrid::new() just a wrapper around CellGrid::rebuild (with an initially empty FlatIndex)
     #[must_use = "rebuild() consumes `self` and returns the rebuilt `CellGrid`"]
     pub fn rebuild<'p>(
         self,
@@ -41,19 +45,34 @@ impl<const N: usize> CellGrid<N> {
         cutoff: Option<f64>,
     ) -> Self {
         let cutoff = cutoff.unwrap_or(self.index.grid_info.cutoff);
-        let index = MultiIndex::from_points(points, cutoff);
+        let index = FlatIndex::from_points(points, cutoff);
 
         if index == self.index {
             self
         } else {
-            let mut cells = HashMap::with_capacity(index.index.len());
+            let mut cell_lists = CellStorage::with_capacity(index.index.len());
 
-            let cell_lists = index
+            //TODO: there might be a better way for this temporary multiset/hashbag/histogram
+            //TODO: e.g. have sth. like cells: HashMap<i32, Either<CellSliceMeta, usize>>
+            //TODO: or divert CellSliceMeta from it's intended use and use CellSliceMeta::cursor as a counter
+            //TODO: and initialize CellSliceMeta::range later once all counts are known
+            let cell_sizes: HashMap<i32, usize> =
+                index.index.iter().fold(HashMap::new(), |mut map, idx| {
+                    *map.entry(*idx).or_default() += 1;
+                    map
+                });
+
+            let mut cells: HashMap<i32, CellSliceMeta> = cell_sizes
+                .iter()
+                .map(|(idx, count)| (*idx, cell_lists.reserve_cell(*count)))
+                .collect();
+
+            index
                 .index
                 .iter()
                 .enumerate()
-                .map(|(i, cell)| cells.insert(*cell, i))
-                .collect();
+                //TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
+                .for_each(|(i, cell)| cell_lists.push(i, cells.get_mut(cell).unwrap()));
 
             Self {
                 cells,
@@ -69,15 +88,40 @@ impl<const N: usize> CellGrid<N> {
         cutoff: Option<f64>,
     ) {
         if self.index.rebuild_mut(points, cutoff) {
-            self.cell_lists.resize(self.index.index.len(), None);
-
             self.cells.clear();
-            // We're not `reserve()`ing or `shrink_to_fit()`ing here.
-            // HashMap should be sufficiently smart about reallocating in chunks.
-            // Also this does not happen that often.
+            self.cell_lists.clear();
+
+            let cell_sizes: HashMap<i32, usize> =
+                self.index
+                    .index
+                    .iter()
+                    .fold(HashMap::new(), |mut map, idx| {
+                        *map.entry(*idx).or_default() += 1;
+                        map
+                    });
+
+            cell_sizes.iter().for_each(|(idx, count)| {
+                // SAFETY:
+                // `insert_unique_unchecked()` is safe because `idx` is unique in `cell_sizes`
+                // and `self.cells` has been cleared before.
+                self.cells
+                    .insert_unique_unchecked(*idx, self.cell_lists.reserve_cell(*count));
+            });
+
+            //TODO: we'll re-evaluate this once benchmarks with sparse data have been added
+            //TODO: However, even without shrinking, self.cells.len() has an upper bound of  self.index.index.len()
+            //TODO: (if updated point cloud did not shrink in length)
+            self.cells.shrink_to_fit();
 
             for (i, cell) in self.index.index.iter().enumerate() {
-                self.cell_lists[i] = self.cells.insert(*cell, i); //TODO: cachegrind attributes 6.28% of D1mw misses to this line
+                //TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
+                //TODO: could use unwrap_unchecked() since this can't/shouldn't fail
+                self.cell_lists.push(
+                    i,
+                    self.cells
+                        .get_mut(cell)
+                        .expect("cell grid should contain every cell in the grid index"),
+                );
             }
         }
     }
@@ -112,11 +156,6 @@ impl<const N: usize> CellGrid<N> {
     where
         F: FnMut(usize, usize),
     {
-        /*for cell in self.iter() {
-            for (i, j) in cell.point_pairs() {
-                f(i, j);
-            }
-        }*/
         self.iter().for_each(|cell| {
             cell.point_pairs().for_each(|(i, j)| {
                 f(i, j);
@@ -129,11 +168,6 @@ impl<const N: usize> CellGrid<N> {
         F: FnMut(usize, usize),
         P: Fn(usize, usize) -> bool,
     {
-        /*for cell in self.iter() {
-            for (i, j) in cell.point_pairs().filter(|(i, j)| p(*i, *j)) {
-                f(i, j);
-            }
-        }*/
         self.iter().for_each(|cell| {
             cell.point_pairs()
                 .filter(|(i, j)| p(*i, *j))
@@ -148,8 +182,6 @@ impl<const N: usize> CellGrid<N> {
 impl<const N: usize> CellGrid<N> {
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn par_point_pairs(&self) -> impl ParallelIterator<Item = (usize, usize)> + '_ {
-        //TODO: Find a way to handle cell lifetimes instead of collecting into a Vec?
-        //TODO: seems to be related to flat_map()
         self.par_iter()
             .flat_map(|cell| cell.point_pairs().collect::<Vec<_>>())
     }
@@ -159,9 +191,6 @@ impl<const N: usize> CellGrid<N> {
         F: Fn(usize, usize) + Send + Sync,
     {
         self.par_iter().for_each(|cell| {
-            /*for (i, j) in cell.point_pairs() {
-                f(i, j);
-            }*/
             cell.point_pairs().for_each(|(i, j)| {
                 f(i, j);
             })

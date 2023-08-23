@@ -71,7 +71,6 @@ impl<const N: usize> GridInfo<N> {
 
     //TODO: not sure where it fits better
     //TODO: GridInfo knows enough to do compute the cell index for an arbitrary point
-    //TODO: but MultiIndex seems more fitting semantically?
     //TODO: sth. like Lattice trait maybe
     pub fn cell_index(&self, point: &Point<f64, N>) -> [i32; N] {
         let mut idx = [0; N];
@@ -226,22 +225,22 @@ mod tests {
         assert_eq!(
             grid_info.cell_index(&Point::from([2.7, 2.75, 2.3])),
             [2, 2, 1],
-            "testing GrindInfo.cell_index()"
+            "testing GridInfo.cell_index()"
         );
         assert_eq!(
             grid_info.flat_cell_index(&Point::from([2.7, 2.75, 2.3])),
             26,
-            "testing GrindInfo.flat_cell_index()"
+            "testing GridInfo.flat_cell_index()"
         );
         assert_eq!(
             grid_info.cell_index(&Point::from([2.7, 2.75, 2.8])),
             [2, 2, 2],
-            "testing GrindInfo.cell_index()"
+            "testing GridInfo.cell_index()"
         );
         assert_eq!(
             grid_info.flat_cell_index(&Point::from([2.7, 2.75, 2.8])),
             42,
-            "testing GrindInfo.flat_cell_index()"
+            "testing GridInfo.flat_cell_index()"
         );
     }
 }
