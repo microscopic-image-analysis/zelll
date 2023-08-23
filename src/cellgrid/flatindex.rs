@@ -1,19 +1,20 @@
+//TODO: impl GridIndex trait
 //TODO: impl Deref/AsRef? to index
-//TODO: maybe MultiIndex should know about a point cloud (i.e. store a reference?)
+//TODO: maybe FlatIndex should know about a point cloud (i.e. store a reference?)
 //TODO: Also: currently assuming that the order of points in point cloud does not change
-//TODO: i.e. index in multiindex corresponds to index in point cloud
+//TODO: i.e. index in flatindex corresponds to index in point cloud
 use crate::cellgrid::neighbors::RelativeNeighborIndices;
 use crate::cellgrid::util::*;
 use nalgebra::Point;
 
 #[derive(Debug, PartialEq, Default, Clone)]
-pub struct MultiIndex<const N: usize> {
+pub struct FlatIndex<const N: usize> {
     pub(crate) grid_info: GridInfo<N>,
     pub(crate) index: Vec<i32>,
     pub(crate) neighbor_indices: Vec<i32>,
 }
 
-impl<const N: usize> MultiIndex<N> {
+impl<const N: usize> FlatIndex<N> {
     pub fn with_capacity(info: GridInfo<N>, capacity: usize) -> Self {
         Self {
             grid_info: info,
@@ -41,6 +42,7 @@ impl<const N: usize> MultiIndex<N> {
         Self {
             grid_info,
             index,
+            //TODO: it's a bit annoying that handling half-/full-space here, i.e. we currently would need to re-compute the FlatIndex to switch. This is not very nice behaviour.
             neighbor_indices: RelativeNeighborIndices::half_space()
                 .map(|idx| grid_info.flatten_index(idx))
                 .collect(),
@@ -91,10 +93,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_multiindex() {
+    fn test_flatindex() {
         // using 0-origin for simplicity and to avoid floating point errors
         let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
-        let index = MultiIndex::from_points(points.iter(), 1.0);
+        let index = FlatIndex::from_points(points.iter(), 1.0);
         let mut idx = Vec::with_capacity(points.len());
 
         for x in 0..3 {
@@ -108,7 +110,7 @@ mod tests {
             }
         }
 
-        assert_eq!(index.index, idx, "testing MultiIndex::from_points()")
+        assert_eq!(index.index, idx, "testing FlatIndex::from_points()")
     }
 }
 
