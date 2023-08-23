@@ -1,2 +1,9 @@
 /target
 /Cargo.lock
+/profiling
+*.svg
+*.png
+*.out
+*.rnote
+perf.data*
+
