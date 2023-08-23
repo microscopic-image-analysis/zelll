@@ -110,7 +110,6 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
                         && distance_squared(&pointcloud[i], &pointcloud[j]) <= 1.0
                 },
             );
-            //cg.point_pairs().for_each(|_| {});
         })
     });
 
@@ -183,7 +182,6 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
                                     <= cutoff_squared
                         },
                     );
-                    //cg.point_pairs().for_each(|_| {});
                 })
             },
         );

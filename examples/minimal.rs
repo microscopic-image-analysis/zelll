@@ -14,12 +14,12 @@ fn main() {
         let a = 3.0 * cutoff;
         let b = 3.0 * cutoff;
         let c = (size as f64 / conc) / a / b;
-        let vol_edges = (size as f64 / conc).cbrt();
+        let _vol_edges = (size as f64 / conc).cbrt();
         let pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0]);
 
         let cg = CellGrid::new(pointcloud.iter(), cutoff);
         println!("{:?}", cg.shape());
-        let cutoff_squared = cutoff.powi(2);
+        let _cutoff_squared = cutoff.powi(2);
 
         //cg.for_each_point_pair(|_, _| black_box(()));
         let mut count: usize = 0;
@@ -28,7 +28,7 @@ fn main() {
             |_, _| {
                 count += 1;
             },
-            |i, j| true, //distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared,
+            |_i, _j| true, //distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared,
         );
         //let count = cg.point_pairs().count();
         #[cfg(feature = "rayon")]
@@ -37,7 +37,7 @@ fn main() {
                 //count += 1;
                 black_box(());
             },
-            |i, j| true, //distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared,
+            |_i, _j| true, //distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared,
         );
         //let count = cg.par_point_pairs().count();
         println!("{}", count);
