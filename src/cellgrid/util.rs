@@ -50,8 +50,8 @@ impl<const N: usize> GridInfo<N> {
             //TODO: and it doesn't affect memory since we're using a hash map anyway
             //TODO: the better approach would be:
             //TODO: padded shape (i.e. (2,3,4) -> (4,5,6))
-            //TODO: compute strides from padded shape
-            //TODO: compute cell index (MultiIndex) 1-based instead of 0-based, i.e. lower left corner is [1; N] instead of [0; N]
+            //TODO: compute strides from padded shape (i.e. instead of (5,5)->(1,5) or (1,5+1), do (7,7)->(1,7))
+            //TODO: compute cell_index() from 1-based multi-index instead of 0-based, i.e. lower left corner is [1; N] instead of [0; N]
             let next = prev * (*curr + 1);
             *curr = prev;
             next
@@ -70,7 +70,8 @@ impl<const N: usize> GridInfo<N> {
     }
 
     //TODO: not sure where it fits better
-    //TODO: GridInfo knows enough to do compute the cell index for an arbitrary point
+    //TODO: GridInfo knows enough to compute the cell index for an arbitrary point
+    //TODO: but might make more sense in FlatIndex?
     //TODO: sth. like Lattice trait maybe
     pub fn cell_index(&self, point: &Point<f64, N>) -> [i32; N] {
         let mut idx = [0; N];

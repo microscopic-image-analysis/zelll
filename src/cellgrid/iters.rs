@@ -53,12 +53,23 @@ impl<'g, const N: usize> GridCell<'g, N> {
     //TODO: currently only half-space and aperiodic boundaries
     //TODO: handle half-/full-space  and (a-)periodic boundary conditions
     pub fn neighbors(&self) -> impl Iterator<Item = GridCell<'g, N>> + Clone + FusedIterator + '_ {
+        //TODO: could pre-compute the neighbor indices and store in self.grid.cells?
+        //todo: OR: this should be able to use SIMD efficiently, right?
+        //TODO: just chunk neighbor_indices and add onto it (however, it requires another allocation then?)
+        //TODO: or do the iteration in chunks
+        //TODO: OR: in principle could just increment neighbor_indices +1 to get abs. neighbours for the next cell
+        //TODO: However, makes parallel iteration ugly and I'd have to make sure to reset relative_indices afterwards
+        //TODO: also, doesn't really matter if I do +=1 or +self.index()
         self.grid
             .index
             .neighbor_indices
             .iter()
             .filter_map(move |rel| {
                 let index = rel + self.index();
+                //TODO: I mean I could also store the slice since I'm already accessing its metadata?
+                //TODO: would save me one lookup into the hashmap self.grid.cells in ::iter()
+                //TODO: tested it, I gain ~2pairs/kcycle from it (32->34) might think about it again
+                //TODO: ::iter() is nicer this way, other parts less so
                 self.grid.cells.get(&index).map(|_| GridCell {
                     grid: self.grid,
                     index,
@@ -112,8 +123,7 @@ impl<const N: usize> CellGrid<N> {
     /// cell_grid.iter().flat_map(|cell| cell.iter()).count();
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn iter(&self) -> impl Iterator<Item = GridCell<N>> {
-        //+ Clone + FusedIterator {
+    pub fn iter(&self) -> impl Iterator<Item = GridCell<N>> + Clone + FusedIterator {
         self.cells
             .keys()
             // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).

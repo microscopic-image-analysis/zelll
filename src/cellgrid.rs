@@ -168,6 +168,8 @@ impl<const N: usize> CellGrid<N> {
         F: FnMut(usize, usize),
         P: Fn(usize, usize) -> bool,
     {
+        //TODO: array_chunks() could be nice for autovectorization?
+        //TODO: see https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.array_chunks
         self.iter().for_each(|cell| {
             cell.point_pairs()
                 .filter(|(i, j)| p(*i, *j))

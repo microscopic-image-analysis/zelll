@@ -106,8 +106,9 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
             cg.filter_point_pairs(
                 |_, _| {},
                 |i, j| {
-                    UniformNorm.metric_distance(&pointcloud[i].coords, &pointcloud[j].coords) <= 1.0
-                        && distance_squared(&pointcloud[i], &pointcloud[j]) <= 1.0
+                    /*UniformNorm.metric_distance(&pointcloud[i].coords, &pointcloud[j].coords) <= 1.0
+                    && */
+                    distance_squared(&pointcloud[i], &pointcloud[j]) <= 1.0
                 },
             );
         })
@@ -125,9 +126,9 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
                 cg.par_filter_point_pairs(
                     |_, _| {},
                     |i, j| {
-                        UniformNorm.metric_distance(&pointcloud[i].coords, &pointcloud[j].coords)
-                            <= 1.0
-                            && distance_squared(&pointcloud[i], &pointcloud[j]) <= 1.0
+                        /*UniformNorm.metric_distance(&pointcloud[i].coords, &pointcloud[j].coords)
+                        <= 1.0 &&*/
+                        distance_squared(&pointcloud[i], &pointcloud[j]) <= 1.0
                     },
                 );
             })
@@ -175,11 +176,10 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
                     cg.filter_point_pairs(
                         |_, _| {},
                         |i, j| {
-                            UniformNorm
-                                .metric_distance(&pointcloud[i].coords, &pointcloud[j].coords)
-                                <= cutoff
-                                && distance_squared(&pointcloud[i], &pointcloud[j])
-                                    <= cutoff_squared
+                            /*UniformNorm
+                            .metric_distance(&pointcloud[i].coords, &pointcloud[j].coords)
+                            <= cutoff && */
+                            distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared
                         },
                     );
                 })
@@ -197,11 +197,10 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
                     cg.par_filter_point_pairs(
                         |_, _| {},
                         |i, j| {
-                            UniformNorm
-                                .metric_distance(&pointcloud[i].coords, &pointcloud[j].coords)
-                                <= cutoff
-                                && distance_squared(&pointcloud[i], &pointcloud[j])
-                                    <= cutoff_squared
+                            /*UniformNorm
+                            .metric_distance(&pointcloud[i].coords, &pointcloud[j].coords)
+                            <= cutoff && */
+                            distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared
                         },
                     );
                 })
