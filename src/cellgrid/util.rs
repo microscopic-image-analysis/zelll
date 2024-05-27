@@ -52,6 +52,7 @@ impl<const N: usize> GridInfo<N> {
             //TODO: padded shape (i.e. (2,3,4) -> (4,5,6))
             //TODO: compute strides from padded shape (i.e. instead of (5,5)->(1,5) or (1,5+1), do (7,7)->(1,7))
             //TODO: compute cell_index() from 1-based multi-index instead of 0-based, i.e. lower left corner is [1; N] instead of [0; N]
+            //FIXME: "attempt to multiply with overflow"
             let next = prev * (*curr + 1);
             *curr = prev;
             next
@@ -81,6 +82,7 @@ impl<const N: usize> GridInfo<N> {
                 .map(|coord| coord.floor() as i32)
                 .as_slice(),
         );
+        // FIXME: cell index ([2, -1, 0]) out of bounds ([1, 1, 1])
 
         assert!(
             idx < self.shape,
