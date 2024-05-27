@@ -5,7 +5,20 @@ use nalgebra::distance_squared;
 use rayon::prelude::ParallelIterator;
 use std::hint::black_box;
 use std::iter::FromIterator;
-use zelll::cellgrid::{generate_points_random, CellGrid};
+use zelll::cellgrid::{PointCloud, CellGrid};
+use nalgebra::{Point3, Vector3};
+
+/// Generate a uniformly random 3D point cloud of size `n` in a cuboid of edge lengths `vol` centered around `origin`.
+fn generate_points_random(n: usize, vol: [f64; 3], origin: [f64; 3]) -> PointCloud<3> {
+    std::iter::repeat_with(|| {
+        Point3::<f64>::from(
+            (Vector3::new_random() - Vector3::new(0.5, 0.5, 0.5) + Vector3::from(origin))
+                .component_mul(&Vector3::from(vol)),
+        )
+    })
+    .take(n)
+    .collect()
+}
 
 fn main() {
     for size in (2..=6).map(|exp| 10usize.pow(exp)) {
@@ -17,7 +30,7 @@ fn main() {
         let _vol_edges = (size as f64 / conc).cbrt();
         let pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0]);
 
-        let cg = CellGrid::new(pointcloud.iter(), cutoff);
+        let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords.as_ref()), cutoff);
         println!("{:?}", cg.shape());
         let _cutoff_squared = cutoff.powi(2);
 

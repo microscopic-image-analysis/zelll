@@ -103,7 +103,7 @@ fn main() {
     let white = Point3::new(1.0, 1.0, 1.0);
     let red = Point3::new(1.0, 0.0, 0.0);
 
-    let mut cell_grid = CellGrid::new(borbs.position.iter(), OUTER_RADIUS);
+    let mut cell_grid = CellGrid::new(borbs.position.iter().map(|p| p.coords.as_ref()), OUTER_RADIUS);
 
     let mut cohesion: Vec<Point3<f64>> = vec![Point3::default(); NBORBS];
     let mut separation: Vec<Vector3<f64>> = vec![Vector3::default(); NBORBS];
@@ -160,7 +160,7 @@ fn main() {
             window.draw_line(&a.cast::<f32>(), &b.cast::<f32>(), &red);
         }
 
-        cell_grid.rebuild_mut(borbs.position.iter(), None);
+        cell_grid.rebuild_mut(borbs.position.iter().map(|p| p.coords.as_ref()), None);
 
         cohesion.fill_with(Default::default);
         separation.fill_with(Default::default);

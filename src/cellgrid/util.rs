@@ -10,12 +10,18 @@ pub struct Aabb<const N: usize> {
 }
 
 impl<const N: usize> Aabb<N> {
-    pub fn from_points<'p>(mut points: impl Iterator<Item = &'p Point<f64, N>>) -> Self {
-        let init = points.next().copied().unwrap_or_default();
+    pub fn from_points<'p>(mut points: impl Iterator<Item = &'p [f64; N]>) -> Self {
+        //let init = points.next().copied().unwrap_or_default();
+        let init = points.next().copied().unwrap_or([0.0f64; N]);
+        let init = Point::from(init);
 
         let (inf, sup) = points
             .take(i32::MAX as usize) //TODO: this works but maybe explicit try_into() would be better?
-            .fold((init, init), |(i, s), point| (i.inf(point), s.sup(point)));
+            .fold((init, init), |(i, s), point| {
+                    let point = Point::from(*point);
+                    (i.inf(&point), s.sup(&point))
+                }
+            );
 
         Self { inf, sup }
     }
@@ -74,8 +80,10 @@ impl<const N: usize> GridInfo<N> {
     //TODO: GridInfo knows enough to compute the cell index for an arbitrary point
     //TODO: but might make more sense in FlatIndex?
     //TODO: sth. like Lattice trait maybe
-    pub fn cell_index(&self, point: &Point<f64, N>) -> [i32; N] {
+    pub fn cell_index(&self, point: &[f64; N]) -> [i32; N] {
         let mut idx = [0; N];
+
+        let point = Point::from(*point);
 
         idx.copy_from_slice(
             ((point - self.origin()) / self.cutoff)
@@ -94,7 +102,7 @@ impl<const N: usize> GridInfo<N> {
         idx
     }
 
-    pub fn flat_cell_index(&self, point: &Point<f64, N>) -> i32 {
+    pub fn flat_cell_index(&self, point: &[f64; N]) -> i32 {
         self.flatten_index(self.cell_index(point))
     }
 
@@ -204,7 +212,7 @@ mod tests {
         let points = generate_points([3, 3, 3], 1.0, [0.2, 0.25, 0.3]);
         assert_eq!(points.len(), 28, "testing PointCloud.len()");
 
-        let aabb = Aabb::from_points(points.iter());
+        let aabb = Aabb::from_points(points.iter().map(|p| p.coords.as_ref()));
         assert_eq!(
             aabb,
             Aabb {
@@ -230,22 +238,22 @@ mod tests {
         // 2.3 - 0.3 = 1.9999999999999998
         // This is not an issue though because the index is still uniquely determined
         assert_eq!(
-            grid_info.cell_index(&Point::from([2.7, 2.75, 2.3])),
+            grid_info.cell_index(&[2.7, 2.75, 2.3]),
             [2, 2, 1],
             "testing GridInfo.cell_index()"
         );
         assert_eq!(
-            grid_info.flat_cell_index(&Point::from([2.7, 2.75, 2.3])),
+            grid_info.flat_cell_index(&[2.7, 2.75, 2.3]),
             26,
             "testing GridInfo.flat_cell_index()"
         );
         assert_eq!(
-            grid_info.cell_index(&Point::from([2.7, 2.75, 2.8])),
+            grid_info.cell_index(&[2.7, 2.75, 2.8]),
             [2, 2, 2],
             "testing GridInfo.cell_index()"
         );
         assert_eq!(
-            grid_info.flat_cell_index(&Point::from([2.7, 2.75, 2.8])),
+            grid_info.flat_cell_index(&[2.7, 2.75, 2.8]),
             42,
             "testing GridInfo.flat_cell_index()"
         );

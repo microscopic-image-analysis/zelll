@@ -3,7 +3,19 @@ use criterion::{
     PlotConfiguration, SamplingMode,
 };
 use nalgebra::{distance_squared, Norm, Point3, UniformNorm, Vector3};
-use zelll::cellgrid::{generate_points_random, CellGrid};
+use zelll::cellgrid::{PointCloud, CellGrid};
+
+/// Generate a uniformly random 3D point cloud of size `n` in a cuboid of edge lengths `vol` centered around `origin`.
+fn generate_points_random(n: usize, vol: [f64; 3], origin: [f64; 3]) -> PointCloud<3> {
+    std::iter::repeat_with(|| {
+        Point3::<f64>::from(
+            (Vector3::new_random() - Vector3::new(0.5, 0.5, 0.5) + Vector3::from(origin))
+                .component_mul(&Vector3::from(vol)),
+        )
+    })
+    .take(n)
+    .collect()
+}
 
 pub fn bench_cellgrid_random(c: &mut Criterion) {
     let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
@@ -14,7 +26,7 @@ pub fn bench_cellgrid_random(c: &mut Criterion) {
 
     group.bench_with_input(BenchmarkId::new("Gonnet2007", 1000), &1000, |b, size| {
         let pointcloud = generate_points_random(*size, [3.166; 3], [0.0, 0.0, 0.0]);
-        let cg = CellGrid::new(pointcloud.iter(), 1.0);
+        let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords.as_ref()), 1.0);
         b.iter(|| {
             cg.for_each_point_pair(|_, _| {});
         })
@@ -26,7 +38,7 @@ pub fn bench_cellgrid_random(c: &mut Criterion) {
         &1000,
         |b, size| {
             let pointcloud = generate_points_random(*size, [3.166; 3], [0.0, 0.0, 0.0]);
-            let cg = CellGrid::new(pointcloud.iter(), 1.0);
+            let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords.as_ref()), 1.0);
             b.iter(|| {
                 cg.par_for_each_point_pair(|_, _| {});
             })
@@ -41,7 +53,7 @@ pub fn bench_cellgrid_random(c: &mut Criterion) {
             &pointcloud,
             |b, pointcloud| {
                 b.iter(|| {
-                    CellGrid::new(pointcloud.iter(), 10.0);
+                    CellGrid::new(pointcloud.iter().map(|p| p.coords.as_ref()), 10.0);
                 })
             },
         );
@@ -53,7 +65,7 @@ pub fn bench_cellgrid_random(c: &mut Criterion) {
     //TODO: also: benchmark with constant density instead of constant volume
     for size in (0..=5).map(|exp| 10usize.pow(exp)) {
         let pointcloud = generate_points_random(size, [100.0; 3], [0.0, 0.0, 0.0]);
-        let cg = CellGrid::new(pointcloud.iter(), 10.0);
+        let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords.as_ref()), 10.0);
 
         group.bench_with_input(
             BenchmarkId::new("::for_each_point_pair()", size),
@@ -83,7 +95,7 @@ pub fn bench_cellgrid_random(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("::rebuild_mut()", size), &cg, |b, cg| {
             let mut cg = cg.clone();
             b.iter(|| {
-                cg.rebuild_mut(pointcloud.iter(), None);
+                cg.rebuild_mut(pointcloud.iter().map(|p| p.coords.as_ref()), None);
             })
         });
     }
@@ -100,7 +112,7 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
 
     group.bench_with_input(BenchmarkId::new("Gonnet2007", 1000), &1000, |b, size| {
         let pointcloud = generate_points_random(*size, [3.166; 3], [0.0, 0.0, 0.0]);
-        let cg = CellGrid::new(pointcloud.iter(), 1.0);
+        let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords.as_ref()), 1.0);
         b.iter(|| {
             //cg.for_each_point_pair(|_, _| {});
             cg.filter_point_pairs(
@@ -120,7 +132,7 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
         &1000,
         |b, size| {
             let pointcloud = generate_points_random(*size, [3.166; 3], [0.0, 0.0, 0.0]);
-            let cg = CellGrid::new(pointcloud.iter(), 1.0);
+            let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords.as_ref()), 1.0);
             b.iter(|| {
                 //cg.par_for_each_point_pair(|_, _| {});
                 cg.par_filter_point_pairs(
@@ -149,7 +161,7 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
             &pointcloud,
             |b, pointcloud| {
                 b.iter(|| {
-                    CellGrid::new(pointcloud.iter(), cutoff);
+                    CellGrid::new(pointcloud.iter().map(|p| p.coords.as_ref()), cutoff);
                 })
             },
         );
@@ -164,7 +176,7 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
         let vol_edges = (size as f64 / conc).cbrt();
 
         let pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0]);
-        let cg = CellGrid::new(pointcloud.iter(), cutoff);
+        let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords.as_ref()), cutoff);
 
         group.bench_with_input(
             BenchmarkId::new("::for_each_point_pair()", size),
@@ -212,7 +224,7 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("::rebuild_mut()", size), &cg, |b, cg| {
             let mut cg = cg.clone();
             b.iter(|| {
-                cg.rebuild_mut(pointcloud.iter(), None);
+                cg.rebuild_mut(pointcloud.iter().map(|p| p.coords.as_ref()), None);
             })
         });
     }

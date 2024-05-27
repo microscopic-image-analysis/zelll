@@ -5,7 +5,6 @@
 //TODO: i.e. index in flatindex corresponds to index in point cloud
 use crate::cellgrid::neighbors::RelativeNeighborIndices;
 use crate::cellgrid::util::*;
-use nalgebra::Point;
 
 #[derive(Debug, PartialEq, Default, Clone)]
 pub struct FlatIndex<const N: usize> {
@@ -29,7 +28,7 @@ impl<const N: usize> FlatIndex<N> {
     //TODO: or can I chunk iterators such that rustc auto-vectorizes?
     //TODO: see https://www.nickwilcox.com/blog/autovec/
     pub fn from_points<'p>(
-        points: impl Iterator<Item = &'p Point<f64, N>> + Clone,
+        points: impl Iterator<Item = &'p [f64; N]> + Clone,
         cutoff: f64,
     ) -> Self {
         let aabb = Aabb::from_points(points.clone());
@@ -42,7 +41,7 @@ impl<const N: usize> FlatIndex<N> {
         Self {
             grid_info,
             index,
-            //TODO: it's a bit annoying that handling half-/full-space here, i.e. we currently would need to re-compute the FlatIndex to switch. This is not very nice behaviour.
+            //TODO: it's a bit annoying that we're handling half-/full-space here, i.e. we currently would need to re-compute the FlatIndex to switch. This is not very nice behaviour.
             neighbor_indices: RelativeNeighborIndices::half_space()
                 .map(|idx| grid_info.flatten_index(idx))
                 .collect(),
@@ -52,7 +51,7 @@ impl<const N: usize> FlatIndex<N> {
     //TODO: Documentation: return bool indicating whether the index changed at all (in length or any individual entry)
     pub fn rebuild_mut<'p>(
         &mut self,
-        points: impl Iterator<Item = &'p Point<f64, N>> + Clone,
+        points: impl Iterator<Item = &'p [f64; N]> + Clone,
         cutoff: Option<f64>,
     ) -> bool {
         let cutoff = cutoff.unwrap_or(self.grid_info.cutoff);
@@ -96,7 +95,7 @@ mod tests {
     fn test_flatindex() {
         // using 0-origin for simplicity and to avoid floating point errors
         let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
-        let index = FlatIndex::from_points(points.iter(), 1.0);
+        let index = FlatIndex::from_points(points.iter().map(|p| p.coords.as_ref()), 1.0);
         let mut idx = Vec::with_capacity(points.len());
 
         for x in 0..3 {
@@ -113,4 +112,5 @@ mod tests {
         assert_eq!(index.index, idx, "testing FlatIndex::from_points()")
     }
 }
+
 

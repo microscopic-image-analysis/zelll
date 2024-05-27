@@ -14,7 +14,6 @@ pub mod util;
 pub use flatindex::*;
 use hashbrown::HashMap;
 pub use iters::*;
-use nalgebra::Point;
 pub use neighbors::*;
 #[cfg(feature = "rayon")]
 //TODO: should do a re-export of rayon?
@@ -30,7 +29,7 @@ pub struct CellGrid<const N: usize> {
 }
 
 impl<const N: usize> CellGrid<N> {
-    pub fn new<'p>(points: impl Iterator<Item = &'p Point<f64, N>> + Clone, cutoff: f64) -> Self {
+    pub fn new<'p>(points: impl Iterator<Item = &'p [f64; N]> + Clone, cutoff: f64) -> Self {
         CellGrid::default().rebuild(points, Some(cutoff))
     }
 
@@ -41,7 +40,7 @@ impl<const N: usize> CellGrid<N> {
     #[must_use = "rebuild() consumes `self` and returns the rebuilt `CellGrid`"]
     pub fn rebuild<'p>(
         self,
-        points: impl Iterator<Item = &'p Point<f64, N>> + Clone,
+        points: impl Iterator<Item = &'p [f64; N]> + Clone,
         cutoff: Option<f64>,
     ) -> Self {
         let cutoff = cutoff.unwrap_or(self.index.grid_info.cutoff);
@@ -84,7 +83,7 @@ impl<const N: usize> CellGrid<N> {
 
     pub fn rebuild_mut<'p>(
         &mut self,
-        points: impl Iterator<Item = &'p Point<f64, N>> + Clone,
+        points: impl Iterator<Item = &'p [f64; N]> + Clone,
         cutoff: Option<f64>,
     ) {
         if self.index.rebuild_mut(points, cutoff) {

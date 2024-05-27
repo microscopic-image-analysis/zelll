@@ -52,7 +52,7 @@ impl<'g, const N: usize> GridCell<'g, N> {
     /// Return an iterator over all (currently half-space) non-empty neighboring cells.
     //TODO: currently only half-space and aperiodic boundaries
     //TODO: handle half-/full-space  and (a-)periodic boundary conditions
-    pub fn neighbors(&self) -> impl Iterator<Item = GridCell<'g, N>> + Clone + FusedIterator + '_ {
+    pub fn neighbors(&self) -> impl FusedIterator<Item = GridCell<'g, N>> + Clone + '_ {
         //TODO: could pre-compute the neighbor indices and store in self.grid.cells?
         //todo: OR: this should be able to use SIMD efficiently, right?
         //TODO: just chunk neighbor_indices and add onto it (however, it requires another allocation then?)
@@ -80,14 +80,14 @@ impl<'g, const N: usize> GridCell<'g, N> {
     /// Iterate over all unique pairs of points in this `GridCell`.
     fn intra_cell_pairs(
         &self,
-    ) -> impl Iterator<Item = (usize, usize)> + Clone + FusedIterator + '_ {
+    ) -> impl FusedIterator<Item = (usize, usize)> + Clone + '_ {
         self.iter().copied().tuple_combinations::<(usize, usize)>()
     }
 
     /// Iterate over all unique pairs of points in this `GridCell` with points of the neighboring cells.
     fn inter_cell_pairs(
         &self,
-    ) -> impl Iterator<Item = (usize, usize)> + Clone + FusedIterator + '_ {
+    ) -> impl FusedIterator<Item = (usize, usize)> + Clone + '_ {
         //TODO: storing neighboring slices in a temporary allocation improves sequential iteration
         //TODO: but negatively impacts parallel iteration (perhaps due to multiple threads wanting to allocate concurrently?)
         /*let others: Vec<_> = self
@@ -103,7 +103,7 @@ impl<'g, const N: usize> GridCell<'g, N> {
     /// Iterate over all "relevant" pairs of points within in the neighborhood of this `GridCell`.
     //TODO: explain what "relevant" means here.
     //TODO: handle full-space as well
-    pub fn point_pairs(&self) -> impl Iterator<Item = (usize, usize)> + Clone + FusedIterator + '_ {
+    pub fn point_pairs(&self) -> impl FusedIterator<Item = (usize, usize)> + Clone + '_ {
         self.intra_cell_pairs().chain(self.inter_cell_pairs())
     }
 }
@@ -119,11 +119,12 @@ impl<const N: usize> CellGrid<N> {
     /// # use zelll::cellgrid::CellGrid;
     /// # use nalgebra::Point;
     /// # let points = [Point::from([0.0, 0.0, 0.0]), Point::from([1.0,2.0,0.0]), Point::from([0.0, 0.1, 0.2])];
+    /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
     /// # let cell_grid = CellGrid::new(points.iter(), 1.0);
     /// cell_grid.iter().flat_map(|cell| cell.iter()).count();
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn iter(&self) -> impl Iterator<Item = GridCell<N>> + Clone + FusedIterator {
+    pub fn iter(&self) -> impl FusedIterator<Item = GridCell<N>> + Clone {
         self.cells
             .keys()
             // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
@@ -149,7 +150,7 @@ mod tests {
     fn test_cellgrid_iter() {
         // Using 0-origin to avoid floating point errors
         let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
-        let cell_grid: CellGrid<3> = CellGrid::new(points.iter(), 1.0);
+        let cell_grid: CellGrid<3> = CellGrid::new(points.iter().map(|p| p.coords.as_ref()), 1.0);
 
         assert_eq!(cell_grid.iter().count(), 14, "testing iter()");
 
@@ -161,7 +162,7 @@ mod tests {
     fn test_gridcell_iter() {
         // Using 0-origin to avoid floating point errors
         let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
-        let cell_grid: CellGrid<3> = CellGrid::new(points.iter(), 1.0);
+        let cell_grid: CellGrid<3> = CellGrid::new(points.iter().map(|p| p.coords.as_ref()), 1.0);
 
         assert_eq!(
             cell_grid.iter().flat_map(|cell| cell.iter()).count(),
@@ -186,7 +187,7 @@ mod tests {
     fn test_neighborcell_pointpairs() {
         // Using 0-origin to avoid floating point errors
         let points = generate_points([2, 2, 2], 1.0, [0.0, 0.0, 0.0]);
-        let cell_grid: CellGrid<3> = CellGrid::new(points.iter(), 1.0);
+        let cell_grid: CellGrid<3> = CellGrid::new(points.iter().map(|p| p.coords.as_ref()), 1.0);
 
         assert_eq!(
             cell_grid
