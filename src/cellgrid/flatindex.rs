@@ -95,7 +95,7 @@ mod tests {
     fn test_flatindex() {
         // using 0-origin for simplicity and to avoid floating point errors
         let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
-        let index = FlatIndex::from_points(points.iter().map(|p| p.coords.as_ref()), 1.0);
+        let index = FlatIndex::from_points(points.iter(), 1.0);
         let mut idx = Vec::with_capacity(points.len());
 
         for x in 0..3 {
