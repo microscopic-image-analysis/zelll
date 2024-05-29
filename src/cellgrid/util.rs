@@ -1,9 +1,12 @@
 #![allow(dead_code)]
 use nalgebra::*;
+// TODO: waiting for https://doc.rust-lang.org/std/simd/struct.Simd.html#  to be stabilized
+// TODO: in order to remove nalgebra dependency
 
-pub type PointCloud<const N: usize> = Vec<Point<f64, N>>;
+// TODO: remove this alias?
+pub type PointCloud<const N: usize> = Vec<[f64; N]>;
 
-//TODO: rename fields (inf/sup stem from nalgebra terminology for component-wise min/max)
+//TODO: rename fields, infimum/supremum might be confusing outside of a lattice context
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct Aabb<const N: usize> {
     inf: Point<f64, N>,
@@ -12,12 +15,9 @@ pub struct Aabb<const N: usize> {
 
 impl<const N: usize> Aabb<N> {
     pub fn from_points<'p>(mut points: impl Iterator<Item = &'p [f64; N]>) -> Self {
-        //let init = points.next().copied().unwrap_or_default();
         let init = points.next().copied().unwrap_or([0.0f64; N]);
         let init = Point::from(init);
 
-        // with https://doc.rust-lang.org/std/simd/struct.Simd.html# stabilized
-        // we wouldn't need nalgebra or some manual computation
         let (inf, sup) = points
             .take(i32::MAX as usize) //TODO: this works but maybe explicit try_into() would be better?
             .fold((init, init), |(i, s), point| {
@@ -30,11 +30,11 @@ impl<const N: usize> Aabb<N> {
     }
 
     pub fn inf(&self) -> [f64; N] {
-        self.inf.coords.into()
+        self.inf.into()
     }
 
     pub fn sup(&self) -> [f64; N] {
-        self.sup.coords.into()
+        self.sup.into()
     }
 }
 
@@ -43,21 +43,14 @@ impl<const N: usize> Aabb<N> {
 pub struct GridInfo<const N: usize> {
     pub(crate) aabb: Aabb<N>,
     pub(crate) cutoff: f64,
-    //TODO: probably should implement a method instead of using pub/pub(crate)
-    pub(crate) shape: [i32; N],
-    pub(crate) strides: [i32; N],
+    shape: SVector<i32, N>,
+    strides: SVector<i32, N>,
 }
 
 impl<const N: usize> GridInfo<N> {
     pub fn new(aabb: Aabb<N>, cutoff: f64) -> Self {
-        // TODO: not sure yet if I want shape to be a Point<N>
-        let mut shape = [0; N];
-        // TODO: This is not very nice yet. We'll figure the precise types out later
-        shape.copy_from_slice(
-            ((aabb.sup - aabb.inf) / cutoff)
-                .map(|coord| coord.floor() as i32 + 1)
-                .as_slice(),
-        );
+        let shape = ((aabb.sup - aabb.inf) / cutoff)
+            .map(|coord| coord.floor() as i32 + 1);
 
         let mut strides = shape;
         strides.iter_mut().fold(1, |prev, curr| {
@@ -83,8 +76,17 @@ impl<const N: usize> GridInfo<N> {
         }
     }
 
-    pub fn origin(&self) -> &Point<f64, N> {
-        &self.aabb.inf
+    // TODO: check if returning references makes more sense
+    pub fn origin(&self) -> [f64; N] {
+        self.aabb.inf.into()
+    }
+
+    pub fn shape(&self) -> [i32; N] {
+        self.shape.into()
+    }
+
+    pub fn strides(&self) -> [i32; N] {
+        self.strides.into()
     }
 
     //TODO: not sure where it fits better
@@ -92,17 +94,12 @@ impl<const N: usize> GridInfo<N> {
     //TODO: but might make more sense in FlatIndex?
     //TODO: sth. like Lattice trait maybe
     pub fn cell_index(&self, point: &[f64; N]) -> [i32; N] {
-        let mut idx = [0; N];
-
         let point = Point::from(*point);
 
-        idx.copy_from_slice(
-            ((point - self.origin()) / self.cutoff)
-                .map(|coord| coord.floor() as i32)
-                .as_slice(),
-        );
-        // FIXME: cell index ([2, -1, 0]) out of bounds ([1, 1, 1])
+        let idx = ((point - self.aabb.inf) / self.cutoff)
+            .map(|coord| coord.floor() as i32);
 
+        // FIXME: cell index ([2, -1, 0]) out of bounds ([1, 1, 1])
         assert!(
             idx < self.shape,
             "cell index ({:?}) out of bounds ({:?})",
@@ -110,19 +107,25 @@ impl<const N: usize> GridInfo<N> {
             self.shape
         );
 
-        idx
+        idx.into()
     }
 
     pub fn flat_cell_index(&self, point: &[f64; N]) -> i32 {
-        self.flatten_index(self.cell_index(point))
+        let point = Point::from(*point);
+
+        ((point - self.aabb.inf) / self.cutoff)
+            .map(|coord| coord.floor() as i32)
+            .dot(&self.strides)
+
+        //TODO: bounds checks are a bit unintuitive now. might defer it to hashmap lookup?
+        // note that the following line is not as efficient:
+        // self.flatten_index(self.cell_index(point))
     }
 
     pub fn flatten_index(&self, idx: [i32; N]) -> i32 {
-        //TODO: benchmark if nalgebra dot product might be faster (due to SIMD)
-        idx.iter()
-            .zip(self.strides)
-            .map(|(i, s)| *i * s)
-            .sum::<i32>()
+        let i = Vector::from(idx);
+
+        i.dot(&self.strides)
     }
 }
 
@@ -145,16 +148,16 @@ pub fn generate_points(shape: [usize; 3], cutoff: f64, origin: [f64; 3]) -> Poin
         for y in 0..shape[1] {
             for z in 0..shape[2] {
                 if (x + y + z) % 2 == 0 {
-                    points.push(Point::from([
+                    points.push([
                         cutoff.mul_add(x as f64, origin[0]),
                         cutoff.mul_add(y as f64, origin[1]),
                         cutoff.mul_add(z as f64, origin[2]),
-                    ]));
-                    points.push(Point::from([
+                    ]);
+                    points.push([
                         cutoff.mul_add(x as f64, cutoff.mul_add(0.5, origin[0])),
                         cutoff.mul_add(y as f64, cutoff.mul_add(0.5, origin[1])),
                         cutoff.mul_add(z as f64, cutoff.mul_add(0.5, origin[2])),
-                    ]));
+                    ]);
                 }
             }
         }
@@ -186,34 +189,34 @@ mod tests {
     #[test]
     fn test_generate_points() {
         let points = vec![
-            Point::from([0.0, 0.0, 0.0]),
-            Point::from([0.5, 0.5, 0.5]),
-            Point::from([0.0, 0.0, 2.0]),
-            Point::from([0.5, 0.5, 2.5]),
-            Point::from([0.0, 1.0, 1.0]),
-            Point::from([0.5, 1.5, 1.5]),
-            Point::from([0.0, 2.0, 0.0]),
-            Point::from([0.5, 2.5, 0.5]),
-            Point::from([0.0, 2.0, 2.0]),
-            Point::from([0.5, 2.5, 2.5]),
-            Point::from([1.0, 0.0, 1.0]),
-            Point::from([1.5, 0.5, 1.5]),
-            Point::from([1.0, 1.0, 0.0]),
-            Point::from([1.5, 1.5, 0.5]),
-            Point::from([1.0, 1.0, 2.0]),
-            Point::from([1.5, 1.5, 2.5]),
-            Point::from([1.0, 2.0, 1.0]),
-            Point::from([1.5, 2.5, 1.5]),
-            Point::from([2.0, 0.0, 0.0]),
-            Point::from([2.5, 0.5, 0.5]),
-            Point::from([2.0, 0.0, 2.0]),
-            Point::from([2.5, 0.5, 2.5]),
-            Point::from([2.0, 1.0, 1.0]),
-            Point::from([2.5, 1.5, 1.5]),
-            Point::from([2.0, 2.0, 0.0]),
-            Point::from([2.5, 2.5, 0.5]),
-            Point::from([2.0, 2.0, 2.0]),
-            Point::from([2.5, 2.5, 2.5]),
+            [0.0, 0.0, 0.0],
+            [0.5, 0.5, 0.5],
+            [0.0, 0.0, 2.0],
+            [0.5, 0.5, 2.5],
+            [0.0, 1.0, 1.0],
+            [0.5, 1.5, 1.5],
+            [0.0, 2.0, 0.0],
+            [0.5, 2.5, 0.5],
+            [0.0, 2.0, 2.0],
+            [0.5, 2.5, 2.5],
+            [1.0, 0.0, 1.0],
+            [1.5, 0.5, 1.5],
+            [1.0, 1.0, 0.0],
+            [1.5, 1.5, 0.5],
+            [1.0, 1.0, 2.0],
+            [1.5, 1.5, 2.5],
+            [1.0, 2.0, 1.0],
+            [1.5, 2.5, 1.5],
+            [2.0, 0.0, 0.0],
+            [2.5, 0.5, 0.5],
+            [2.0, 0.0, 2.0],
+            [2.5, 0.5, 2.5],
+            [2.0, 1.0, 1.0],
+            [2.5, 1.5, 1.5],
+            [2.0, 2.0, 0.0],
+            [2.5, 2.5, 0.5],
+            [2.0, 2.0, 2.0],
+            [2.5, 2.5, 2.5],
         ];
         assert_eq!(points, generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]));
     }
@@ -223,7 +226,7 @@ mod tests {
         let points = generate_points([3, 3, 3], 1.0, [0.2, 0.25, 0.3]);
         assert_eq!(points.len(), 28, "testing PointCloud.len()");
 
-        let aabb = Aabb::from_points(points.iter().map(|p| p.coords.as_ref()));
+        let aabb = Aabb::from_points(points.iter());
         assert_eq!(
             aabb,
             Aabb {
@@ -236,13 +239,13 @@ mod tests {
         let grid_info = GridInfo::new(aabb, 1.0);
         assert_eq!(
             grid_info.origin(),
-            &Point::from([0.2, 0.25, 0.3]),
+            [0.2, 0.25, 0.3],
             "testing GridInfo.origin()"
         );
-        assert_eq!(grid_info.shape, [3, 3, 3], "testing GridInfo.shape");
+        assert_eq!(grid_info.shape(), [3, 3, 3], "testing GridInfo.shape");
         //TODO: note that these are the strides for grid_info.shape + [1, 1, 1]
         //TODO: this allows us to use negative relative indices representable by BalancedTernary<N>
-        assert_eq!(grid_info.strides, [1, 4, 16], "testing GridInfo.strides");
+        assert_eq!(grid_info.strides(), [1, 4, 16], "testing GridInfo.strides");
 
         // Intuitively you'd expect [2, 2, 2] for this
         // but we're having floating point imprecision:
