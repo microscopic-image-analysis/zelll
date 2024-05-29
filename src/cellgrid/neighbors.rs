@@ -21,7 +21,6 @@
 use super::{GridCell, GridInfo};
 use core::iter::FusedIterator;
 use core::ops::{Add, AddAssign};
-use nalgebra::wrap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 #[repr(i8)]
