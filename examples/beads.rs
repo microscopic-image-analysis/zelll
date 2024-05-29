@@ -3,7 +3,7 @@ use itertools::Itertools;
 use kiss3d::camera::ArcBall;
 use kiss3d::light::Light;
 use kiss3d::window::Window;
-use nalgebra::{Point3, Vector3};
+use kiss3d::nalgebra::{Point3, Vector3};
 use soa_derive::StructOfArray;
 use zelll::cellgrid::*;
 

@@ -3,10 +3,11 @@ use nalgebra::*;
 
 pub type PointCloud<const N: usize> = Vec<Point<f64, N>>;
 
+//TODO: rename fields (inf/sup stem from nalgebra terminology for component-wise min/max)
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct Aabb<const N: usize> {
-    pub inf: Point<f64, N>,
-    pub sup: Point<f64, N>,
+    inf: Point<f64, N>,
+    sup: Point<f64, N>,
 }
 
 impl<const N: usize> Aabb<N> {
@@ -15,6 +16,8 @@ impl<const N: usize> Aabb<N> {
         let init = points.next().copied().unwrap_or([0.0f64; N]);
         let init = Point::from(init);
 
+        // with https://doc.rust-lang.org/std/simd/struct.Simd.html# stabilized
+        // we wouldn't need nalgebra or some manual computation
         let (inf, sup) = points
             .take(i32::MAX as usize) //TODO: this works but maybe explicit try_into() would be better?
             .fold((init, init), |(i, s), point| {
@@ -24,6 +27,14 @@ impl<const N: usize> Aabb<N> {
             );
 
         Self { inf, sup }
+    }
+
+    pub fn inf(&self) -> [f64; N] {
+        self.inf.coords.into()
+    }
+
+    pub fn sup(&self) -> [f64; N] {
+        self.sup.coords.into()
     }
 }
 

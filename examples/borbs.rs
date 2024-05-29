@@ -22,8 +22,8 @@ const COHESION: f64 = 0.3;
 //TODO: some misses with Iterator::fold()?
 
 fn aabb_vertices(aabb: &Aabb<3>) -> Vec<(Point3<f64>, Point3<f64>)> {
-    let inf = aabb.inf;
-    let sup = aabb.sup;
+    let inf = aabb.inf();
+    let sup = aabb.sup();
 
     // cube edges in python python:
     // list(itertools.filterfalse(lambda edge: sum(a!=b for a,b in zip(*edge))!=1 ,itertools.combinations(itertools.product(*zip((0,0,0),(1,1,1))), 2)))
