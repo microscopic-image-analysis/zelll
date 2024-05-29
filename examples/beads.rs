@@ -4,6 +4,8 @@ use kiss3d::camera::ArcBall;
 use kiss3d::light::Light;
 use kiss3d::window::Window;
 use kiss3d::nalgebra::{Point3, Vector3};
+use rand::prelude::*;
+use rand::distributions::Standard;
 use soa_derive::StructOfArray;
 use zelll::cellgrid::*;
 
@@ -36,7 +38,7 @@ pub struct Bead {
 impl Bead {
     fn new_random() -> Self {
         Self {
-            position: ((Vector3::new_random() - Vector3::new(0.5, 0.5, 0.5)) * 100.0).into(),
+            position: ((Vector3::from_iterator(thread_rng().sample_iter(Standard)) - Vector3::new(0.5, 0.5, 0.5)) * 100.0).into(),
             velocity: Vector3::new(0.0, 0.0, 0.0),
         }
     }

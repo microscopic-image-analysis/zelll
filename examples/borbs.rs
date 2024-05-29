@@ -3,6 +3,8 @@ use kiss3d::light::Light;
 use kiss3d::nalgebra::{Point3, Vector3};
 use kiss3d::window::Window;
 use soa_derive::StructOfArray;
+use rand::prelude::*;
+use rand::distributions::Standard;
 use zelll::cellgrid::Aabb;
 use zelll::cellgrid::*;
 
@@ -179,8 +181,8 @@ pub struct Borb {
 impl Borb {
     fn new_random() -> Self {
         Self {
-            position: ((Vector3::new_random() - Vector3::new(0.5, 0.5, 0.5)) * 100.0).into(),
-            direction: Vector3::new_random(),
+            position: ((Vector3::from_iterator(thread_rng().sample_iter(Standard)) - Vector3::new(0.5, 0.5, 0.5)) * 100.0).into(),
+            direction: Vector3::from_iterator(thread_rng().sample_iter(Standard)),
         }
     }
 }

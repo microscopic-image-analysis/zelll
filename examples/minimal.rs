@@ -1,18 +1,20 @@
 use hashbrown::{HashMap, HashSet};
-use nalgebra::distance_squared;
 //use nohash_hasher::BuildNoHashHasher;
 #[cfg(feature = "rayon")]
 use rayon::prelude::ParallelIterator;
+use rand::prelude::*;
+use rand::distributions::Standard;
 use std::hint::black_box;
 use std::iter::FromIterator;
-use zelll::cellgrid::{PointCloud, CellGrid};
-use nalgebra::{Point3, Vector3};
+use zelll::cellgrid::CellGrid;
+use nalgebra::{Point3, Vector3, Point};
 
+type PointCloud<const N: usize> = Vec<Point<f64, N>>;
 /// Generate a uniformly random 3D point cloud of size `n` in a cuboid of edge lengths `vol` centered around `origin`.
 fn generate_points_random(n: usize, vol: [f64; 3], origin: [f64; 3]) -> PointCloud<3> {
     std::iter::repeat_with(|| {
         Point3::<f64>::from(
-            (Vector3::new_random() - Vector3::new(0.5, 0.5, 0.5) + Vector3::from(origin))
+            (Vector3::from_iterator(thread_rng().sample_iter(Standard)) - Vector3::new(0.5, 0.5, 0.5) + Vector3::from(origin))
                 .component_mul(&Vector3::from(vol)),
         )
     })

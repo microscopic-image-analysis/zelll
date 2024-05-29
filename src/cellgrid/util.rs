@@ -166,22 +166,6 @@ pub fn generate_points(shape: [usize; 3], cutoff: f64, origin: [f64; 3]) -> Poin
     points
 }
 
-/// Generate a uniformly random 3D point cloud of size `n` in a cuboid of edge lengths `vol` centered around `origin`.
-//TODO: Matrix::new_random() requires nalgebra with feature `rand`
-//TODO: I'm not sure why cargo check and cargo clippy are not using dev dependencies?
-//TODO: but I probably should set some feature in Cargo.toml if I want to keep this public
-#[cfg(feature = "dep:nalgebra/rand")]
-pub(crate) fn generate_points_random(n: usize, vol: [f64; 3], origin: [f64; 3]) -> PointCloud<3> {
-    std::iter::repeat_with(|| {
-        Point3::<f64>::from(
-            (Vector3::new_random() - Vector3::new(0.5, 0.5, 0.5) + Vector3::from(origin))
-                .component_mul(&Vector3::from(vol)),
-        )
-    })
-    .take(n)
-    .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

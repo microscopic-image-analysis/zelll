@@ -13,14 +13,14 @@ edition = "2021"
 
 [dependencies]
 itertools = "0.10"
-nalgebra = "0.30"
+nalgebra = "0.32"
 hashbrown = "0.14"
 rayon = { version = "1.0", optional = true }
 
 [dev-dependencies]
 criterion = "0.5"
 kiss3d = "0.35"
-nalgebra = { version = "0.30", features = ["debug"] }
+rand = "0.8"
 soa_derive = "0.12"
 dashmap = "5.4"
 
