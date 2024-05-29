@@ -125,8 +125,8 @@ impl<const N: usize> CellGrid<N> {
         }
     }
 
-    pub fn shape(&self) -> &[i32; N] {
-        &self.index.grid_info.shape
+    pub fn shape(&self) -> [i32; N] {
+        self.index.grid_info.shape()
     }
 
     pub fn bounding_box(&self) -> &Aabb<N> {
