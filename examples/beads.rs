@@ -28,6 +28,13 @@ const _SIGMA_POW12: f64 = _SIGMA_POW6 * _SIGMA_POW6;
 const LJA: f64 = 4.0 * EPSILON * _SIGMA_POW12;
 const LJB: f64 = 4.0 * EPSILON * _SIGMA_POW6;
 
+// TODO: SoAIndex::get() conflicts with Itertools::get() (>= "0.13")
+// TODO: there's nobody really at fault but I think
+// TODO: the easiest fix would be to use fully qualified syntax for SoAIndex::get()
+// TODO: where it's used inside of that proc_macro
+// TODO: probably should file an issue? or fix it myself, it's relatively simple
+// TODO: see https://github.com/lumol-org/soa-derive/blob/master/soa-derive-internal/src/index.rs
+// TODO: the reason is: some Range* types impl Iterator
 #[derive(Debug, StructOfArray)]
 #[soa_derive(Debug)]
 pub struct Bead {

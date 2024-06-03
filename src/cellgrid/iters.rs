@@ -98,6 +98,16 @@ impl<'g, const N: usize> GridCell<'g, N> {
         self.iter()
             .copied()
             .cartesian_product(self.neighbors().flat_map(|cell| cell.iter().copied()))
+
+        //TODO: itertools >= "0.12" cartesian_product() doesn't optimize well?
+        //TODO: possibly because of nested Option in https://github.com/rust-itertools/itertools/pull/800
+        //TODO: which is likely the correct thing to do but it's unfortunate to lose 10-15% of performance
+        //TODO: For itertools >= "0.12", two nested flat_maps perform just as well as cartesian_product()
+        /*self.iter().copied().flat_map(move |i| {
+            self.neighbors()
+                .flat_map(|cell| cell.iter().copied())
+                .map(move |j| (i, j))
+        })*/
     }
 
     /// Iterate over all "relevant" pairs of points within in the neighborhood of this `GridCell`.
