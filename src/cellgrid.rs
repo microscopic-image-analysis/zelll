@@ -13,6 +13,7 @@ pub mod util;
 
 pub use flatindex::*;
 use hashbrown::HashMap;
+use itertools::Itertools;
 pub use iters::*;
 pub use neighbors::*;
 #[cfg(feature = "rayon")]
@@ -174,7 +175,7 @@ impl<const N: usize> CellGrid<N> {
                 .filter(|(i, j)| p(*i, *j))
                 .for_each(|(i, j)| {
                     f(i, j);
-                })
+                });
         });
     }
 }

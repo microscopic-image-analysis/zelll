@@ -10,9 +10,12 @@ use zelll::cellgrid::CellGrid;
 type PointCloud<const N: usize> = Vec<Point<f64, N>>;
 /// Generate a uniformly random 3D point cloud of size `n` in a cuboid of edge lengths `vol` centered around `origin`.
 fn generate_points_random(n: usize, vol: [f64; 3], origin: [f64; 3]) -> PointCloud<3> {
+    // with fixed seed for reproducability
+    let mut rng = StdRng::seed_from_u64(3079380797442975911);
+
     std::iter::repeat_with(|| {
         Point3::<f64>::from(
-            (Vector3::from_iterator(thread_rng().sample_iter(Standard)) - Vector3::new(0.5, 0.5, 0.5) + Vector3::from(origin))
+            (Vector3::from_iterator((&mut rng).sample_iter(Standard)) - Vector3::new(0.5, 0.5, 0.5) + Vector3::from(origin))
                 .component_mul(&Vector3::from(vol)),
         )
     })
