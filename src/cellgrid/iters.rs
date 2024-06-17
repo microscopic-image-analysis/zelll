@@ -64,7 +64,7 @@ impl<'g, const N: usize> GridCell<'g, N> {
             .index
             .neighbor_indices
             .iter()
-            .filter_map(move |rel| {
+            .filter_map(|rel| {
                 let index = rel + self.index();
                 //TODO: I mean I could also store the slice since I'm already accessing its metadata?
                 //TODO: would save me one lookup into the hashmap self.grid.cells in ::iter()
@@ -137,8 +137,7 @@ impl<const N: usize> CellGrid<N> {
     pub fn iter(&self) -> impl FusedIterator<Item = GridCell<N>> + Clone {
         self.cells
             .keys()
-            // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
-            .map(move |&index| GridCell { grid: self, index })
+            .map(|&index| GridCell { grid: self, index })
     }
 
     #[cfg(feature = "rayon")]
@@ -146,8 +145,7 @@ impl<const N: usize> CellGrid<N> {
     pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<N>> {
         self.cells
             .par_keys()
-            // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
-            .map(move |&index| GridCell { grid: self, index })
+            .map(|&index| GridCell { grid: self, index })
     }
 }
 
