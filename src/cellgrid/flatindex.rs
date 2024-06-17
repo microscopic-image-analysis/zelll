@@ -5,6 +5,7 @@
 //TODO: i.e. index in flatindex corresponds to index in point cloud
 use crate::cellgrid::neighbors::RelativeNeighborIndices;
 use crate::cellgrid::util::*;
+//use itertools::Itertools;
 
 #[derive(Debug, PartialEq, Default, Clone)]
 pub struct FlatIndex<const N: usize> {
@@ -70,6 +71,15 @@ impl<const N: usize> FlatIndex<N> {
         self.neighbor_indices = RelativeNeighborIndices::half_space()
             .map(|idx| grid_info.flatten_index(idx))
             .collect();
+        //FIXME: this is full-space but my tests don't seem to mind?
+        //FIXME: make sure to only cover half-space here
+        /*
+        self.neighbor_indices = [-1, 0, 1].into_iter()
+            .map(|_| [-1, 0, 1].into_iter() )
+            .multi_cartesian_product()
+            .map(|idx| grid_info.flatten_index(idx.try_into().unwrap()))
+            .collect();
+        */
 
         let index_changed =
             self.index
