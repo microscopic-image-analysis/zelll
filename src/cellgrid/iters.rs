@@ -95,9 +95,18 @@ impl<'g, const N: usize> GridCell<'g, N> {
             .flat_map(|cell| cell.iter().copied())
             .collect();
         self.iter().copied().cartesian_product(others)*/
+
+        //TODO: might help instead of having a closure in the iterator
+        //TODO: if I wanted introduce a type alias?
+        /*
+        fn copied_cell_iter<const N: usize>(cell: GridCell<N>) -> std::iter::Copied<std::slice::Iter<'_, usize>> {
+            cell.iter().copied()
+        }
+        */
         self.iter()
             .copied()
             .cartesian_product(self.neighbors().flat_map(|cell| cell.iter().copied()))
+            //.cartesian_product(self.neighbors().flat_map(copied_cell_iter))
 
         //TODO: itertools >= "0.12" cartesian_product() doesn't optimize well?
         //TODO: possibly because of nested Option in https://github.com/rust-itertools/itertools/pull/800
