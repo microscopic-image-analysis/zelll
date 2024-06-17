@@ -10,6 +10,12 @@ use rayon::prelude::ParallelIterator;
 #[derive(Debug, Clone, Copy)]
 pub struct GridCell<'g, const N: usize> {
     //TODO: maybe provide proper accessors to these fields for neighbors.rs to use?
+    //TODO: is there a better way than having a reference to the containing CellGrid?
+    //TODO: this would make CellGrid::point_pairs() nicer (wouldn't have to collect() there)
+    //TODO: and also simplify the API because I could remove for_point_pairs() and related stuff
+    //TODO: and would just have to expose point_pairs() (would be also nice for pyo3)
+    //TODO: could use https://doc.rust-lang.org/std/rc/struct.Weak.html for this?
+    //TODO: but maybe it's better to just pass a reference to parent CellGrid where necessary
     pub(crate) grid: &'g CellGrid<N>,
     pub(crate) index: i32,
 }
