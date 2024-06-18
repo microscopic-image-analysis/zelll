@@ -122,5 +122,3 @@ mod tests {
         assert_eq!(index.index, idx, "testing FlatIndex::from_points()")
     }
 }
-
-

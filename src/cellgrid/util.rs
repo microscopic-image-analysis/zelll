@@ -21,10 +21,9 @@ impl<const N: usize> Aabb<N> {
         let (inf, sup) = points
             .take(i32::MAX as usize) //TODO: this works but maybe explicit try_into() would be better?
             .fold((init, init), |(i, s), point| {
-                    let point = Point::from(*point);
-                    (i.inf(&point), s.sup(&point))
-                }
-            );
+                let point = Point::from(*point);
+                (i.inf(&point), s.sup(&point))
+            });
 
         Self { inf, sup }
     }
@@ -49,8 +48,7 @@ pub struct GridInfo<const N: usize> {
 
 impl<const N: usize> GridInfo<N> {
     pub fn new(aabb: Aabb<N>, cutoff: f64) -> Self {
-        let shape = ((aabb.sup - aabb.inf) / cutoff)
-            .map(|coord| coord.floor() as i32 + 1);
+        let shape = ((aabb.sup - aabb.inf) / cutoff).map(|coord| coord.floor() as i32 + 1);
 
         let mut strides = shape;
         strides.iter_mut().fold(1, |prev, curr| {
@@ -96,8 +94,7 @@ impl<const N: usize> GridInfo<N> {
     pub fn cell_index(&self, point: &[f64; N]) -> [i32; N] {
         let point = Point::from(*point);
 
-        let idx = ((point - self.aabb.inf) / self.cutoff)
-            .map(|coord| coord.floor() as i32);
+        let idx = ((point - self.aabb.inf) / self.cutoff).map(|coord| coord.floor() as i32);
 
         // FIXME: cell index ([2, -1, 0]) out of bounds ([1, 1, 1])
         assert!(
@@ -257,4 +254,3 @@ mod tests {
         );
     }
 }
-

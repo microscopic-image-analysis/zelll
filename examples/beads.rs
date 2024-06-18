@@ -2,10 +2,10 @@ use dashmap::DashMap;
 use itertools::Itertools;
 use kiss3d::camera::ArcBall;
 use kiss3d::light::Light;
-use kiss3d::window::Window;
 use kiss3d::nalgebra::{Point3, Vector3};
-use rand::prelude::*;
+use kiss3d::window::Window;
 use rand::distributions::Standard;
+use rand::prelude::*;
 use soa_derive::StructOfArray;
 use zelll::cellgrid::*;
 
@@ -45,7 +45,10 @@ pub struct Bead {
 impl Bead {
     fn new_random() -> Self {
         Self {
-            position: ((Vector3::from_iterator(thread_rng().sample_iter(Standard)) - Vector3::new(0.5, 0.5, 0.5)) * 100.0).into(),
+            position: ((Vector3::from_iterator(thread_rng().sample_iter(Standard))
+                - Vector3::new(0.5, 0.5, 0.5))
+                * 100.0)
+                .into(),
             velocity: Vector3::new(0.0, 0.0, 0.0),
         }
     }
@@ -181,4 +184,3 @@ fn main() {
         cell_grid.rebuild_mut(beads.position.iter().map(|p| p.coords.as_ref()), None);
     }
 }
-

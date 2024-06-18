@@ -2,9 +2,9 @@ use kiss3d::camera::ArcBall;
 use kiss3d::light::Light;
 use kiss3d::nalgebra::{Point3, Vector3};
 use kiss3d::window::Window;
-use soa_derive::StructOfArray;
-use rand::prelude::*;
 use rand::distributions::Standard;
+use rand::prelude::*;
+use soa_derive::StructOfArray;
 use zelll::cellgrid::Aabb;
 use zelll::cellgrid::*;
 
@@ -105,7 +105,10 @@ fn main() {
     let white = Point3::new(1.0, 1.0, 1.0);
     let red = Point3::new(1.0, 0.0, 0.0);
 
-    let mut cell_grid = CellGrid::new(borbs.position.iter().map(|p| p.coords.as_ref()), OUTER_RADIUS);
+    let mut cell_grid = CellGrid::new(
+        borbs.position.iter().map(|p| p.coords.as_ref()),
+        OUTER_RADIUS,
+    );
 
     let mut cohesion: Vec<Point3<f64>> = vec![Point3::default(); NBORBS];
     let mut separation: Vec<Vector3<f64>> = vec![Vector3::default(); NBORBS];
@@ -181,7 +184,10 @@ pub struct Borb {
 impl Borb {
     fn new_random() -> Self {
         Self {
-            position: ((Vector3::from_iterator(thread_rng().sample_iter(Standard)) - Vector3::new(0.5, 0.5, 0.5)) * 100.0).into(),
+            position: ((Vector3::from_iterator(thread_rng().sample_iter(Standard))
+                - Vector3::new(0.5, 0.5, 0.5))
+                * 100.0)
+                .into(),
             direction: Vector3::from_iterator(thread_rng().sample_iter(Standard)),
         }
     }
@@ -196,4 +202,3 @@ impl BorbRefMut<'_> {
         *self.position += *self.direction * delta;
     }
 }
-

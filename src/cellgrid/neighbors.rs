@@ -261,4 +261,3 @@ impl<'c, const N: usize> Iterator for CellNeighbors<'c, N> {
 }
 
 impl<const N: usize> FusedIterator for CellNeighbors<'_, N> {}
-
