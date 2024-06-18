@@ -13,12 +13,12 @@ pub mod util;
 
 pub use flatindex::*;
 use hashbrown::HashMap;
-use itertools::Itertools;
 pub use iters::*;
+use itertools::Itertools;
 pub use neighbors::*;
 #[cfg(feature = "rayon")]
 //TODO: should do a re-export of rayon?
-use rayon::prelude::ParallelIterator;
+pub use rayon::prelude::ParallelIterator;
 pub use storage::*;
 pub use util::*;
 //TODO: crate-global type alias for [i32/isize; N] (or [usize; N] if I revert back)
@@ -135,15 +135,21 @@ impl<const N: usize> CellGrid<N> {
     }
 
     /// Iterate over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`.
-    /// This has some overhead due to internal use of [`flat_map`].
+    /// ```ignore
+    /// cell_grid.point_pairs()
+    ///     .filter(|&(i, j)| {
+    ///         distance_squared(&points[i], &points[j]) <= cutoff_squared
+    ///     })
+    ///     .for_each(|&(i, j)| {
+    ///         ...
+    ///     });
+    /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn point_pairs(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
-        self.iter()
-            .flat_map(|cell| cell.point_pairs().collect::<Vec<_>>())
+        self.iter().flat_map(|cell| cell.point_pairs())
     }
 
     /// Call a closure on each relevant (i.e. within cutoff threshold + some extra) unique pair of points in this `CellGrid`.
-    /// This should be preferred over [`CellGrid::point_pairs()`].
     /// `for_each_point_pair()` is equivalent to a nested loop:
     /// ```ignore
     /// for cell in cell_grid.iter() {
@@ -152,6 +158,7 @@ impl<const N: usize> CellGrid<N> {
     ///     }
     /// }
     /// ```
+    #[deprecated(note = "Please use [`point_pairs()`](#method.point_pairs) instead.")]
     pub fn for_each_point_pair<F>(&self, mut f: F)
     where
         F: FnMut(usize, usize),
@@ -163,6 +170,7 @@ impl<const N: usize> CellGrid<N> {
         });
     }
 
+    #[deprecated(note = "Please use [`point_pairs()`](#method.point_pairs) instead.")]
     pub fn filter_point_pairs<F, P>(&self, mut f: F, p: P)
     where
         F: FnMut(usize, usize),
@@ -182,12 +190,27 @@ impl<const N: usize> CellGrid<N> {
 
 #[cfg(feature = "rayon")]
 impl<const N: usize> CellGrid<N> {
+    /// Iterate in parallel over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`.
+    /// Try to avoid filtering this [`ParallelIterator`] to avoid significant overhead:
+    /// ```ignore
+    /// cell_grid.par_point_pairs()
+    ///     .for_each(|(i, j)| {
+    ///         if distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared {
+    ///             ...
+    ///         } else {
+    ///             ...
+    ///         }
+    ///     });
+    /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn par_point_pairs(&self) -> impl ParallelIterator<Item = (usize, usize)> + '_ {
         self.par_iter()
-            .flat_map(|cell| cell.point_pairs().collect::<Vec<_>>())
+            //.flat_map(|cell| cell.point_pairs().collect::<Vec<_>>())
+            //.flat_map_iter(|cell| cell.point_pairs().collect::<Vec<_>>())
+            .flat_map_iter(|cell| cell.point_pairs())
     }
 
+    #[deprecated(note = "Please use [`par_point_pairs()`](#method.par_point_pairs) instead.")]
     pub fn par_for_each_point_pair<F>(&self, f: F)
     where
         F: Fn(usize, usize) + Send + Sync,
@@ -199,6 +222,7 @@ impl<const N: usize> CellGrid<N> {
         });
     }
 
+    #[deprecated(note = "Please use [`par_point_pairs()`](#method.par_point_pairs) instead.")]
     pub fn par_filter_point_pairs<F, P>(&self, f: F, p: P)
     where
         F: Fn(usize, usize) + Send + Sync,
@@ -213,4 +237,3 @@ impl<const N: usize> CellGrid<N> {
         });
     }
 }
-

@@ -2,6 +2,7 @@
 //TODO: perhaps move parallel iteration into separate submodule
 use super::{CellGrid, CellNeighbors};
 use core::iter::FusedIterator;
+use core::slice::Iter;
 use itertools::Itertools;
 #[cfg(feature = "rayon")]
 use rayon::prelude::ParallelIterator;
@@ -26,7 +27,8 @@ impl<'g, const N: usize> GridCell<'g, N> {
         self.index
     }
 
-    pub fn iter(&self) -> std::slice::Iter<'g, usize> {
+    // TODO: should probably rather impl IntoIterator to match consuming/copy behaviour of neighbors()/point_pairs()?
+    pub fn iter(&self) -> Iter<'g, usize> {
         self.grid
             .cell_lists
             .cell_slice(&self.grid.cells[&self.index])
@@ -58,7 +60,9 @@ impl<'g, const N: usize> GridCell<'g, N> {
     /// Return an iterator over all (currently half-space) non-empty neighboring cells.
     //TODO: currently only half-space and aperiodic boundaries
     //TODO: handle half-/full-space  and (a-)periodic boundary conditions
-    pub fn neighbors(&self) -> impl FusedIterator<Item = GridCell<'g, N>> + Clone + '_ {
+    //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
+    pub fn neighbors(self) -> impl FusedIterator<Item = GridCell<'g, N>> + Clone {
+        //pub fn neighbors(&self) -> FilterMap<Iter<'g, i32>, impl FnMut(&'g i32) -> Option<GridCell<'g, N>> + Clone + '_> {
         //TODO: could pre-compute the neighbor indices and store in self.grid.cells?
         //todo: OR: this should be able to use SIMD efficiently, right?
         //TODO: just chunk neighbor_indices and add onto it (however, it requires another allocation then?)
@@ -70,7 +74,7 @@ impl<'g, const N: usize> GridCell<'g, N> {
             .index
             .neighbor_indices
             .iter()
-            .filter_map(|rel| {
+            .filter_map(move |rel| {
                 let index = rel + self.index();
                 //TODO: I mean I could also store the slice since I'm already accessing its metadata?
                 //TODO: would save me one lookup into the hashmap self.grid.cells in ::iter()
@@ -84,16 +88,12 @@ impl<'g, const N: usize> GridCell<'g, N> {
     }
 
     /// Iterate over all unique pairs of points in this `GridCell`.
-    fn intra_cell_pairs(
-        &self,
-    ) -> impl FusedIterator<Item = (usize, usize)> + Clone + '_ {
+    fn intra_cell_pairs(self) -> impl FusedIterator<Item = (usize, usize)> + Clone + 'g {
         self.iter().copied().tuple_combinations::<(usize, usize)>()
     }
 
     /// Iterate over all unique pairs of points in this `GridCell` with points of the neighboring cells.
-    fn inter_cell_pairs(
-        &self,
-    ) -> impl FusedIterator<Item = (usize, usize)> + Clone + '_ {
+    fn inter_cell_pairs(self) -> impl FusedIterator<Item = (usize, usize)> + Clone + 'g {
         //TODO: storing neighboring slices in a temporary allocation improves sequential iteration
         //TODO: but negatively impacts parallel iteration (perhaps due to multiple threads wanting to allocate concurrently?)
         /*let others: Vec<_> = self
@@ -112,7 +112,7 @@ impl<'g, const N: usize> GridCell<'g, N> {
         self.iter()
             .copied()
             .cartesian_product(self.neighbors().flat_map(|cell| cell.iter().copied()))
-            //.cartesian_product(self.neighbors().flat_map(copied_cell_iter))
+        //.cartesian_product(self.neighbors().flat_map(copied_cell_iter))
 
         //TODO: itertools >= "0.12" cartesian_product() doesn't optimize well?
         //TODO: possibly because of nested Option in https://github.com/rust-itertools/itertools/pull/800
@@ -128,7 +128,8 @@ impl<'g, const N: usize> GridCell<'g, N> {
     /// Iterate over all "relevant" pairs of points within in the neighborhood of this `GridCell`.
     //TODO: explain what "relevant" means here.
     //TODO: handle full-space as well
-    pub fn point_pairs(&self) -> impl FusedIterator<Item = (usize, usize)> + Clone + '_ {
+    //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
+    pub fn point_pairs(self) -> impl FusedIterator<Item = (usize, usize)> + Clone + 'g {
         self.intra_cell_pairs().chain(self.inter_cell_pairs())
     }
 }
@@ -231,4 +232,3 @@ mod tests {
         );
     }
 }
-
