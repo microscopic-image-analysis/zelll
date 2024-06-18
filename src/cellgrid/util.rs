@@ -28,6 +28,13 @@ impl<const N: usize> Aabb<N> {
         Self { inf, sup }
     }
 
+    //TODO: could also pass iterators here (single point could be wrapped by std::iter::once or Option::iter())
+    fn update(&mut self, point: [f64; N]) {
+        let point = Point::from(point);
+        self.inf = point.inf(&self.inf);
+        self.sup = point.sup(&self.sup);
+    }
+
     pub fn inf(&self) -> [f64; N] {
         self.inf.into()
     }

@@ -30,6 +30,15 @@ pub struct CellGrid<const N: usize> {
 }
 
 impl<const N: usize> CellGrid<N> {
+    // TODO: whereever I need impl Iterator<>
+    // TODO: I should probably use impl IntoIterator<Item = &'p [f64; N]> (+ Clone or + Borrow?)
+    // TODO: usually this means, that the type impl'ing IntoIterator is a reference so it can be safely copied and iterated over
+    // TODO: also maybe Item = impl Deref<Target = [f64; N]>? e.g. DashMap's iterators iterate over custom reference types
+    // TODO: cf. https://users.rust-lang.org/t/declaring-associated-item-whose-references-implement-intoiterator/17103/6
+    // TODO: cf. https://doc.rust-lang.org/stable/std/primitive.reference.html
+    // TODO: cf. https://docs.rs/pyo3/latest/pyo3/prelude/trait.PyAnyMethods.html#implementors
+    // TODO: impl IntoIterator for T: PyAnyMethods (kann ich das? brauch ich wrapper/super trait?)
+    // TODO: Bound<'py, PyAny> impl's PyAnyMethods + Clone
     pub fn new<'p>(points: impl Iterator<Item = &'p [f64; N]> + Clone, cutoff: f64) -> Self {
         CellGrid::default().rebuild(points, Some(cutoff))
     }
