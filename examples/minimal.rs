@@ -39,7 +39,7 @@ fn main() {
         let _cutoff_squared = cutoff.powi(2);
 
         //cg.for_each_point_pair(|_, _| black_box(()));
-        let mut count: usize = 0;
+        //let mut count: usize = 0;
         #[cfg(not(feature = "rayon"))]
         /*cg.filter_point_pairs(
             |_, _| {
