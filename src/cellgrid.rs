@@ -39,7 +39,7 @@ impl<const N: usize> CellGrid<N> {
     // TODO: cf. https://docs.rs/pyo3/latest/pyo3/prelude/trait.PyAnyMethods.html#implementors
     // TODO: impl IntoIterator for T: PyAnyMethods (kann ich das? brauch ich wrapper/super trait?)
     // TODO: Bound<'py, PyAny> impl's PyAnyMethods + Clone
-    pub fn new<'p>(points: impl Iterator<Item = &'p [f64; N]> + Clone, cutoff: f64) -> Self {
+    pub fn new<'p>(points: impl IntoIterator<Item = &'p [f64; N]> + Clone, cutoff: f64) -> Self {
         CellGrid::default().rebuild(points, Some(cutoff))
     }
 
@@ -50,7 +50,7 @@ impl<const N: usize> CellGrid<N> {
     #[must_use = "rebuild() consumes `self` and returns the rebuilt `CellGrid`"]
     pub fn rebuild<'p>(
         self,
-        points: impl Iterator<Item = &'p [f64; N]> + Clone,
+        points: impl IntoIterator<Item = &'p [f64; N]> + Clone,
         cutoff: Option<f64>,
     ) -> Self {
         let cutoff = cutoff.unwrap_or(self.index.grid_info.cutoff);
@@ -93,7 +93,7 @@ impl<const N: usize> CellGrid<N> {
 
     pub fn rebuild_mut<'p>(
         &mut self,
-        points: impl Iterator<Item = &'p [f64; N]> + Clone,
+        points: impl IntoIterator<Item = &'p [f64; N]> + Clone,
         cutoff: Option<f64>,
     ) {
         if self.index.rebuild_mut(points, cutoff) {

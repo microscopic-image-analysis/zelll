@@ -29,12 +29,13 @@ impl<const N: usize> FlatIndex<N> {
     //TODO: or can I chunk iterators such that rustc auto-vectorizes?
     //TODO: see https://www.nickwilcox.com/blog/autovec/
     pub fn from_points<'p>(
-        points: impl Iterator<Item = &'p [f64; N]> + Clone,
+        points: impl IntoIterator<Item = &'p [f64; N]> + Clone,
         cutoff: f64,
     ) -> Self {
-        let aabb = Aabb::from_points(points.clone());
+        let aabb = Aabb::from_points(points.clone().into_iter());
         let grid_info = GridInfo::new(aabb, cutoff);
         let index = points
+            .into_iter()
             .take(i32::MAX as usize)
             .map(|point| grid_info.flat_cell_index(point))
             .collect();
@@ -52,16 +53,17 @@ impl<const N: usize> FlatIndex<N> {
     //TODO: Documentation: return bool indicating whether the index changed at all (in length or any individual entry)
     pub fn rebuild_mut<'p>(
         &mut self,
-        points: impl Iterator<Item = &'p [f64; N]> + Clone,
+        points: impl IntoIterator<Item = &'p [f64; N]> + Clone,
         cutoff: Option<f64>,
     ) -> bool {
         let cutoff = cutoff.unwrap_or(self.grid_info.cutoff);
-        let aabb = Aabb::from_points(points.clone());
+        let aabb = Aabb::from_points(points.clone().into_iter());
         let grid_info = GridInfo::new(aabb, cutoff);
 
         //TODO:
-        self.index
-            .resize(points.clone().take(i32::MAX as usize).count(), 0);
+        let points = points.into_iter();
+        let (size_hint, _) = points.size_hint();
+        self.index.resize(size_hint, 0);
 
         let new_index = points
             .take(i32::MAX as usize)
