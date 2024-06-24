@@ -1,15 +1,27 @@
-[package]
-name = "zelll"
+[workspace]
+members = ["python"]
+
+[workspace.package]
 authors = ["Vincent Messow <vincent.messow@uni-jena.de>"]
 repository = "https://github.com/microscopic-image-analysis/zelll"
-readme = "README.md"
 license = "MIT"
-description = "tbd."
-include = ["src/*", "Cargo.toml", "README.md", "COPYING"]
 keywords = []
 categories = ["science"]
 version = "0.1.0"
 edition = "2021"
+
+[package]
+name = "zelll"
+authors.workspace = true
+repository.workspace = true
+readme = "README.md"
+license.workspace = true
+description = "tbd."
+include = ["src/*", "Cargo.toml", "README.md", "COPYING"]
+keywords.workspace = true
+categories.workspace = true
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 itertools = "0.11"

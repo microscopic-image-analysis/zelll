@@ -1,0 +1,20 @@
+[package]
+name = "python-zelll"
+authors.workspace = true
+repository.workspace = true
+readme = "README.md"
+license.workspace = true
+description = "tbd."
+#include = ["src/*", "Cargo.toml", "README.md", "COPYING"]
+keywords.workspace = true
+categories.workspace = true
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "zelll"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = "0.21.1"
+zelll = { path  = ".." }
