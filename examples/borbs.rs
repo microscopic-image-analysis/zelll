@@ -2,6 +2,8 @@ use kiss3d::camera::ArcBall;
 use kiss3d::light::Light;
 use kiss3d::nalgebra::{Point3, Vector3};
 use kiss3d::window::Window;
+use rand::distributions::Standard;
+use rand::prelude::*;
 use soa_derive::StructOfArray;
 use zelll::cellgrid::Aabb;
 use zelll::cellgrid::*;
@@ -22,8 +24,8 @@ const COHESION: f64 = 0.3;
 //TODO: some misses with Iterator::fold()?
 
 fn aabb_vertices(aabb: &Aabb<3>) -> Vec<(Point3<f64>, Point3<f64>)> {
-    let inf = aabb.inf;
-    let sup = aabb.sup;
+    let inf = aabb.inf();
+    let sup = aabb.sup();
 
     // cube edges in python python:
     // list(itertools.filterfalse(lambda edge: sum(a!=b for a,b in zip(*edge))!=1 ,itertools.combinations(itertools.product(*zip((0,0,0),(1,1,1))), 2)))
@@ -103,7 +105,10 @@ fn main() {
     let white = Point3::new(1.0, 1.0, 1.0);
     let red = Point3::new(1.0, 0.0, 0.0);
 
-    let mut cell_grid = CellGrid::new(borbs.position.iter(), OUTER_RADIUS);
+    let mut cell_grid = CellGrid::new(
+        borbs.position.iter().map(|p| p.coords.as_ref()),
+        OUTER_RADIUS,
+    );
 
     let mut cohesion: Vec<Point3<f64>> = vec![Point3::default(); NBORBS];
     let mut separation: Vec<Vector3<f64>> = vec![Vector3::default(); NBORBS];
@@ -117,11 +122,21 @@ fn main() {
             if relative_pos.norm() <= OUTER_RADIUS
             //&& borbs.direction[borb].angle(&relative_pos) < 1.7
             {
-                neighborhood[borb] += 1;
+                if borbs.direction[borb].angle(&relative_pos) < 1.7 {
+                    neighborhood[borb] += 1;
 
-                separation[borb] += relative_pos;
-                cohesion[borb] += borbs.position[other].coords;
-                alignment[borb] += borbs.direction[other];
+                    separation[borb] += relative_pos;
+                    cohesion[borb] += borbs.position[other].coords;
+                    alignment[borb] += borbs.direction[other];
+                }
+                //TODO: this block can be removed once full-space neighbor enumeration is properly implemented
+                if borbs.direction[other].angle(&-relative_pos) < 1.7 {
+                    neighborhood[other] += 1;
+
+                    separation[other] -= relative_pos;
+                    cohesion[other] += borbs.position[borb].coords;
+                    alignment[other] += borbs.direction[borb];
+                }
             }
         });
 
@@ -130,6 +145,7 @@ fn main() {
             let borb_separation = separation[i];
             let borb_alignment = alignment[i] / neighborhood[i].max(1) as f64;
 
+            //TODO: velocity verlet
             *borb.direction += COHESION * borb_cohesion
                 + SEPARATION * borb_separation
                 + ALIGNMENT * borb_alignment;
@@ -149,7 +165,7 @@ fn main() {
             window.draw_line(&a.cast::<f32>(), &b.cast::<f32>(), &red);
         }
 
-        cell_grid.rebuild_mut(borbs.position.iter(), None);
+        cell_grid.rebuild_mut(borbs.position.iter().map(|p| p.coords.as_ref()), None);
 
         cohesion.fill_with(Default::default);
         separation.fill_with(Default::default);
@@ -168,8 +184,11 @@ pub struct Borb {
 impl Borb {
     fn new_random() -> Self {
         Self {
-            position: ((Vector3::new_random() - Vector3::new(0.5, 0.5, 0.5)) * 100.0).into(),
-            direction: Vector3::new_random(),
+            position: ((Vector3::from_iterator(thread_rng().sample_iter(Standard))
+                - Vector3::new(0.5, 0.5, 0.5))
+                * 100.0)
+                .into(),
+            direction: Vector3::from_iterator(thread_rng().sample_iter(Standard)),
         }
     }
 }
@@ -183,4 +202,3 @@ impl BorbRefMut<'_> {
         *self.position += *self.direction * delta;
     }
 }
-

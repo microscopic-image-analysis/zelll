@@ -2,8 +2,10 @@ use dashmap::DashMap;
 use itertools::Itertools;
 use kiss3d::camera::ArcBall;
 use kiss3d::light::Light;
+use kiss3d::nalgebra::{Point3, Vector3};
 use kiss3d::window::Window;
-use nalgebra::{Point3, Vector3};
+use rand::distributions::Standard;
+use rand::prelude::*;
 use soa_derive::StructOfArray;
 use zelll::cellgrid::*;
 
@@ -26,6 +28,13 @@ const _SIGMA_POW12: f64 = _SIGMA_POW6 * _SIGMA_POW6;
 const LJA: f64 = 4.0 * EPSILON * _SIGMA_POW12;
 const LJB: f64 = 4.0 * EPSILON * _SIGMA_POW6;
 
+// TODO: SoAIndex::get() conflicts with Itertools::get() (>= "0.13")
+// TODO: there's nobody really at fault but I think
+// TODO: the easiest fix would be to use fully qualified syntax for SoAIndex::get()
+// TODO: where it's used inside of that proc_macro
+// TODO: probably should file an issue? or fix it myself, it's relatively simple
+// TODO: see https://github.com/lumol-org/soa-derive/blob/master/soa-derive-internal/src/index.rs
+// TODO: the reason is: some Range* types impl Iterator
 #[derive(Debug, StructOfArray)]
 #[soa_derive(Debug)]
 pub struct Bead {
@@ -36,7 +45,10 @@ pub struct Bead {
 impl Bead {
     fn new_random() -> Self {
         Self {
-            position: ((Vector3::new_random() - Vector3::new(0.5, 0.5, 0.5)) * 100.0).into(),
+            position: ((Vector3::from_iterator(thread_rng().sample_iter(Standard))
+                - Vector3::new(0.5, 0.5, 0.5))
+                * 100.0)
+                .into(),
             velocity: Vector3::new(0.0, 0.0, 0.0),
         }
     }
@@ -109,7 +121,7 @@ fn main() {
 
     let accelerations: DashMap<usize, Vector3<f64>> = DashMap::with_capacity(NBEADS);
 
-    let mut cell_grid = CellGrid::new(beads.position.iter(), CUTOFF);
+    let mut cell_grid = CellGrid::new(beads.position.iter().map(|p| p.coords.as_ref()), CUTOFF);
 
     while window.render_with_camera(&mut cam) {
         //TODO: unfortunately, soa_derive doesn't support rayon directly
@@ -169,7 +181,6 @@ fn main() {
             window.draw_line(&a.cast::<f32>(), &b.cast::<f32>(), &red);
         }
 
-        cell_grid.rebuild_mut(beads.position.iter(), None);
+        cell_grid.rebuild_mut(beads.position.iter().map(|p| p.coords.as_ref()), None);
     }
 }
-

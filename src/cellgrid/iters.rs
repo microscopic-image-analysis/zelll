@@ -2,34 +2,39 @@
 //TODO: perhaps move parallel iteration into separate submodule
 use super::{CellGrid, CellNeighbors};
 use core::iter::FusedIterator;
-//TODO: hide this behind a featureflag?
+use core::slice::Iter;
 use itertools::Itertools;
 #[cfg(feature = "rayon")]
 use rayon::prelude::ParallelIterator;
 
 /// `GridCell` represents a non-empty (by construction) cell of a `CellGrid`.
-//TODO: maybe should add assertions that the stored `head`is valid, e.g. in GridCell::index()
-//TODO: In principle, could have out-ouf-bounds head indices there.
 #[derive(Debug, Clone, Copy)]
 pub struct GridCell<'g, const N: usize> {
     //TODO: maybe provide proper accessors to these fields for neighbors.rs to use?
+    //TODO: is there a better way than having a reference to the containing CellGrid?
+    //TODO: this would make CellGrid::point_pairs() nicer (wouldn't have to collect() there)
+    //TODO: and also simplify the API because I could remove for_point_pairs() and related stuff
+    //TODO: and would just have to expose point_pairs() (would be also nice for pyo3)
+    //TODO: could use https://doc.rust-lang.org/std/rc/struct.Weak.html for this?
+    //TODO: but maybe it's better to just pass a reference to parent CellGrid where necessary
     pub(crate) grid: &'g CellGrid<N>,
-    pub(crate) head: usize,
+    pub(crate) index: i32,
 }
 
 impl<'g, const N: usize> GridCell<'g, N> {
-    /// Return the (multi-)index of this (non-empty) `GridCell`.
-    pub(crate) fn index(&self) -> [i32; N] {
-        self.grid.index.index[self.head]
+    /// Return the (flat) index of this (non-empty) `GridCell`.
+    pub(crate) fn index(&self) -> i32 {
+        self.index
     }
 
-    pub fn iter(&self) -> GridCellIterator<'g, N> {
-        GridCellIterator {
-            grid: self.grid,
-            state: Some(self.head),
-        }
+    // TODO: should probably rather impl IntoIterator to match consuming/copy behaviour of neighbors()/point_pairs()?
+    pub fn iter(&self) -> Iter<'g, usize> {
+        self.grid
+            .cell_lists
+            .cell_slice(&self.grid.cells[&self.index])
+            .iter()
     }
-
+    /*
     /// Check whether this `GridCell` is on the boundary of the [`CellGrid`].
     //TODO: I don't think I need it but let's keep it anyway
     pub fn on_boundary(&self) -> bool {
@@ -42,56 +47,92 @@ impl<'g, const N: usize> GridCell<'g, N> {
             }
         }
         false
-    }
+    }*/
 
     /// Return [`CellNeighbors`], an iterator over all (currently half-space) non-empty neighboring cells.
+    #[deprecated(
+        note = "cell_neighbors() returns CellNeighbors<N> which will be phased out soon. Use neighbors() instead."
+    )]
+    pub fn cell_neighbors(&self) -> CellNeighbors<N> {
+        CellNeighbors::half_space(self)
+    }
+
+    /// Return an iterator over all (currently half-space) non-empty neighboring cells.
     //TODO: currently only half-space and aperiodic boundaries
     //TODO: handle half-/full-space  and (a-)periodic boundary conditions
-    pub fn neighbors(&self) -> CellNeighbors<N> {
-        CellNeighbors::half_space(&self)
+    //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
+    pub fn neighbors(self) -> impl FusedIterator<Item = GridCell<'g, N>> + Clone {
+        //pub fn neighbors(&self) -> FilterMap<Iter<'g, i32>, impl FnMut(&'g i32) -> Option<GridCell<'g, N>> + Clone + '_> {
+        //TODO: could pre-compute the neighbor indices and store in self.grid.cells?
+        //todo: OR: this should be able to use SIMD efficiently, right?
+        //TODO: just chunk neighbor_indices and add onto it (however, it requires another allocation then?)
+        //TODO: or do the iteration in chunks
+        //TODO: OR: in principle could just increment neighbor_indices +1 to get abs. neighbours for the next cell
+        //TODO: However, makes parallel iteration ugly and I'd have to make sure to reset relative_indices afterwards
+        //TODO: also, doesn't really matter if I do +=1 or +self.index()
+        self.grid
+            .index
+            .neighbor_indices
+            .iter()
+            .filter_map(move |rel| {
+                let index = rel + self.index();
+                //TODO: I mean I could also store the slice since I'm already accessing its metadata?
+                //TODO: would save me one lookup into the hashmap self.grid.cells in ::iter()
+                //TODO: tested it, I gain ~2pairs/kcycle from it (32->34) might think about it again
+                //TODO: ::iter() is nicer this way, other parts less so
+                self.grid.cells.get(&index).map(|_| GridCell {
+                    grid: self.grid,
+                    index,
+                })
+            })
     }
 
     /// Iterate over all unique pairs of points in this `GridCell`.
-    fn intra_cell_pairs(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
-        self.iter().tuple_combinations::<(usize, usize)>()
+    fn intra_cell_pairs(self) -> impl FusedIterator<Item = (usize, usize)> + Clone + 'g {
+        self.iter().copied().tuple_combinations::<(usize, usize)>()
     }
 
     /// Iterate over all unique pairs of points in this `GridCell` with points of the neighboring cells.
-    fn inter_cell_pairs(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
-        self.iter().flat_map(move |i| {
+    fn inter_cell_pairs(self) -> impl FusedIterator<Item = (usize, usize)> + Clone + 'g {
+        //TODO: storing neighboring slices in a temporary allocation improves sequential iteration
+        //TODO: but negatively impacts parallel iteration (perhaps due to multiple threads wanting to allocate concurrently?)
+        /*let others: Vec<_> = self
+            .neighbors()
+            .flat_map(|cell| cell.iter().copied())
+            .collect();
+        self.iter().copied().cartesian_product(others)*/
+
+        //TODO: might help instead of having a closure in the iterator
+        //TODO: if I wanted introduce a type alias?
+        /*
+        fn copied_cell_iter<const N: usize>(cell: GridCell<N>) -> std::iter::Copied<std::slice::Iter<'_, usize>> {
+            cell.iter().copied()
+        }
+        */
+        self.iter()
+            .copied()
+            .cartesian_product(self.neighbors().flat_map(|cell| cell.iter().copied()))
+        //.cartesian_product(self.neighbors().flat_map(copied_cell_iter))
+
+        //TODO: itertools >= "0.12" cartesian_product() doesn't optimize well?
+        //TODO: possibly because of nested Option in https://github.com/rust-itertools/itertools/pull/800
+        //TODO: which is likely the correct thing to do but it's unfortunate to lose 10-15% of performance
+        //TODO: For itertools >= "0.12", two nested flat_maps perform just as well as cartesian_product()
+        /*self.iter().copied().flat_map(move |i| {
             self.neighbors()
-                .flat_map(|cell| cell.iter())
+                .flat_map(|cell| cell.iter().copied())
                 .map(move |j| (i, j))
-        })
+        })*/
     }
 
     /// Iterate over all "relevant" pairs of points within in the neighborhood of this `GridCell`.
     //TODO: explain what "relevant" means here.
     //TODO: handle full-space as well
-    pub fn point_pairs(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+    //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
+    pub fn point_pairs(self) -> impl FusedIterator<Item = (usize, usize)> + Clone + 'g {
         self.intra_cell_pairs().chain(self.inter_cell_pairs())
     }
 }
-/// Iterates over all points (or rather their indices) in the [`GridCell`] this `GridCellIterator` was created from.
-#[derive(Debug, Clone, Copy)]
-#[must_use = "iterators are lazy and do nothing unless consumed"]
-pub struct GridCellIterator<'g, const N: usize> {
-    grid: &'g CellGrid<N>,
-    state: Option<usize>,
-}
-
-impl<const N: usize> Iterator for GridCellIterator<'_, N> {
-    type Item = usize;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.state.map(|index| {
-            self.state = self.grid.cell_lists[index]; //TODO: cachegrind attributes 11.71% of D1mr misses to this line
-            index
-        })
-    }
-}
-
-impl<const N: usize> FusedIterator for GridCellIterator<'_, N> {}
 
 impl<const N: usize> CellGrid<N> {
     /// Returns an iterator over all [`GridCell`]s in this `CellGrid`, excluding empty cells.
@@ -102,32 +143,25 @@ impl<const N: usize> CellGrid<N> {
     //TODO: this example should still work but it's nonsensical
     /// ```
     /// # use zelll::cellgrid::CellGrid;
+    /// # use nalgebra::Point;
+    /// # let points = [Point::from([0.0, 0.0, 0.0]), Point::from([1.0,2.0,0.0]), Point::from([0.0, 0.1, 0.2])];
     /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
-    /// # let cell_grid = CellGrid::new(&points, 1.0);
-    /// cell_grid.iter().filter(|cell| !cell.is_empty());
+    /// # let cell_grid = CellGrid::new(points.iter(), 1.0);
+    /// cell_grid.iter().flat_map(|cell| cell.iter()).count();
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn iter(&self) -> impl Iterator<Item = GridCell<N>> {
+    pub fn iter(&self) -> impl FusedIterator<Item = GridCell<N>> + Clone {
         self.cells
-            .values()
-            // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
-            .map(move |&head| GridCell { grid: self, head })
+            .keys()
+            .map(|&index| GridCell { grid: self, index })
     }
-    //TODO: parallel iteration is broken, now that we use std::collections::HashMap instead of ndarray::ArrayD...
-    //TODO: However, if we instead switch to the crate hashbrown, we can still have that
-    //TODO: (also gives us AHash with potentially better performance than SipHash?)
-    //TODO: hashbrown does seem to spend less time hashing (using AHash) (although no noticably performance difference overall?)
-    //TODO: but increases cache misses slightly (1.1% vs 0.6% on average)... (still less than using ArrayD (1.7%))
+
     #[cfg(feature = "rayon")]
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<N>> {
         self.cells
-            .par_values()
-            // It seems a bit weird but I'm just moving a reference to self (if I'm not mistaken).
-            .map(move |&head| GridCell {
-                grid: self,
-                head: head,
-            })
+            .par_keys()
+            .map(|&index| GridCell { grid: self, index })
     }
 }
 
@@ -198,4 +232,3 @@ mod tests {
         );
     }
 }
-
