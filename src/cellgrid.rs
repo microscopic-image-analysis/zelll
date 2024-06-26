@@ -154,7 +154,7 @@ impl<const N: usize> CellGrid<N> {
     ///     });
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn point_pairs(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+    pub fn point_pairs<'p>(&'p self) -> impl Iterator<Item = (usize, usize)> + Clone + 'p {
         self.iter().flat_map(|cell| cell.point_pairs())
     }
 
