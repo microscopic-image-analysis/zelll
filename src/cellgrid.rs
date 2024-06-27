@@ -24,6 +24,7 @@ pub use storage::*;
 pub use util::*;
 //TODO: crate-global type alias for [i32/isize; N] (or [usize; N] if I revert back)
 //TODO: I wonder if I could benefit from https://docs.rs/hashbrown/latest/hashbrown/struct.HashTable.html
+//TODO: https://docs.rs/indexmap/latest/indexmap/ is essentially using HashTable but it has too much overhead for us
 #[derive(Debug, Default, Clone)]
 pub struct CellGrid<const N: usize> {
     cells: HashMap<i32, CellSliceMeta>,
