@@ -151,6 +151,7 @@ impl<const N: usize> CellGrid<N> {
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn iter(&self) -> impl FusedIterator<Item = GridCell<N>> + Clone {
+        // note that ::keys() does not keep a stable iteration order!
         self.cells
             .keys()
             .map(|&index| GridCell { grid: self, index })

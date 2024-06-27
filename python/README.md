@@ -22,12 +22,16 @@ cg = CellGrid(points, 0.5)
 # rebuild() accepts an optional cutoff parameter
 cg.rebuild(points, 1.0)
 
-# CellGrid objects are iterable, so you can use them like any other Iterable in python:
+# CellGrid objects are iterable, so you can use them like any other Iterable in Python:
 pairs = list(cg)
 pairs = [(i, j) for i, j in cg]
 pairs = []
 for i, j in cg:
     pairs.append((i, j))
+
+# Note that while CellGrid produces unique ordered index pairs, it visits its cells in arbitrary order.
+# So if you want to check whether the index pairs after `rebuild()` changed,
+# prefer `set(cg)` over `list(cg)` 
 
 # you can keep a CellGridIterator object:
 it = iter(cg)
@@ -39,23 +43,3 @@ it = iter(cg)
 # but CellGrid is and can be sent between threads instead.
 ```
 
-## Known Issues
-
-```python
-from zelll import CellGrid
-import numpy as np
-points = np.random.random_sample((10, 3))
-cg = CellGrid(points, 0.5)
-[x for x in cg]
-cg.rebuild(points, 1.0)
-[x for x in cg]
-cg.rebuild(points, 0.5)
-[x for x in cg] # removing this line causes l1 == l2, so maybe we *do* have undefined behavior? or is it just some rust-itertools quirk?
-l1 = [x for x in cg]
-cg.rebuild(points, 0.1)
-[x for x in cg]
-cg.rebuild(points, 0.5)
-l2 = [x for x in cg]
-l1 != l2
-set(l1) == set(l2)
-```

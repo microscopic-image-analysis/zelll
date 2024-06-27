@@ -23,6 +23,7 @@ use std::borrow::Borrow;
 pub use storage::*;
 pub use util::*;
 //TODO: crate-global type alias for [i32/isize; N] (or [usize; N] if I revert back)
+//TODO: I wonder if I could benefit from https://docs.rs/hashbrown/latest/hashbrown/struct.HashTable.html
 #[derive(Debug, Default, Clone)]
 pub struct CellGrid<const N: usize> {
     cells: HashMap<i32, CellSliceMeta>,
