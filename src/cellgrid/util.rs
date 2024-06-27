@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 use nalgebra::*;
-// TODO: waiting for https://doc.rust-lang.org/std/simd/struct.Simd.html#  to be stabilized
-// TODO: in order to remove nalgebra dependency
+use std::borrow::Borrow;
 
 // TODO: remove this alias?
 pub type PointCloud<const N: usize> = Vec<[f64; N]>;
@@ -14,14 +13,14 @@ pub struct Aabb<const N: usize> {
 }
 
 impl<const N: usize> Aabb<N> {
-    pub fn from_points<'p>(mut points: impl Iterator<Item = &'p [f64; N]>) -> Self {
-        let init = points.next().copied().unwrap_or([0.0f64; N]);
+    pub fn from_points(mut points: impl Iterator<Item = impl Borrow<[f64; N]>>) -> Self {
+        let init = points.next().map(|p| *p.borrow()).unwrap_or([0.0f64; N]);
         let init = Point::from(init);
 
         let (inf, sup) = points
             .take(i32::MAX as usize) //TODO: this works but maybe explicit try_into() would be better?
             .fold((init, init), |(i, s), point| {
-                let point = Point::from(*point);
+                let point = Point::from(*point.borrow());
                 (i.inf(&point), s.sup(&point))
             });
 
@@ -29,8 +28,8 @@ impl<const N: usize> Aabb<N> {
     }
 
     //TODO: could also pass iterators here (single point could be wrapped by std::iter::once or Option::iter())
-    fn update(&mut self, point: [f64; N]) {
-        let point = Point::from(point);
+    fn update(&mut self, point: impl Borrow<[f64; N]>) {
+        let point = Point::from(*point.borrow());
         self.inf = point.inf(&self.inf);
         self.sup = point.sup(&self.sup);
     }
@@ -98,8 +97,8 @@ impl<const N: usize> GridInfo<N> {
     //TODO: GridInfo knows enough to compute the cell index for an arbitrary point
     //TODO: but might make more sense in FlatIndex?
     //TODO: sth. like Lattice trait maybe
-    pub fn cell_index(&self, point: &[f64; N]) -> [i32; N] {
-        let point = Point::from(*point);
+    pub fn cell_index(&self, point: impl Borrow<[f64; N]>) -> [i32; N] {
+        let point = Point::from(*point.borrow());
 
         let idx = ((point - self.aabb.inf) / self.cutoff).map(|coord| coord.floor() as i32);
 
@@ -114,8 +113,8 @@ impl<const N: usize> GridInfo<N> {
         idx.into()
     }
 
-    pub fn flat_cell_index(&self, point: &[f64; N]) -> i32 {
-        let point = Point::from(*point);
+    pub fn flat_cell_index(&self, point: impl Borrow<[f64; N]>) -> i32 {
+        let point = Point::from(*point.borrow());
 
         ((point - self.aabb.inf) / self.cutoff)
             .map(|coord| coord.floor() as i32)
@@ -126,8 +125,8 @@ impl<const N: usize> GridInfo<N> {
         // self.flatten_index(self.cell_index(point))
     }
 
-    pub fn flatten_index(&self, idx: [i32; N]) -> i32 {
-        let i = Vector::from(idx);
+    pub fn flatten_index(&self, idx: impl Borrow<[i32; N]>) -> i32 {
+        let i = Vector::from(*idx.borrow());
 
         i.dot(&self.strides)
     }
