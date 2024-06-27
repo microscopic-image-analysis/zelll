@@ -1,8 +1,55 @@
 use ::zelll::cellgrid::*;
 use pyo3::prelude::*;
+use pyo3::types::PyIterator;
+
+#[derive(Clone)]
+struct PointsIterable<'py> {
+    inner: Bound<'py, PyAny>,
+}
+
+impl<'py> IntoIterator for PointsIterable<'py> {
+    type Item = [f64; 3];
+    type IntoIter = PointsIterator<'py>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        PointsIterator {
+            // panicking is probably not the best idea but I can't bubble up an exception to the rust-python boundary.
+            // and PyO3 seems to do the same for their specific iterators
+            iter: self.inner.iter().unwrap(),
+        }
+    }
+}
+
+#[derive(Clone)]
+struct PointsIterator<'py> {
+    iter: Bound<'py, PyIterator>,
+}
+
+impl<'py> Iterator for PointsIterator<'py> {
+    type Item = [f64; 3];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // TODO: document behavior:
+        // while next element is some Error
+        // retry getting new next element
+        // if it's None, break loop and return
+        // if it's Some, attempt conversion and break loop if it was successful
+        // otherwise, retry with next element
+        loop {
+            match self.iter.next().transpose() {
+                Ok(Some(point)) => match <[f64; 3] as FromPyObject>::extract_bound(&point) {
+                    Ok(point) => break Some(point),
+                    Err(_) => (),
+                },
+                Ok(None) => break None,
+                Err(_) => (),
+            }
+        }
+    }
+}
 
 /// 3D cell grid
-#[pyclass(name = "CellGrid")]
+#[pyclass(name = "CellGrid", module = "zelll")]
 pub struct PyCellGrid {
     inner: CellGrid<3>,
 }
@@ -10,38 +57,30 @@ pub struct PyCellGrid {
 #[pymethods]
 impl PyCellGrid {
     #[new]
-    fn new() -> Self {
-        let points: Vec<[f64; 3]> = vec![
-            [0.534, -0.491, -0.22],
-            [0.108, 0.954, 0.221],
-            [-0.629, -0.916, -0.009],
-            [-0.9, -0.15, 0.017],
-            [-0.01, -0.323, -0.173],
-            [-0.382, 0.329, 0.912],
-            [-0.609, -0.665, -0.004],
-            [0.939, 0.129, 0.676],
-            [0.544, 0.397, 0.248],
-            [0.185, 0.609, 0.12],
-        ];
+    fn new<'py>(points: &Bound<'py, PyAny>, cutoff: f64) -> Self {
+        let points = PointsIterable {
+            inner: points.clone(),
+        };
+
         Self {
-            inner: CellGrid::new(&points, 1.0),
+            inner: CellGrid::new(points, cutoff),
         }
     }
 
-    fn rebuild(mut slf: PyRefMut<'_, Self>) -> () {
-        let points: Vec<[f64; 3]> = vec![
-            [0.534, -0.491, -0.22],
-            [0.108, 0.954, 0.221],
-            [-0.629, -0.916, -0.009],
-            [-0.9, -0.15, 0.017],
-            [-0.01, -0.323, -0.173],
-            [-0.382, 0.329, 0.912],
-            [-0.609, -0.665, -0.004],
-            [0.939, 0.129, 0.676],
-            [0.544, 0.397, 0.248],
-            [0.185, 0.609, 0.12],
-        ];
-        slf.inner.rebuild_mut(points.iter().rev(), None);
+    //FIXME: not sure where it happens, but this gives duplicate pairs of indices
+    //FIXME: or doesn't rebuild properly with different thresholds
+    //FIXME: smells like undefined behavior tbh
+    #[pyo3(signature = (points, /, cutoff=None))]
+    fn rebuild<'py>(
+        mut slf: PyRefMut<'_, Self>,
+        points: &Bound<'py, PyAny>,
+        cutoff: Option<f64>,
+    ) -> () {
+        let points = PointsIterable {
+            inner: points.clone(),
+        };
+
+        slf.inner.rebuild_mut(points, cutoff);
     }
 
     fn __iter__(slf: PyRef<'_, Self>) -> PyCellGridIter {
@@ -51,7 +90,7 @@ impl PyCellGrid {
 
 // PyCellGridIter is unsendable because we need to store a PyRef directly.
 // cf. https://docs.rs/pyo3/latest/pyo3/attr.pyclass.html
-#[pyclass(name = "CellGridIter", unsendable)]
+#[pyclass(name = "CellGridIter", module = "zelll", unsendable)]
 pub struct PyCellGridIter {
     #[pyo3(get)]
     pub owner: PyObject,
