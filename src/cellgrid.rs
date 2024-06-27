@@ -19,6 +19,7 @@ pub use neighbors::*;
 #[cfg(feature = "rayon")]
 //TODO: should do a re-export of rayon?
 pub use rayon::prelude::ParallelIterator;
+use std::borrow::Borrow;
 pub use storage::*;
 pub use util::*;
 //TODO: crate-global type alias for [i32/isize; N] (or [usize; N] if I revert back)
@@ -39,7 +40,10 @@ impl<const N: usize> CellGrid<N> {
     // TODO: cf. https://docs.rs/pyo3/latest/pyo3/prelude/trait.PyAnyMethods.html#implementors
     // TODO: impl IntoIterator for T: PyAnyMethods (kann ich das? brauch ich wrapper/super trait?)
     // TODO: Bound<'py, PyAny> impl's PyAnyMethods + Clone
-    pub fn new<'p>(points: impl IntoIterator<Item = &'p [f64; N]> + Clone, cutoff: f64) -> Self {
+    pub fn new(
+        points: impl IntoIterator<Item = impl Borrow<[f64; N]>> + Clone,
+        cutoff: f64,
+    ) -> Self {
         CellGrid::default().rebuild(points, Some(cutoff))
     }
 
@@ -48,9 +52,9 @@ impl<const N: usize> CellGrid<N> {
     //TODO: If FlatIndex did not change, we don't need to update.
     //TODO: Therefore we check for that and make CellGrid::new() just a wrapper around CellGrid::rebuild (with an initially empty FlatIndex)
     #[must_use = "rebuild() consumes `self` and returns the rebuilt `CellGrid`"]
-    pub fn rebuild<'p>(
+    pub fn rebuild(
         self,
-        points: impl IntoIterator<Item = &'p [f64; N]> + Clone,
+        points: impl IntoIterator<Item = impl Borrow<[f64; N]>> + Clone,
         cutoff: Option<f64>,
     ) -> Self {
         let cutoff = cutoff.unwrap_or(self.index.grid_info.cutoff);
@@ -91,9 +95,9 @@ impl<const N: usize> CellGrid<N> {
         }
     }
 
-    pub fn rebuild_mut<'p>(
+    pub fn rebuild_mut(
         &mut self,
-        points: impl IntoIterator<Item = &'p [f64; N]> + Clone,
+        points: impl IntoIterator<Item = impl Borrow<[f64; N]>> + Clone,
         cutoff: Option<f64>,
     ) {
         if self.index.rebuild_mut(points, cutoff) {

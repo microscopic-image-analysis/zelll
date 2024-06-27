@@ -5,6 +5,7 @@
 //TODO: i.e. index in flatindex corresponds to index in point cloud
 use crate::cellgrid::neighbors::RelativeNeighborIndices;
 use crate::cellgrid::util::*;
+use std::borrow::Borrow;
 //use itertools::Itertools;
 
 #[derive(Debug, PartialEq, Default, Clone)]
@@ -28,8 +29,8 @@ impl<const N: usize> FlatIndex<N> {
     //TODO: see https://www.rustsim.org/blog/2020/03/23/simd-aosoa-in-nalgebra/#using-simd-aosoa-for-linear-algebra-in-rust-ultraviolet-and-nalgebra
     //TODO: or can I chunk iterators such that rustc auto-vectorizes?
     //TODO: see https://www.nickwilcox.com/blog/autovec/
-    pub fn from_points<'p>(
-        points: impl IntoIterator<Item = &'p [f64; N]> + Clone,
+    pub fn from_points(
+        points: impl IntoIterator<Item = impl Borrow<[f64; N]>> + Clone,
         cutoff: f64,
     ) -> Self {
         let aabb = Aabb::from_points(points.clone().into_iter());
@@ -37,7 +38,7 @@ impl<const N: usize> FlatIndex<N> {
         let index = points
             .into_iter()
             .take(i32::MAX as usize)
-            .map(|point| grid_info.flat_cell_index(point))
+            .map(|point| grid_info.flat_cell_index(point.borrow()))
             .collect();
 
         Self {
@@ -51,9 +52,9 @@ impl<const N: usize> FlatIndex<N> {
     }
     // there is no rebuild(), named it rebuild_mut() to match CellGrid::rebuild_mut()
     //TODO: Documentation: return bool indicating whether the index changed at all (in length or any individual entry)
-    pub fn rebuild_mut<'p>(
+    pub fn rebuild_mut(
         &mut self,
-        points: impl IntoIterator<Item = &'p [f64; N]> + Clone,
+        points: impl IntoIterator<Item = impl Borrow<[f64; N]>> + Clone,
         cutoff: Option<f64>,
     ) -> bool {
         let cutoff = cutoff.unwrap_or(self.grid_info.cutoff);
@@ -67,7 +68,7 @@ impl<const N: usize> FlatIndex<N> {
 
         let new_index = points
             .take(i32::MAX as usize)
-            .map(|point| grid_info.flat_cell_index(point));
+            .map(|point| grid_info.flat_cell_index(point.borrow()));
         self.grid_info = grid_info;
 
         self.neighbor_indices = RelativeNeighborIndices::half_space()
