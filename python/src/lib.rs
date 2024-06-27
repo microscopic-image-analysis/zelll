@@ -90,16 +90,15 @@ impl PyCellGrid {
 // cf. https://docs.rs/pyo3/latest/pyo3/attr.pyclass.html
 #[pyclass(name = "CellGridIter", module = "zelll", unsendable)]
 pub struct PyCellGridIter {
-    #[pyo3(get)]
-    pub owner: PyObject,
-    _uphold_borrow: PyRef<'static, PyCellGrid>,
+    _owner: PyObject,
+    _keep_borrow: PyRef<'static, PyCellGrid>,
     iter: Box<dyn Iterator<Item = (usize, usize)>>,
 }
 
 impl PyCellGridIter {
     fn new(py_cellgrid: PyRef<'_, PyCellGrid>) -> Self {
         let py = py_cellgrid.py();
-        let owner = (&py_cellgrid).into_py(py);
+        let _owner = (&py_cellgrid).into_py(py);
         let iter = Box::new((&py_cellgrid).inner.point_pairs());
         // SAFETY: lol
         // replicating some ideas from
@@ -111,11 +110,11 @@ impl PyCellGridIter {
             >(iter)
         };
         // SAFETY: lol
-        let static_borrow: PyRef<'static, PyCellGrid> = unsafe { std::mem::transmute(py_cellgrid) };
+        let _keep_borrow: PyRef<'static, PyCellGrid> = unsafe { std::mem::transmute(py_cellgrid) };
 
         Self {
-            owner,
-            _uphold_borrow: static_borrow,
+            _owner,
+            _keep_borrow,
             iter,
         }
     }
