@@ -67,9 +67,6 @@ impl PyCellGrid {
         }
     }
 
-    //FIXME: not sure where it happens, but this gives duplicate pairs of indices
-    //FIXME: or doesn't rebuild properly with different thresholds
-    //FIXME: smells like undefined behavior tbh
     #[pyo3(signature = (points, /, cutoff=None))]
     fn rebuild<'py>(
         mut slf: PyRefMut<'_, Self>,
@@ -81,6 +78,7 @@ impl PyCellGrid {
         };
 
         slf.inner.rebuild_mut(points, cutoff);
+        // slf.inner = (&slf.inner).clone().rebuild(points, cutoff);
     }
 
     fn __iter__(slf: PyRef<'_, Self>) -> PyCellGridIter {

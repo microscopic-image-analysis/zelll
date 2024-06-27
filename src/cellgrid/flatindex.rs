@@ -61,12 +61,11 @@ impl<const N: usize> FlatIndex<N> {
         let aabb = Aabb::from_points(points.clone().into_iter());
         let grid_info = GridInfo::new(aabb, cutoff);
 
-        //TODO:
-        let points = points.into_iter();
-        let (size_hint, _) = points.size_hint();
-        self.index.resize(size_hint, 0);
+        let size = points.clone().into_iter().take(i32::MAX as usize).count();
+        self.index.resize(size, 0);
 
         let new_index = points
+            .into_iter()
             .take(i32::MAX as usize)
             .map(|point| grid_info.flat_cell_index(point.borrow()));
         self.grid_info = grid_info;
