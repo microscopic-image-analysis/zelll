@@ -1,5 +1,7 @@
 # `python-zelll`
 
+proof-of-concept bindings for `zelll` with the aim to allow for idiomatic use in Python.
+
 ## Try it Yourself
 
 The following steps assume a working Rust toolchain.
@@ -9,7 +11,7 @@ The following steps assume a working Rust toolchain.
 3. create and activate a virtual environment: `python3 -m venv .venv && source .venv/bin/activate`
 4. (optionally install `numpy` in your environment for testing purposes)
 5. run `maturin develop` to build and install a `.whl` into the current virtual environment
-6. start a Python REPL and start playing around (currently w/o any documentation):
+6. open a Python REPL and start playing around (currently w/o any documentation):
 ```python
 from zelll import CellGrid
 import numpy as np
@@ -42,5 +44,22 @@ it = iter(cg)
 # (see above for examples)
 # Additionally, CellGridIterator is not thread-safe 
 # but CellGrid is and can be sent between threads instead.
+
+# The index pairs produced by CellGridIterator also contain pairs
+# with distance > cutoff.
+# Here's an example dropping the index pairs with distance > cutoff.
+# Note that there are faster ways to compute the (squared) euclidean distance.
+pairs = [(i,j) for i, j in cg if np.linalg.norm(points[i] - points[j]) <= 0.5]
 ```
+
+## TODO
+
+- [ ] measure bindings performance overhead
+- [ ] fully convince myself that usage of std::mem::transmute() is sound
+- [ ] complete API
+- [ ] documentation
+    * [ ] integrate with readthedocs.io
+- [ ] distribution
+    * [ ] build `*.whl`s on CI
+    * [ ] publish to PyPI on release
 
