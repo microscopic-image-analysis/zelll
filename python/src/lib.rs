@@ -104,7 +104,8 @@ impl PyCellGridIter {
         let iter = Box::new((&py_cellgrid).inner.point_pairs());
         // SAFETY: lol
         // replicating some ideas from
-        // https://github.com/PyO3/pyo3/issues/1085
+        // https://github.com/PyO3/pyo3/issues/1085 and
+        // https://github.com/PyO3/pyo3/issues/1089
         let iter = unsafe {
             std::mem::transmute::<
                 Box<dyn Iterator<Item = (usize, usize)> + '_>,
