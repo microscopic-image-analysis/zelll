@@ -13,8 +13,7 @@ impl<'py> IntoIterator for PointsIterable<'py> {
 
     fn into_iter(self) -> Self::IntoIter {
         PointsIterator {
-            // panicking is probably not the best idea but I can't bubble up an exception to the rust-python boundary.
-            // and PyO3 seems to do the same for their specific iterators
+            // PyO3 also just `unwrap()`s in their specific iterators
             iter: self.inner.iter().unwrap(),
         }
     }
@@ -90,7 +89,10 @@ impl PyCellGrid {
 // cf. https://docs.rs/pyo3/latest/pyo3/attr.pyclass.html
 #[pyclass(name = "CellGridIter", module = "zelll", unsendable)]
 pub struct PyCellGridIter {
+    // TODO: it looks like we probably don't need `_owner`
     _owner: PyObject,
+    // `_keep_borrow` is enough to maintain correct drop order *and* prevents `PyCellGrid`
+    // from being mutated while `PyCellGridIter` is still alive
     _keep_borrow: PyRef<'static, PyCellGrid>,
     iter: Box<dyn Iterator<Item = (usize, usize)>>,
 }
@@ -110,6 +112,9 @@ impl PyCellGridIter {
             >(iter)
         };
         // SAFETY: lol
+        // TODO: check whether we can transmute `_owner` (or `py`) to extend lifetime
+        // TODO: instead of `_keep_borrow`
+        // TODO: and get the same behavior + thread safety?
         let _keep_borrow: PyRef<'static, PyCellGrid> = unsafe { std::mem::transmute(py_cellgrid) };
 
         Self {
@@ -119,6 +124,18 @@ impl PyCellGridIter {
         }
     }
 }
+
+// impl Drop for PyCellGrid {
+//     fn drop(&mut self) {
+//         eprintln!("Dropping PyCellGrid");
+//     }
+// }
+
+// impl Drop for PyCellGridIter {
+//     fn drop(&mut self) {
+//         eprintln!("Dropping PyCellGridIter");
+//     }
+// }
 
 #[pymethods]
 impl PyCellGridIter {
@@ -131,7 +148,7 @@ impl PyCellGridIter {
     }
 }
 
-/// A Python module implemented in Rust.
+/// `python-zelll`
 #[pymodule]
 fn zelll(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCellGrid>()?;
