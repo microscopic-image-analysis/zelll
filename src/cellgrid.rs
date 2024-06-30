@@ -22,7 +22,9 @@ pub use rayon::prelude::ParallelIterator;
 use std::borrow::Borrow;
 pub use storage::*;
 pub use util::*;
-//TODO: crate-global type alias for [i32/isize; N] (or [usize; N] if I revert back)
+//TODO: make CellGrid and related stuff generic over (internally) used numeric types: https://docs.rs/num-traits/latest/num_traits/
+//TODO: expose type aliases for practical combinations of numeric primitive types
+//TODO: decide what's getting re-exported at the crate root
 //TODO: I wonder if I could benefit from https://docs.rs/hashbrown/latest/hashbrown/struct.HashTable.html
 //TODO: https://docs.rs/indexmap/latest/indexmap/ is essentially using HashTable but it has too much overhead for us
 #[derive(Debug, Default, Clone)]
