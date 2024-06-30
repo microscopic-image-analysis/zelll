@@ -129,7 +129,9 @@ impl<'g, const N: usize> GridCell<'g, N> {
     //TODO: explain what "relevant" means here.
     //TODO: handle full-space as well
     //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
-    pub fn point_pairs(self) -> impl FusedIterator<Item = (usize, usize)> + Clone + 'g {
+    pub fn point_pairs(
+        self,
+    ) -> impl FusedIterator<Item = (usize, usize)> + Clone + Send + Sync + 'g {
         self.intra_cell_pairs().chain(self.inter_cell_pairs())
     }
 }
