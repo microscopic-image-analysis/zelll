@@ -147,6 +147,9 @@ impl<const N: usize> Iterator for RelativeNeighborIndices<N> {
     fn next(&mut self) -> Option<Self::Item> {
         match self.state {
             // Iterator stops if the current state is already the last (which is always BalancedTernary::MAX)
+            // FIXME: we should only return None after we returned ::MAX once
+            // FIXME: however we made addition saturating and don't keep the carry trit
+            // FIXME: could store an `exhausted: bool` flag and check that after seeing ::MAX for the first time
             max if max == BalancedTernary::MAX => None,
             // Skip the center cell
             zero if zero == BalancedTernary::ZERO => {

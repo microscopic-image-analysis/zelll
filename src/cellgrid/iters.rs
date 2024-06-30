@@ -1,6 +1,6 @@
 //TODO iterate over all neighboured cells (full/half space), pairs of particles
 //TODO: perhaps move parallel iteration into separate submodule
-use super::{CellGrid, CellNeighbors};
+use super::{neighbors::CellNeighbors, CellGrid};
 use core::iter::FusedIterator;
 use core::slice::Iter;
 use itertools::Itertools;

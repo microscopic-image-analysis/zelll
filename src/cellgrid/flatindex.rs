@@ -3,10 +3,9 @@
 //TODO: maybe FlatIndex should know about a point cloud (i.e. store a reference?)
 //TODO: Also: currently assuming that the order of points in point cloud does not change
 //TODO: i.e. index in flatindex corresponds to index in point cloud
-use crate::cellgrid::neighbors::RelativeNeighborIndices;
 use crate::cellgrid::util::*;
+use itertools::Itertools;
 use std::borrow::Borrow;
-//use itertools::Itertools;
 
 #[derive(Debug, PartialEq, Default, Clone)]
 pub struct FlatIndex<const N: usize> {
@@ -20,9 +19,7 @@ impl<const N: usize> FlatIndex<N> {
         Self {
             grid_info: info,
             index: Vec::with_capacity(capacity),
-            neighbor_indices: RelativeNeighborIndices::half_space()
-                .map(|idx| info.flatten_index(idx))
-                .collect(),
+            neighbor_indices: FlatIndex::neighbor_indices(&info, 1),
         }
     }
     //TODO: this is a candidate for SIMD AoSoA
@@ -44,10 +41,7 @@ impl<const N: usize> FlatIndex<N> {
         Self {
             grid_info,
             index,
-            //TODO: it's a bit annoying that we're handling half-/full-space here, i.e. we currently would need to re-compute the FlatIndex to switch. This is not very nice behaviour.
-            neighbor_indices: RelativeNeighborIndices::half_space()
-                .map(|idx| grid_info.flatten_index(idx))
-                .collect(),
+            neighbor_indices: FlatIndex::neighbor_indices(&grid_info, 1),
         }
     }
     // there is no rebuild(), named it rebuild_mut() to match CellGrid::rebuild_mut()
@@ -70,36 +64,10 @@ impl<const N: usize> FlatIndex<N> {
             .map(|point| grid_info.flat_cell_index(point.borrow()));
         self.grid_info = grid_info;
 
-        // TODO: this actually boils down to just enumerating from 1 to 13
-        // TODO: and could also work for larger neighbor "kernels" (e.g. order 5x5 instead of 3x3)?
-        // TODO: or does it rely on my +1 strides hack?
-        // TODO: just have to compute neighbors = floor(order^N/2)
-        // TODO: (probably don't need floor(), could just do +1 somewhere since order is odd)
-        // TODO: and could maybe just store the range 1..=neighbors (although I'd prefer a exclusive range)
-        // FIXME: there seems to be a Bug in this map()/flatten_index() or RelativeNeighborIndices?
-        self.neighbor_indices = RelativeNeighborIndices::half_space()
-            .map(|idx| grid_info.flatten_index(idx))
-            .collect();
-        // FIXME: it doesn't produce the same as this and sometimes even redundant values
-        // eprintln!("{:?}", self.neighbor_indices);
-        // self.neighbor_indices = [-2, -1, 0, 1, 2].into_iter()
-        //     .map(|_| [-2, -1, 0, 1, 2].into_iter() )
-        //     .multi_cartesian_product()
-        //     .map(|idx| grid_info.flatten_index(TryInto::<[i32; N]>::try_into(idx).unwrap()))
-        //     .filter(|idx| idx.is_positive())
-        //     .collect();
-        // eprintln!("{:?}", self.neighbor_indices);
-        // [1, 1, 2, 3, 3, 4, 5, 5, 6, 7, 7, 8]
-        // [3, 5, 1, 7, 4, 6, 2, 8, 5, 1, 7, 3, 9]
-        //
-        // [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-        // [5, 8, 2, 11, 6, 9, 3, 12, 7, 1, 10, 4, 13]
-        // FIXME: first, RelativeNeighbors omits the last relative neighbor? check for 2D
-        // FIXME: second, redundant flat indices indicate a bug in computing shape/strides
-        // FIXME: probably my +1 hack/trick. so it should be revisited
-        // FIXME: especially in light of allowing higher order neighborhoods (with cells of edge length cutoff/(order-1/2))
-        // FIXME: third, with larger shape/strides instead of +1 strides hack, the flat relative neighbor indices are not simply 1..=13 anymore?
-        // FIXME: actually need to think about this, I think it's just due to my specific test case 1..=13
+        // FIXME: there seems to be a Bug in shape/stride computation, causing redundant indices for small shapes e.g. (2,2,2)?
+        // FIXME: at least it used to, with RelativeNeighborIndices
+        self.neighbor_indices = FlatIndex::neighbor_indices(&grid_info, 1);
+        eprintln!("{:?}", self.neighbor_indices);
 
         let index_changed =
             self.index
@@ -114,6 +82,23 @@ impl<const N: usize> FlatIndex<N> {
                     }
                 });
         index_changed
+    }
+}
+
+// TODO: maybe make it part of the public API to allow changing the rank of the neighborhood
+// TODO: but then we should make sure to re-scale the cell edge lengths, i.e. GridInfo needs to know about the neighborhood
+// TODO: or store not the actual cutoff but rescaled. The public API should at most expose the option to set neighborhood rank
+// TODO: this could easily handle full space as well (just have to ignore center of the neighborhood)
+impl<const N: usize> FlatIndex<N> {
+    fn neighbor_indices(grid_info: &GridInfo<N>, rank: i32) -> Vec<i32> {
+        assert!(rank > 0, "rank should be positive"); // TODO: not sure if it makes sense to use u32 or NonZero<u32> here?
+
+        (0..N)
+            .map(|_| -rank..=rank)
+            .multi_cartesian_product()
+            .map(|idx| grid_info.flatten_index(TryInto::<[i32; N]>::try_into(idx).unwrap()))
+            .take((2 * rank + 1).pow(N as u32) as usize / 2) // equivalent to .div_euclid()
+            .collect()
     }
 }
 
