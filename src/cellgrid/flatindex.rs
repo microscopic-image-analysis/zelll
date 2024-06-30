@@ -98,7 +98,8 @@ impl<const N: usize> FlatIndex<N> {
         // FIXME: second, redundant flat indices indicate a bug in computing shape/strides
         // FIXME: probably my +1 hack/trick. so it should be revisited
         // FIXME: especially in light of allowing higher order neighborhoods (with cells of edge length cutoff/(order-1/2))
-        // FIXME: third, with larger shape/strides instead of +1 strides hack, the flat relative neighbor indices are not simply 1..=13 anymore
+        // FIXME: third, with larger shape/strides instead of +1 strides hack, the flat relative neighbor indices are not simply 1..=13 anymore?
+        // FIXME: actually need to think about this, I think it's just due to my specific test case 1..=13
 
         let index_changed =
             self.index
