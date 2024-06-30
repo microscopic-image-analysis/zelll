@@ -19,7 +19,7 @@ impl<const N: usize> FlatIndex<N> {
         Self {
             grid_info: info,
             index: Vec::with_capacity(capacity),
-            neighbor_indices: FlatIndex::neighbor_indices(&info, 1),
+            neighbor_indices: FlatIndex::neighbor_indices(info, 1),
         }
     }
     //TODO: this is a candidate for SIMD AoSoA
@@ -41,7 +41,7 @@ impl<const N: usize> FlatIndex<N> {
         Self {
             grid_info,
             index,
-            neighbor_indices: FlatIndex::neighbor_indices(&grid_info, 1),
+            neighbor_indices: FlatIndex::neighbor_indices(grid_info, 1),
         }
     }
     // there is no rebuild(), named it rebuild_mut() to match CellGrid::rebuild_mut()
@@ -66,8 +66,7 @@ impl<const N: usize> FlatIndex<N> {
 
         // FIXME: there seems to be a Bug in shape/stride computation, causing redundant indices for small shapes e.g. (2,2,2)?
         // FIXME: at least it used to, with RelativeNeighborIndices
-        self.neighbor_indices = FlatIndex::neighbor_indices(&grid_info, 1);
-        eprintln!("{:?}", self.neighbor_indices);
+        self.neighbor_indices = FlatIndex::neighbor_indices(grid_info, 1);
 
         let index_changed =
             self.index
@@ -90,13 +89,15 @@ impl<const N: usize> FlatIndex<N> {
 // TODO: or store not the actual cutoff but rescaled. The public API should at most expose the option to set neighborhood rank
 // TODO: this could easily handle full space as well (just have to ignore center of the neighborhood)
 impl<const N: usize> FlatIndex<N> {
-    fn neighbor_indices(grid_info: &GridInfo<N>, rank: i32) -> Vec<i32> {
-        assert!(rank > 0, "rank should be positive"); // TODO: not sure if it makes sense to use u32 or NonZero<u32> here?
+    fn neighbor_indices(grid_info: GridInfo<N>, rank: i32) -> Vec<i32> {
+        // TODO: not sure if it makes sense to use u32 or NonZero<u32> here?
+        assert!(rank > 0, "rank should be positive");
 
         (0..N)
-            .map(|_| -rank..=rank)
+            .map(|_| (-rank..rank + 1))
             .multi_cartesian_product()
             .map(|idx| grid_info.flatten_index(TryInto::<[i32; N]>::try_into(idx).unwrap()))
+            //.take_while(|idx| *idx != 0) // not sure which one I like better
             .take((2 * rank + 1).pow(N as u32) as usize / 2) // equivalent to .div_euclid()
             .collect()
     }
