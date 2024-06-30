@@ -70,18 +70,33 @@ impl<const N: usize> FlatIndex<N> {
             .map(|point| grid_info.flat_cell_index(point.borrow()));
         self.grid_info = grid_info;
 
+        // TODO: this actually boils down to just enumerating from 1 to 13
+        // TODO: and should also work for larger neighbor "kernels" (e.g. order 5x5 instead of 3x3)
+        // TODO: just have to compute neighbors = floor(order^N/2)
+        // TODO: (probably don't need floor(), could just do +1 somewhere since order is odd)
+        // TODO: and could maybe just store the range 1..=neighbors (although I'd prefer a exclusive range)
+        // FIXME: there seems to be a Bug in this map()/flatten_index() or RelativeNeighborIndices?
         self.neighbor_indices = RelativeNeighborIndices::half_space()
             .map(|idx| grid_info.flatten_index(idx))
             .collect();
-        //FIXME: this is full-space but my tests don't seem to mind?
-        //FIXME: make sure to only cover half-space here
-        /*
-        self.neighbor_indices = [-1, 0, 1].into_iter()
-            .map(|_| [-1, 0, 1].into_iter() )
-            .multi_cartesian_product()
-            .map(|idx| grid_info.flatten_index(idx.try_into().unwrap()))
-            .collect();
-        */
+        // FIXME: it doesn't produce the same as this and sometimes even redundant values
+        // eprintln!("{:?}", self.neighbor_indices);
+        // self.neighbor_indices = [-2, -1, 0, 1, 2].into_iter()
+        //     .map(|_| [-2, -1, 0, 1, 2].into_iter() )
+        //     .multi_cartesian_product()
+        //     .map(|idx| grid_info.flatten_index(TryInto::<[i32; N]>::try_into(idx).unwrap()))
+        //     .filter(|idx| idx.is_positive())
+        //     .collect();
+        // eprintln!("{:?}", self.neighbor_indices);
+        // [1, 1, 2, 3, 3, 4, 5, 5, 6, 7, 7, 8]
+        // [3, 5, 1, 7, 4, 6, 2, 8, 5, 1, 7, 3, 9]
+        //
+        // [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        // [5, 8, 2, 11, 6, 9, 3, 12, 7, 1, 10, 4, 13]
+        // FIXME: first, RelativeNeighbors omits the last relative neighbor? check for 2D
+        // FIXME: second, redundant flat indices indicate a bug in computing shape/strides
+        // FIXME: probably my +1 hack/trick. so it should be revisited
+        // FIXME: especially in light of allowing higher order neighborhoods (with cells of edge length cutoff/(order-1/2))
 
         let index_changed =
             self.index
