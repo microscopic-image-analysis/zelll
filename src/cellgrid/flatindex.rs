@@ -71,7 +71,8 @@ impl<const N: usize> FlatIndex<N> {
         self.grid_info = grid_info;
 
         // TODO: this actually boils down to just enumerating from 1 to 13
-        // TODO: and should also work for larger neighbor "kernels" (e.g. order 5x5 instead of 3x3)
+        // TODO: and could also work for larger neighbor "kernels" (e.g. order 5x5 instead of 3x3)?
+        // TODO: or does it rely on my +1 strides hack?
         // TODO: just have to compute neighbors = floor(order^N/2)
         // TODO: (probably don't need floor(), could just do +1 somewhere since order is odd)
         // TODO: and could maybe just store the range 1..=neighbors (although I'd prefer a exclusive range)
@@ -97,6 +98,7 @@ impl<const N: usize> FlatIndex<N> {
         // FIXME: second, redundant flat indices indicate a bug in computing shape/strides
         // FIXME: probably my +1 hack/trick. so it should be revisited
         // FIXME: especially in light of allowing higher order neighborhoods (with cells of edge length cutoff/(order-1/2))
+        // FIXME: third, with larger shape/strides instead of +1 strides hack, the flat relative neighbor indices are not simply 1..=13 anymore
 
         let index_changed =
             self.index
