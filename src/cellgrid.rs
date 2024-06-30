@@ -5,7 +5,7 @@ pub mod flatindex;
 #[allow(dead_code)]
 pub mod iters;
 #[allow(dead_code)]
-pub mod neighbors;
+mod neighbors;
 #[allow(dead_code)]
 pub mod storage;
 #[allow(dead_code)]
@@ -14,8 +14,6 @@ pub mod util;
 pub use flatindex::*;
 use hashbrown::HashMap;
 pub use iters::*;
-use itertools::Itertools;
-pub use neighbors::*;
 #[cfg(feature = "rayon")]
 //TODO: should do a re-export of rayon?
 pub use rayon::prelude::ParallelIterator;
