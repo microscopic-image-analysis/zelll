@@ -96,14 +96,14 @@ impl<const N: usize> FlatIndex<N> {
 impl<const N: usize> FlatIndex<N> {
     fn neighbor_indices(grid_info: GridInfo<N>) -> Vec<i32> {
         // this is the rank of the neighborhood, 1 -> 3^N, 2 -> 5^N
-        let rank = 1;
+        const RANK: i32 = 1;
 
         (0..N)
-            .map(|_| (-rank..rank + 1))
+            .map(|_| (-RANK..RANK + 1))
             .multi_cartesian_product()
             .map(|idx| grid_info.flatten_index(TryInto::<[i32; N]>::try_into(idx).unwrap()))
             //.take_while(|idx| *idx != 0) // not sure which one I like better
-            .take((2 * rank + 1).pow(N as u32) as usize / 2) // equivalent to .div_euclid()
+            .take((2 * RANK + 1).pow(N as u32) as usize / 2) // equivalent to .div_euclid()
             .collect()
     }
 }

@@ -85,7 +85,14 @@ impl<const N: usize> CellGrid<N> {
                 .iter()
                 .enumerate()
                 //TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
-                .for_each(|(i, cell)| cell_lists.push(i, cells.get_mut(cell).unwrap()));
+                .for_each(|(i, cell)| {
+                    cell_lists.push(
+                        i,
+                        cells
+                            .get_mut(cell)
+                            .expect("cell grid should contain every cell in the grid index"),
+                    )
+                });
 
             Self {
                 cells,
@@ -126,16 +133,20 @@ impl<const N: usize> CellGrid<N> {
             //TODO: (if updated point cloud did not shrink in length)
             self.cells.shrink_to_fit();
 
-            for (i, cell) in self.index.index.iter().enumerate() {
+            self.index
+                .index
+                .iter()
+                .enumerate()
                 //TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
                 //TODO: could use unwrap_unchecked() since this can't/shouldn't fail
-                self.cell_lists.push(
-                    i,
-                    self.cells
-                        .get_mut(cell)
-                        .expect("cell grid should contain every cell in the grid index"),
-                );
-            }
+                .for_each(|(i, cell)| {
+                    self.cell_lists.push(
+                        i,
+                        self.cells
+                            .get_mut(cell)
+                            .expect("cell grid should contain every cell in the grid index"),
+                    )
+                });
         }
     }
 
