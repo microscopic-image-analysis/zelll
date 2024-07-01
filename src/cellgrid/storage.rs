@@ -41,7 +41,7 @@ impl<T> CellStorage<T> {
     }
 
     //TODO: choose appropriate Error type
-    pub fn try_push(&mut self, value: T, metadata: &mut CellSliceMeta) {
+    pub fn try_push(&mut self, _value: T, _metadata: &mut CellSliceMeta) {
         todo!()
     }
 
@@ -108,7 +108,7 @@ impl CellSliceMeta {
     }
 
     //TODO: proper error type?
-    pub fn try_move_cursor(&mut self, steps: usize) {
+    pub fn try_move_cursor(&mut self, _steps: usize) {
         todo!()
     }
 }
