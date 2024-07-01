@@ -19,7 +19,7 @@ impl<const N: usize> FlatIndex<N> {
         Self {
             grid_info: info,
             index: Vec::with_capacity(capacity),
-            neighbor_indices: FlatIndex::neighbor_indices(info, 1),
+            neighbor_indices: FlatIndex::neighbor_indices(info),
         }
     }
     //TODO: this is a candidate for SIMD AoSoA
@@ -41,7 +41,7 @@ impl<const N: usize> FlatIndex<N> {
         Self {
             grid_info,
             index,
-            neighbor_indices: FlatIndex::neighbor_indices(grid_info, 1),
+            neighbor_indices: FlatIndex::neighbor_indices(grid_info),
         }
     }
     // there is no rebuild(), named it rebuild_mut() to match CellGrid::rebuild_mut()
@@ -64,9 +64,8 @@ impl<const N: usize> FlatIndex<N> {
             .map(|point| grid_info.flat_cell_index(point.borrow()));
         self.grid_info = grid_info;
 
-        // FIXME: there seems to be a Bug in shape/stride computation, causing redundant indices for small shapes e.g. (2,2,2)?
-        // FIXME: at least it used to, with RelativeNeighborIndices
-        self.neighbor_indices = FlatIndex::neighbor_indices(grid_info, 1);
+        // FIXME: there seems to be a bug in shape/stride computation, causing redundant indices for small shapes e.g. (2,2,2)?
+        self.neighbor_indices = FlatIndex::neighbor_indices(grid_info);
 
         let index_changed =
             self.index
@@ -86,12 +85,18 @@ impl<const N: usize> FlatIndex<N> {
 
 // TODO: maybe make it part of the public API to allow changing the rank of the neighborhood
 // TODO: but then we should make sure to re-scale the cell edge lengths, i.e. GridInfo needs to know about the neighborhood
-// TODO: or store not the actual cutoff but rescaled. The public API should at most expose the option to set neighborhood rank
+// TODO: GridInfo should store rank and cutoff, so neighbor_indices can access it.
+// TODO: However, for rank > 1, HashMap is not the best choice anymore. for N=3: 62 vs 13 neighboring cells (half-space)
+// TODO: that many random lookups add up. Also, more non-empty cells makes HashMap construction more expensive
+// TODO: for higher ranks, we'd sth. with more spatial locality
+// TODO:
 // TODO: this could easily handle full space as well (just have to ignore center of the neighborhood)
+// TODO: in this case (-rank..rank+1) is not quite ideal. sth. like (0..rank+1).chain(-rank..0)
+// TODO: and then skip first element of cartesian product
 impl<const N: usize> FlatIndex<N> {
-    fn neighbor_indices(grid_info: GridInfo<N>, rank: i32) -> Vec<i32> {
-        // TODO: not sure if it makes sense to use u32 or NonZero<u32> here?
-        assert!(rank > 0, "rank should be positive");
+    fn neighbor_indices(grid_info: GridInfo<N>) -> Vec<i32> {
+        // this is the rank of the neighborhood, 1 -> 3^N, 2 -> 5^N
+        let rank = 1;
 
         (0..N)
             .map(|_| (-rank..rank + 1))
