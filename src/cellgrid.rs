@@ -5,8 +5,6 @@ pub mod flatindex;
 #[allow(dead_code)]
 pub mod iters;
 #[allow(dead_code)]
-mod neighbors;
-#[allow(dead_code)]
 pub mod storage;
 #[allow(dead_code)]
 pub mod util;
