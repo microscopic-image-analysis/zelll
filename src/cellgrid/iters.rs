@@ -1,6 +1,6 @@
 //TODO iterate over all neighboured cells (full/half space), pairs of particles
 //TODO: perhaps move parallel iteration into separate submodule
-use super::{neighbors::CellNeighbors, CellGrid};
+use super::CellGrid;
 use core::iter::FusedIterator;
 use core::slice::Iter;
 use itertools::Itertools;
@@ -48,14 +48,6 @@ impl<'g, const N: usize> GridCell<'g, N> {
         }
         false
     }*/
-
-    /// Return [`CellNeighbors`], an iterator over all (currently half-space) non-empty neighboring cells.
-    #[deprecated(
-        note = "cell_neighbors() returns CellNeighbors<N> which will be phased out soon. Use neighbors() instead."
-    )]
-    pub fn cell_neighbors(&self) -> CellNeighbors<N> {
-        CellNeighbors::half_space(self)
-    }
 
     /// Return an iterator over all (currently half-space) non-empty neighboring cells.
     //TODO: currently only half-space and aperiodic boundaries
