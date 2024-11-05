@@ -94,6 +94,7 @@ impl<const N: usize> FlatIndex<N> {
 // TODO: in this case (-rank..rank+1) is not quite ideal. sth. like (0..rank+1).chain(-rank..0)
 // TODO: and then skip first element of cartesian product
 impl<const N: usize> FlatIndex<N> {
+    // TODO: see iters.rs could remove intra_cell_pairs() if neighbor_indices() includes `0`
     fn neighbor_indices(grid_info: GridInfo<N>) -> Vec<i32> {
         // this is the rank of the neighborhood, 1 -> 3^N, 2 -> 5^N
         const RANK: i32 = 1;

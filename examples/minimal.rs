@@ -1,6 +1,6 @@
 use hashbrown::{HashMap, HashSet};
 //use nohash_hasher::BuildNoHashHasher;
-use nalgebra::{Point, Point3, Vector3};
+use nalgebra::{distance_squared, Point, Point3, Vector3};
 use rand::distributions::Standard;
 use rand::prelude::*;
 #[cfg(feature = "rayon")]
@@ -25,14 +25,19 @@ fn generate_points_random(n: usize, vol: [f64; 3], origin: [f64; 3]) -> PointClo
 }
 
 fn main() {
-    for size in (2..=6).map(|exp| 10usize.pow(exp)) {
+    for size in (2..=7).map(|exp| 10usize.pow(exp)) {
         let cutoff: f64 = 10.0;
         let conc = 10.0 / cutoff.powi(3); //i.e. 100mol per 10^3 volume units
         let a = 3.0 * cutoff;
         let b = 3.0 * cutoff;
         let c = (size as f64 / conc) / a / b;
         let _vol_edges = (size as f64 / conc).cbrt();
-        let pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0]);
+        let mut pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0]);
+        // This does seem to  improve cache hits in CellGrid::new()?
+        // because particles are roughly sorted by their flat index. so lookup into the hashmap is likely to be cached
+        // otoh, ::point_pairs() is unaffected because neighbor cell lookup in hashmap is non-local
+        // linear probing in HashMap would help maybe?
+        //pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
 
         let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords.as_ref()), cutoff);
         println!("{:?}", cg.shape());
@@ -47,7 +52,10 @@ fn main() {
             },
             |_i, _j| true, //distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared,
         );*/
-        let count = cg.point_pairs().count();
+        // let count = cg.point_pairs().count();
+        cg.point_pairs()
+            .filter(|&(i, j)| distance_squared(&pointcloud[i], &pointcloud[j]) <= _cutoff_squared)
+            .for_each(|_| black_box(()));
         #[cfg(feature = "rayon")]
         cg.par_filter_point_pairs(
             |_, _| {
@@ -57,7 +65,7 @@ fn main() {
             |_i, _j| true, //distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared,
         );
         //let count = cg.par_point_pairs().count();
-        println!("{}", count);
+        //println!("{}", count);
     }
 
     /*let vals = 0..100usize;

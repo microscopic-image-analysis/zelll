@@ -35,13 +35,19 @@ kiss3d = "0.35"
 rand = "0.8"
 soa_derive = "0.13"
 dashmap = "5.5"
+# needed for chunk_by() in SIMD experiments
+# itertools13 = { package = "itertools", version = "0.13" }
 
 [features]
 default = []
 rayon = ["dep:rayon", "hashbrown/rayon"]
 
+# [[bench]]
+# name = "cellgrid"
+# harness = false
+
 [[bench]]
-name = "cellgrid"
+name = "simd"
 harness = false
 
 [profile.bench]
