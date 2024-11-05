@@ -31,7 +31,15 @@ impl<'g, const N: usize> GridCell<'g, N> {
     pub fn iter(&self) -> Iter<'g, usize> {
         self.grid
             .cell_lists
-            .cell_slice(&self.grid.cells[&self.index])
+            // TODO: should use explicit .get() instead of using Index trait here
+            //.cell_slice(&self.grid.cells[&self.index])
+            .cell_slice(
+                &self
+                    .grid
+                    .cells
+                    .get(&self.index)
+                    .expect("This GridCell should be contained in the CellGrid but it is not."),
+            )
             .iter()
     }
     /*
@@ -62,6 +70,10 @@ impl<'g, const N: usize> GridCell<'g, N> {
         //TODO: OR: in principle could just increment neighbor_indices +1 to get abs. neighbours for the next cell
         //TODO: However, makes parallel iteration ugly and I'd have to make sure to reset relative_indices afterwards
         //TODO: also, doesn't really matter if I do +=1 or +self.index()
+        //TODO: don't need mutable access here but would I get better performance if I'd use
+        //TODO: ::get_many_mut() or ::get_many_mut_unchecked()?
+        //TODO: see https://docs.rs/hashbrown/latest/hashbrown/struct.HashMap.html#method.get_many_mut
+        //TODO: or does it purely help with multiple *mutable* references?
         self.grid
             .index
             .neighbor_indices
@@ -80,6 +92,8 @@ impl<'g, const N: usize> GridCell<'g, N> {
     }
 
     /// Iterate over all unique pairs of points in this `GridCell`.
+    // TODO: don't necessarily need this function if self.grid.index.neighbor_indices includes `0`
+    // TODO: the question would be if that makes a difference in performance but the code would look better?
     fn intra_cell_pairs(self) -> impl FusedIterator<Item = (usize, usize)> + Clone + 'g {
         self.iter().copied().tuple_combinations::<(usize, usize)>()
     }
@@ -146,9 +160,10 @@ impl<const N: usize> CellGrid<N> {
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn iter(&self) -> impl FusedIterator<Item = GridCell<N>> + Clone {
         // note that ::keys() does not keep a stable iteration order!
-        self.cells
-            .keys()
-            .map(|&index| GridCell { grid: self, index })
+        self.cells.keys().map(|&index| GridCell {
+            grid: self,
+            index: index,
+        })
     }
 
     #[cfg(feature = "rayon")]

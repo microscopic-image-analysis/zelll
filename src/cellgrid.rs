@@ -26,6 +26,7 @@ pub use util::*;
 #[derive(Debug, Default, Clone)]
 pub struct CellGrid<const N: usize> {
     cells: HashMap<i32, CellSliceMeta>,
+    //cells: DenseMap,
     cell_lists: CellStorage<usize>,
     index: FlatIndex<N>,
 }
@@ -76,6 +77,7 @@ impl<const N: usize> CellGrid<N> {
                 });
 
             let mut cells: HashMap<i32, CellSliceMeta> = cell_sizes
+                //let mut cells: DenseMap = cell_sizes
                 .iter()
                 .map(|(idx, count)| (*idx, cell_lists.reserve_cell(*count)))
                 .collect();
@@ -133,6 +135,12 @@ impl<const N: usize> CellGrid<N> {
             //TODO: (if updated point cloud did not shrink in length)
             self.cells.shrink_to_fit();
 
+            // TODO: https://docs.rs/hashbrown/latest/hashbrown/struct.HashMap.html#method.get_many_mut
+            // TODO: maybe could use get_many_mut here, but unfortunately we'd have to handle
+            // TODO: duplicate keys (i.e. cells)
+            // TODO: for that, we could chunk the index iter(), sort & count the chunks and then
+            // TODO: get the cell once and push each particle index with a single lookup into the hashmap
+            // TODO: perhaps this would be autovectorized?
             self.index
                 .index
                 .iter()

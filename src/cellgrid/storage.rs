@@ -112,3 +112,196 @@ impl CellSliceMeta {
         todo!()
     }
 }
+
+use core::iter::FusedIterator;
+
+#[derive(Debug, Default, Clone)]
+pub struct DenseMap {
+    // TODO: should make this a Vec<Option<(i32, CellSliceMeta)>>
+    inner: Vec<Option<(i32, CellSliceMeta)>>,
+}
+
+impl DenseMap {
+    pub fn new() -> Self {
+        Self { inner: Vec::new() }
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            inner: Vec::with_capacity(capacity),
+        }
+    }
+}
+
+impl GridStorage for DenseMap {
+    type Entry = CellSliceMeta;
+
+    fn clear(&mut self) {
+        self.inner.clear();
+    }
+
+    fn get(&self, k: &i32) -> Option<&Self::Entry> {
+        self.inner
+            .get(*k as usize)
+            .and_then(|c| c.as_ref().map(|(_, v)| v))
+    }
+
+    fn get_mut(&mut self, k: &i32) -> Option<&mut Self::Entry> {
+        self.inner
+            .get_mut(*k as usize)
+            .and_then(|c| c.as_mut().map(|(_, v)| v))
+    }
+
+    fn shrink_to_fit(&mut self) {
+        self.inner.shrink_to_fit();
+    }
+
+    fn insert_unique_unchecked(&mut self, k: i32, v: Self::Entry) {
+        if k as usize >= self.inner.len() {
+            self.inner.resize(k as usize + 1, None);
+        }
+        self.inner[k as usize] = Some((k, v));
+    }
+
+    // TODO: typical vecmap: https://crates.io/crates/vecmap-rs
+    // TODO: impl GridStorage trait for VecMap, hashbrown::HashMap, std HashMap, std BTreeMap
+    // TODO: and sprs::CsVecBase
+    // TODO: note that vecmap-rs could be used as a sparse storage with costly insert(), similar to CsVecBase
+    // TODO: would have to prepulate vecmap-rs to make it a dense storage...
+    // TODO: or simply keep my wrapper DenseMap
+    // TODO: https://docs.rs/ordered-vecmap/latest/ordered_vecmap/ would also be interesting
+    fn keys(&self) -> impl FusedIterator<Item = &i32> + Clone + '_ {
+        self.inner.iter().filter_map(|c| c.as_ref().map(|(k, _)| k))
+    }
+
+    fn iter(&self) -> impl FusedIterator<Item = (&i32, &Self::Entry)> + Clone + '_ {
+        self.inner
+            .iter()
+            .filter_map(|c| c.as_ref().map(|(k, v)| (k, v)))
+    }
+}
+
+use std::iter::FromIterator;
+use std::ops::Index;
+
+impl Index<&i32> for DenseMap {
+    type Output = CellSliceMeta;
+
+    fn index(&self, index: &i32) -> &Self::Output {
+        self.get(index).expect("index should not be out of bounds.")
+    }
+}
+
+impl FromIterator<(i32, CellSliceMeta)> for DenseMap {
+    fn from_iter<T: IntoIterator<Item = (i32, CellSliceMeta)>>(iter: T) -> Self {
+        let iter = iter.into_iter();
+        let mut dense_map = DenseMap::with_capacity(iter.size_hint().0);
+        iter.for_each(|(k, v)| dense_map.insert_unique_unchecked(k, v));
+        dense_map
+    }
+}
+
+pub trait GridStorage: Default {
+    type Entry; // = CellSliceMeta or Either<i32, CellSliceMeta> (if we want to count inside the same storage)
+    // TODO: note that if I make this Either<i32, CellSliceMeta>, I could also remove CellSliceMeta entirely
+    // TODO: if I create a  custom Enum for us:
+    // enum CellSlice {
+    //     Capacity(i32),
+    //     Slice(&[usize]),
+    //     MutSlice(&mut [usize]),
+    // }
+    // TODO: would then need to convert from Capacity(i32) to MutSlice by repeatedly calling split_at_mut()
+
+    // default implementation is a no-op
+    // but overriding this helps to replicate with_capacity() (since Default is super trait)
+    fn reserve(&mut self, additional: usize) {
+        ()
+    }
+
+    fn shrink_to_fit(&mut self) {
+        ()
+    }
+
+    fn clear(&mut self);
+
+    // TODO: this indicates our assumptions when inserting. That's all we need.
+    // TODO: i.e. implementors don't have to perform lookup before insertion
+    fn insert_unique_unchecked(&mut self, k: i32, v: Self::Entry);
+
+    fn get(&self, k: &i32) -> Option<&Self::Entry>;
+
+    fn get_mut(&mut self, k: &i32) -> Option<&mut Self::Entry>;
+
+    fn iter(&self) -> impl FusedIterator<Item = (&i32, &Self::Entry)> + Clone + '_;
+
+    fn keys(&self) -> impl FusedIterator<Item = &i32> + Clone + '_ {
+        GridStorage::iter(self).map(|(k, _)| k)
+    }
+}
+
+use hashbrown::HashMap;
+use std::collections::BTreeMap;
+
+impl GridStorage for HashMap<i32, CellSliceMeta> {
+    type Entry = CellSliceMeta;
+
+    fn reserve(&mut self, additional: usize) {
+        self.reserve(additional);
+    }
+
+    fn shrink_to_fit(&mut self) {
+        self.shrink_to_fit();
+    }
+
+    fn clear(&mut self) {
+        self.clear()
+    }
+
+    fn insert_unique_unchecked(&mut self, k: i32, v: Self::Entry) {
+        self.insert_unique_unchecked(k, v);
+    }
+
+    fn get(&self, k: &i32) -> Option<&Self::Entry> {
+        self.get(k)
+    }
+
+    fn get_mut(&mut self, k: &i32) -> Option<&mut Self::Entry> {
+        self.get_mut(k)
+    }
+
+    fn iter(&self) -> impl FusedIterator<Item = (&i32, &Self::Entry)> + Clone + '_ {
+        self.iter()
+    }
+
+    fn keys(&self) -> impl FusedIterator<Item = &i32> + Clone + '_ {
+        self.keys()
+    }
+}
+
+impl GridStorage for BTreeMap<i32, CellSliceMeta> {
+    type Entry = CellSliceMeta;
+
+    fn clear(&mut self) {
+        self.clear()
+    }
+
+    fn insert_unique_unchecked(&mut self, k: i32, v: Self::Entry) {
+        self.insert(k, v);
+    }
+
+    fn get(&self, k: &i32) -> Option<&Self::Entry> {
+        self.get(k)
+    }
+
+    fn get_mut(&mut self, k: &i32) -> Option<&mut Self::Entry> {
+        self.get_mut(k)
+    }
+
+    fn iter(&self) -> impl FusedIterator<Item = (&i32, &Self::Entry)> + Clone + '_ {
+        self.iter()
+    }
+
+    fn keys(&self) -> impl FusedIterator<Item = &i32> + Clone + '_ {
+        self.keys()
+    }
+}
