@@ -42,13 +42,13 @@ dashmap = "5.5"
 default = []
 rayon = ["dep:rayon", "hashbrown/rayon"]
 
-# [[bench]]
-# name = "cellgrid"
-# harness = false
-
 [[bench]]
-name = "simd"
+name = "cellgrid"
 harness = false
+
+# [[bench]]
+# name = "simd"
+# harness = false
 
 [profile.bench]
 opt-level = 3
