@@ -1,5 +1,5 @@
 use dashmap::DashMap;
-use itertools::Itertools;
+//use itertools::Itertools;
 use kiss3d::camera::ArcBall;
 use kiss3d::light::Light;
 use kiss3d::nalgebra::{Point3, Vector3};
@@ -177,7 +177,12 @@ fn main() {
             window.draw_point(&bead.position.cast::<f32>(), &white);
         }
 
-        for (a, b) in beads.position.iter().tuple_windows() {
+        // for (a, b) in beads.position.iter().tuple_windows() {
+        //     window.draw_line(&a.cast::<f32>(), &b.cast::<f32>(), &red);
+        // }
+        for ab in beads.position.windows(2) {
+            let a = ab[0];
+            let b = ab[1];
             window.draw_line(&a.cast::<f32>(), &b.cast::<f32>(), &red);
         }
 
