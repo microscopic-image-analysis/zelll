@@ -12,11 +12,6 @@ use rayon::prelude::ParallelIterator;
 pub struct GridCell<'g, const N: usize> {
     //TODO: maybe provide proper accessors to these fields for neighbors.rs to use?
     //TODO: is there a better way than having a reference to the containing CellGrid?
-    //TODO: this would make CellGrid::point_pairs() nicer (wouldn't have to collect() there)
-    //TODO: and also simplify the API because I could remove for_point_pairs() and related stuff
-    //TODO: and would just have to expose point_pairs() (would be also nice for pyo3)
-    //TODO: could use https://doc.rust-lang.org/std/rc/struct.Weak.html for this?
-    //TODO: but maybe it's better to just pass a reference to parent CellGrid where necessary
     pub(crate) grid: &'g CellGrid<N>,
     pub(crate) index: i32,
 }
@@ -31,8 +26,6 @@ impl<'g, const N: usize> GridCell<'g, N> {
     pub fn iter(&self) -> Iter<'g, usize> {
         self.grid
             .cell_lists
-            // TODO: should use explicit .get() instead of using Index trait here
-            //.cell_slice(&self.grid.cells[&self.index])
             .cell_slice(
                 &self
                     .grid
@@ -62,18 +55,6 @@ impl<'g, const N: usize> GridCell<'g, N> {
     //TODO: handle half-/full-space  and (a-)periodic boundary conditions
     //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
     pub fn neighbors(self) -> impl FusedIterator<Item = GridCell<'g, N>> + Clone {
-        //pub fn neighbors(&self) -> FilterMap<Iter<'g, i32>, impl FnMut(&'g i32) -> Option<GridCell<'g, N>> + Clone + '_> {
-        //TODO: could pre-compute the neighbor indices and store in self.grid.cells?
-        //todo: OR: this should be able to use SIMD efficiently, right?
-        //TODO: just chunk neighbor_indices and add onto it (however, it requires another allocation then?)
-        //TODO: or do the iteration in chunks
-        //TODO: OR: in principle could just increment neighbor_indices +1 to get abs. neighbours for the next cell
-        //TODO: However, makes parallel iteration ugly and I'd have to make sure to reset relative_indices afterwards
-        //TODO: also, doesn't really matter if I do +=1 or +self.index()
-        //TODO: don't need mutable access here but would I get better performance if I'd use
-        //TODO: ::get_many_mut() or ::get_many_mut_unchecked()?
-        //TODO: see https://docs.rs/hashbrown/latest/hashbrown/struct.HashMap.html#method.get_many_mut
-        //TODO: or does it purely help with multiple *mutable* references?
         self.grid
             .index
             .neighbor_indices
