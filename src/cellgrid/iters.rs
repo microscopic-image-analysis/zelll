@@ -92,43 +92,23 @@ impl<'g, const N: usize> GridCell<'g, N> {
     }
 
     /// Iterate over all unique pairs of points in this `GridCell`.
-    // TODO: don't necessarily need this function if self.grid.index.neighbor_indices includes `0`
-    // TODO: the question would be if that makes a difference in performance but the code would look better?
+    #[inline]
     fn intra_cell_pairs(self) -> impl FusedIterator<Item = (usize, usize)> + Clone + 'g {
-        self.iter().copied().tuple_combinations::<(usize, usize)>()
+        // this is equivalent to
+        // self.iter().copied().tuple_combinations::<(usize, usize)>()
+        // but faster for our specific case (pairs from slice of `Copy` values)
+        self.iter()
+            .copied()
+            .enumerate()
+            .flat_map(move |(n, i)| self.iter().copied().skip(n + 1).map(move |j| (i, j)))
     }
 
     /// Iterate over all unique pairs of points in this `GridCell` with points of the neighboring cells.
+    #[inline]
     fn inter_cell_pairs(self) -> impl FusedIterator<Item = (usize, usize)> + Clone + 'g {
-        //TODO: storing neighboring slices in a temporary allocation improves sequential iteration
-        //TODO: but negatively impacts parallel iteration (perhaps due to multiple threads wanting to allocate concurrently?)
-        /*let others: Vec<_> = self
-            .neighbors()
-            .flat_map(|cell| cell.iter().copied())
-            .collect();
-        self.iter().copied().cartesian_product(others)*/
-
-        //TODO: might help instead of having a closure in the iterator
-        //TODO: if I wanted introduce a type alias?
-        /*
-        fn copied_cell_iter<const N: usize>(cell: GridCell<N>) -> std::iter::Copied<std::slice::Iter<'_, usize>> {
-            cell.iter().copied()
-        }
-        */
         self.iter()
             .copied()
             .cartesian_product(self.neighbors().flat_map(|cell| cell.iter().copied()))
-        //.cartesian_product(self.neighbors().flat_map(copied_cell_iter))
-
-        //TODO: itertools >= "0.12" cartesian_product() doesn't optimize well?
-        //TODO: possibly because of nested Option in https://github.com/rust-itertools/itertools/pull/800
-        //TODO: which is likely the correct thing to do but it's unfortunate to lose 10-15% of performance
-        //TODO: For itertools >= "0.12", two nested flat_maps perform just as well as cartesian_product()
-        /*self.iter().copied().flat_map(move |i| {
-            self.neighbors()
-                .flat_map(|cell| cell.iter().copied())
-                .map(move |j| (i, j))
-        })*/
     }
 
     /// Iterate over all "relevant" pairs of points within in the neighborhood of this `GridCell`.
