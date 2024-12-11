@@ -12,12 +12,12 @@ pub mod util;
 pub use flatindex::*;
 use hashbrown::HashMap;
 pub use iters::*;
+use nalgebra::SimdPartialOrd;
+use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 #[cfg(feature = "rayon")]
 //TODO: should do a re-export of rayon?
 pub use rayon::prelude::ParallelIterator;
 use std::borrow::Borrow;
-use nalgebra::SimdPartialOrd;
-use num_traits::{AsPrimitive, Float, NumAssignOps, ConstOne, ConstZero};
 pub use storage::*;
 pub use util::*;
 //TODO: make CellGrid and related stuff generic over (internally) used numeric types: https://docs.rs/num-traits/latest/num_traits/
@@ -39,7 +39,13 @@ where
 
 impl<const N: usize, T: Float + Send + Sync> CellGrid<N, T>
 where
-    T: NumAssignOps + ConstOne + ConstZero + AsPrimitive<i32> + SimdPartialOrd + std::fmt::Debug + Default,
+    T: NumAssignOps
+        + ConstOne
+        + ConstZero
+        + AsPrimitive<i32>
+        + SimdPartialOrd
+        + std::fmt::Debug
+        + Default,
 {
     // TODO: whereever I need impl Iterator<>
     // TODO: I should probably use impl IntoIterator<Item = &'p [f64; N]> (+ Clone or + Borrow?)
@@ -50,10 +56,7 @@ where
     // TODO: cf. https://docs.rs/pyo3/latest/pyo3/prelude/trait.PyAnyMethods.html#implementors
     // TODO: impl IntoIterator for T: PyAnyMethods (kann ich das? brauch ich wrapper/super trait?)
     // TODO: Bound<'py, PyAny> impl's PyAnyMethods + Clone
-    pub fn new(
-        points: impl IntoIterator<Item = impl Borrow<[T; N]>> + Clone,
-        cutoff: T,
-    ) -> Self {
+    pub fn new(points: impl IntoIterator<Item = impl Borrow<[T; N]>> + Clone, cutoff: T) -> Self {
         CellGrid::default().rebuild(points, Some(cutoff))
     }
 
@@ -135,8 +138,10 @@ where
                 // SAFETY:
                 // `insert_unique_unchecked()` is safe because `idx` is unique in `cell_sizes`
                 // and `self.cells` has been cleared before.
-                self.cells
-                    .insert_unique_unchecked(*idx, self.cell_lists.reserve_cell(*count));
+                unsafe {
+                    self.cells
+                        .insert_unique_unchecked(*idx, self.cell_lists.reserve_cell(*count));
+                }
             });
 
             //TODO: we'll re-evaluate this once benchmarks with sparse data have been added

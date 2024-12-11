@@ -258,7 +258,9 @@ impl GridStorage for HashMap<i32, CellSliceMeta> {
     }
 
     fn insert_unique_unchecked(&mut self, k: i32, v: Self::Entry) {
-        self.insert_unique_unchecked(k, v);
+        unsafe {
+            self.insert_unique_unchecked(k, v);
+        }
     }
 
     fn get(&self, k: &i32) -> Option<&Self::Entry> {

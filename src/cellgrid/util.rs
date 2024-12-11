@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use nalgebra::*;
-use num_traits::{AsPrimitive, Float, NumAssignOps, ConstZero, ConstOne};
+use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 use std::borrow::Borrow;
 
 // TODO: remove this alias?
@@ -158,8 +158,7 @@ impl<const N: usize, F> Default for GridInfo<N, F>
 where
     F: Float + std::fmt::Debug + Default + NumAssignOps + AsPrimitive<i32> + ConstOne,
 {
-    fn default() -> Self
-    {
+    fn default() -> Self {
         GridInfo::new(Aabb::default(), F::ONE)
     }
 }
