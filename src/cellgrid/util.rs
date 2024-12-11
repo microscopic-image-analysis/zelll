@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use nalgebra::*;
+use num_traits::{AsPrimitive, Float, NumAssignOps, ConstZero, ConstOne};
 use std::borrow::Borrow;
 
 // TODO: remove this alias?
@@ -7,14 +8,20 @@ pub type PointCloud<const N: usize> = Vec<[f64; N]>;
 
 //TODO: rename fields, infimum/supremum might be confusing outside of a lattice context
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
-pub struct Aabb<const N: usize> {
-    inf: Point<f64, N>,
-    sup: Point<f64, N>,
+pub struct Aabb<const N: usize = 3, F: Float + std::fmt::Debug + 'static = f64> {
+    inf: Point<F, N>,
+    sup: Point<F, N>,
 }
 
-impl<const N: usize> Aabb<N> {
-    pub fn from_points(mut points: impl Iterator<Item = impl Borrow<[f64; N]>>) -> Self {
-        let init = points.next().map(|p| *p.borrow()).unwrap_or([0.0f64; N]);
+pub type Aabb64<const N: usize> = Aabb<N, f64>;
+pub type Aabb32<const N: usize> = Aabb<N, f32>;
+
+impl<const N: usize, F: Float + std::fmt::Debug> Aabb<N, F> {
+    pub fn from_points(mut points: impl Iterator<Item = impl Borrow<[F; N]>>) -> Self
+    where
+        F: SimdPartialOrd + ConstZero,
+    {
+        let init = points.next().map(|p| *p.borrow()).unwrap_or([F::ZERO; N]);
         let init = Point::from(init);
 
         let (inf, sup) = points
@@ -28,33 +35,42 @@ impl<const N: usize> Aabb<N> {
     }
 
     //TODO: could also pass iterators here (single point could be wrapped by std::iter::once or Option::iter())
-    fn update(&mut self, point: impl Borrow<[f64; N]>) {
+    fn update(&mut self, point: impl Borrow<[F; N]>)
+    where
+        F: SimdPartialOrd,
+    {
         let point = Point::from(*point.borrow());
         self.inf = point.inf(&self.inf);
         self.sup = point.sup(&self.sup);
     }
 
-    pub fn inf(&self) -> [f64; N] {
+    pub fn inf(&self) -> [F; N] {
         self.inf.into()
     }
 
-    pub fn sup(&self) -> [f64; N] {
+    pub fn sup(&self) -> [F; N] {
         self.sup.into()
     }
 }
 
 /// The grid described by `GridInfo` may be slightly larger than the underlying bounding box `aabb`.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct GridInfo<const N: usize> {
-    pub(crate) aabb: Aabb<N>,
-    pub(crate) cutoff: f64,
+pub struct GridInfo<const N: usize = 3, F: Float + std::fmt::Debug + 'static = f64> {
+    pub(crate) aabb: Aabb<N, F>,
+    pub(crate) cutoff: F,
     shape: SVector<i32, N>,
     strides: SVector<i32, N>,
 }
 
-impl<const N: usize> GridInfo<N> {
-    pub fn new(aabb: Aabb<N>, cutoff: f64) -> Self {
-        let shape = ((aabb.sup - aabb.inf) / cutoff).map(|coord| coord.floor() as i32 + 1);
+pub type GridInfo64<const N: usize> = GridInfo<N, f64>; // = GridInfo<N> would suffice but let's be explicit here
+pub type GridInfo32<const N: usize> = GridInfo<N, f32>;
+// : Float + Scalar + SimdPartialOrd + std::ops::SubAssign + std::ops::DivAssign + AsPrimitive<i32>
+impl<const N: usize, F: Float + std::fmt::Debug> GridInfo<N, F> {
+    pub fn new(aabb: Aabb<N, F>, cutoff: F) -> Self
+    where
+        F: NumAssignOps + AsPrimitive<i32>,
+    {
+        let shape = ((aabb.sup - aabb.inf) / cutoff).map(|coord| coord.floor().as_() + 1);
 
         let mut strides = shape;
         strides.iter_mut().fold(1, |prev, curr| {
@@ -81,7 +97,7 @@ impl<const N: usize> GridInfo<N> {
     }
 
     // TODO: check if returning references makes more sense
-    pub fn origin(&self) -> [f64; N] {
+    pub fn origin(&self) -> [F; N] {
         self.aabb.inf.into()
     }
 
@@ -97,10 +113,13 @@ impl<const N: usize> GridInfo<N> {
     //TODO: GridInfo knows enough to compute the cell index for an arbitrary point
     //TODO: but might make more sense in FlatIndex?
     //TODO: sth. like Lattice trait maybe
-    pub fn cell_index(&self, point: impl Borrow<[f64; N]>) -> [i32; N] {
+    pub fn cell_index(&self, point: impl Borrow<[F; N]>) -> [i32; N]
+    where
+        F: NumAssignOps + AsPrimitive<i32>,
+    {
         let point = Point::from(*point.borrow());
 
-        let idx = ((point - self.aabb.inf) / self.cutoff).map(|coord| coord.floor() as i32);
+        let idx = ((point - self.aabb.inf) / self.cutoff).map(|coord| coord.floor().as_());
 
         // FIXME: cell index ([2, -1, 0]) out of bounds ([1, 1, 1])
         assert!(
@@ -113,11 +132,14 @@ impl<const N: usize> GridInfo<N> {
         idx.into()
     }
 
-    pub fn flat_cell_index(&self, point: impl Borrow<[f64; N]>) -> i32 {
+    pub fn flat_cell_index(&self, point: impl Borrow<[F; N]>) -> i32
+    where
+        F: NumAssignOps + AsPrimitive<i32>,
+    {
         let point = Point::from(*point.borrow());
 
         ((point - self.aabb.inf) / self.cutoff)
-            .map(|coord| coord.floor() as i32)
+            .map(|coord| coord.floor().as_())
             .dot(&self.strides)
 
         //TODO: bounds checks are a bit unintuitive now. might defer it to hashmap lookup?
@@ -132,9 +154,13 @@ impl<const N: usize> GridInfo<N> {
     }
 }
 
-impl<const N: usize> Default for GridInfo<N> {
-    fn default() -> Self {
-        GridInfo::new(Aabb::default(), 1.0)
+impl<const N: usize, F> Default for GridInfo<N, F>
+where
+    F: Float + std::fmt::Debug + Default + NumAssignOps + AsPrimitive<i32> + ConstOne,
+{
+    fn default() -> Self
+    {
+        GridInfo::new(Aabb::default(), F::ONE)
     }
 }
 
