@@ -4,7 +4,7 @@ use super::CellGrid;
 use core::iter::FusedIterator;
 use core::slice::Iter;
 use itertools::Itertools;
-use num_traits::{AsPrimitive, Float, NumAssignOps, ConstOne};
+use num_traits::{AsPrimitive, ConstOne, Float, NumAssignOps};
 #[cfg(feature = "rayon")]
 use rayon::prelude::ParallelIterator;
 
