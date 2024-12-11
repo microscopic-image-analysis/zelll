@@ -4,19 +4,26 @@ use super::CellGrid;
 use core::iter::FusedIterator;
 use core::slice::Iter;
 use itertools::Itertools;
+use num_traits::{AsPrimitive, Float, NumAssignOps, ConstOne};
 #[cfg(feature = "rayon")]
 use rayon::prelude::ParallelIterator;
 
 /// `GridCell` represents a non-empty (by construction) cell of a `CellGrid`.
 #[derive(Debug, Clone, Copy)]
-pub struct GridCell<'g, const N: usize> {
+pub struct GridCell<'g, const N: usize = 3, F: Float = f64>
+where
+    F: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
+{
     //TODO: maybe provide proper accessors to these fields for neighbors.rs to use?
     //TODO: is there a better way than having a reference to the containing CellGrid?
-    pub(crate) grid: &'g CellGrid<N>,
+    pub(crate) grid: &'g CellGrid<N, F>,
     pub(crate) index: i32,
 }
 
-impl<'g, const N: usize> GridCell<'g, N> {
+impl<'g, const N: usize, F: Float + Send + Sync> GridCell<'g, N, F>
+where
+    F: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
+{
     /// Return the (flat) index of this (non-empty) `GridCell`.
     pub(crate) fn index(&self) -> i32 {
         self.index
@@ -54,7 +61,7 @@ impl<'g, const N: usize> GridCell<'g, N> {
     //TODO: currently only half-space and aperiodic boundaries
     //TODO: handle half-/full-space  and (a-)periodic boundary conditions
     //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
-    pub fn neighbors(self) -> impl FusedIterator<Item = GridCell<'g, N>> + Clone {
+    pub fn neighbors(self) -> impl FusedIterator<Item = GridCell<'g, N, F>> + Clone {
         self.grid
             .index
             .neighbor_indices
@@ -103,7 +110,10 @@ impl<'g, const N: usize> GridCell<'g, N> {
     }
 }
 
-impl<const N: usize> CellGrid<N> {
+impl<const N: usize, F: Float + Send + Sync> CellGrid<N, F>
+where
+    F: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
+{
     /// Returns an iterator over all [`GridCell`]s in this `CellGrid`, excluding empty cells.
     /// A particular iteration order is not guaranteed.
     ///
@@ -119,7 +129,7 @@ impl<const N: usize> CellGrid<N> {
     /// cell_grid.iter().flat_map(|cell| cell.iter()).count();
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn iter(&self) -> impl FusedIterator<Item = GridCell<N>> + Clone {
+    pub fn iter(&self) -> impl FusedIterator<Item = GridCell<N, F>> + Clone {
         // note that ::keys() does not keep a stable iteration order!
         self.cells.keys().map(|&index| GridCell {
             grid: self,
@@ -129,7 +139,7 @@ impl<const N: usize> CellGrid<N> {
 
     #[cfg(feature = "rayon")]
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<N>> {
+    pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<N, F>> {
         self.cells
             .par_keys()
             .map(|&index| GridCell { grid: self, index })

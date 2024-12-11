@@ -9,19 +9,21 @@ use zelll::cellgrid::CellGrid;
 #[cfg(feature = "rayon")]
 use zelll::cellgrid::ParallelIterator;
 
-type PointCloud<const N: usize> = Vec<Point<f64, N>>;
+type F32or64 = f64;
+
+type PointCloud<const N: usize> = Vec<Point<F32or64, N>>;
 /// Generate a uniformly random 3D point cloud of size `n` in a cuboid of edge lengths `vol` centered around `origin`.
 fn generate_points_random(
     n: usize,
-    vol: [f64; 3],
-    origin: [f64; 3],
+    vol: [F32or64; 3],
+    origin: [F32or64; 3],
     seed: Option<u64>,
 ) -> PointCloud<3> {
     // with fixed seed for reproducability
     let mut rng = StdRng::seed_from_u64(seed.unwrap_or(3079380797442975911));
 
     std::iter::repeat_with(|| {
-        Point3::<f64>::from(
+        Point3::<F32or64>::from(
             (Vector3::from_iterator((&mut rng).sample_iter(Standard))
                 - Vector3::new(0.5, 0.5, 0.5)
                 + Vector3::from(origin))
@@ -163,12 +165,12 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
     );
 
     for size in (2..=7).map(|exp| 10usize.pow(exp)) {
-        let cutoff: f64 = 10.0;
+        let cutoff: F32or64 = 10.0;
         let conc = 10.0 / cutoff.powi(3); //i.e. 10mol per 10^3 volume units
         let a = 3.0 * cutoff;
         let b = 3.0 * cutoff;
-        let c = (size as f64 / conc) / a / b;
-        let vol_edges = (size as f64 / conc).cbrt();
+        let c = (size as F32or64 / conc) / a / b;
+        let vol_edges = (size as F32or64 / conc).cbrt();
         let pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0], None);
 
         group.bench_with_input(
@@ -183,12 +185,12 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
     }
 
     for size in (2..=7).map(|exp| 10usize.pow(exp)) {
-        let cutoff: f64 = 10.0;
+        let cutoff: F32or64 = 10.0;
         let conc = 10.0 / cutoff.powi(3); //i.e. 10mol per cutoff^3 volume units
         let a = 3.0 * cutoff;
         let b = 3.0 * cutoff;
-        let c = (size as f64 / conc) / a / b;
-        let vol_edges = (size as f64 / conc).cbrt();
+        let c = (size as F32or64 / conc) / a / b;
+        let vol_edges = (size as F32or64 / conc).cbrt();
 
         let pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0], None);
         let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords.as_ref()), cutoff);

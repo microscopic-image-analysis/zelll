@@ -16,6 +16,8 @@ pub use iters::*;
 //TODO: should do a re-export of rayon?
 pub use rayon::prelude::ParallelIterator;
 use std::borrow::Borrow;
+use nalgebra::SimdPartialOrd;
+use num_traits::{AsPrimitive, Float, NumAssignOps, ConstOne, ConstZero};
 pub use storage::*;
 pub use util::*;
 //TODO: make CellGrid and related stuff generic over (internally) used numeric types: https://docs.rs/num-traits/latest/num_traits/
@@ -24,14 +26,21 @@ pub use util::*;
 //TODO: I wonder if I could benefit from https://docs.rs/hashbrown/latest/hashbrown/struct.HashTable.html
 //TODO: https://docs.rs/indexmap/latest/indexmap/ is essentially using HashTable but it has too much overhead for us
 #[derive(Debug, Default, Clone)]
-pub struct CellGrid<const N: usize> {
+pub struct CellGrid<const N: usize = 3, T: Float = f64>
+where
+    T: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
+{
     cells: HashMap<i32, CellSliceMeta>,
     //cells: DenseMap,
+    // TODO: could make this CellStorage<(usize, [f64; N])>
     cell_lists: CellStorage<usize>,
-    index: FlatIndex<N>,
+    index: FlatIndex<N, T>,
 }
 
-impl<const N: usize> CellGrid<N> {
+impl<const N: usize, T: Float + Send + Sync> CellGrid<N, T>
+where
+    T: NumAssignOps + ConstOne + ConstZero + AsPrimitive<i32> + SimdPartialOrd + std::fmt::Debug + Default,
+{
     // TODO: whereever I need impl Iterator<>
     // TODO: I should probably use impl IntoIterator<Item = &'p [f64; N]> (+ Clone or + Borrow?)
     // TODO: usually this means, that the type impl'ing IntoIterator is a reference so it can be safely copied and iterated over
@@ -42,8 +51,8 @@ impl<const N: usize> CellGrid<N> {
     // TODO: impl IntoIterator for T: PyAnyMethods (kann ich das? brauch ich wrapper/super trait?)
     // TODO: Bound<'py, PyAny> impl's PyAnyMethods + Clone
     pub fn new(
-        points: impl IntoIterator<Item = impl Borrow<[f64; N]>> + Clone,
-        cutoff: f64,
+        points: impl IntoIterator<Item = impl Borrow<[T; N]>> + Clone,
+        cutoff: T,
     ) -> Self {
         CellGrid::default().rebuild(points, Some(cutoff))
     }
@@ -55,8 +64,8 @@ impl<const N: usize> CellGrid<N> {
     #[must_use = "rebuild() consumes `self` and returns the rebuilt `CellGrid`"]
     pub fn rebuild(
         self,
-        points: impl IntoIterator<Item = impl Borrow<[f64; N]>> + Clone,
-        cutoff: Option<f64>,
+        points: impl IntoIterator<Item = impl Borrow<[T; N]>> + Clone,
+        cutoff: Option<T>,
     ) -> Self {
         let cutoff = cutoff.unwrap_or(self.index.grid_info.cutoff);
         let index = FlatIndex::from_points(points, cutoff);
@@ -106,8 +115,8 @@ impl<const N: usize> CellGrid<N> {
 
     pub fn rebuild_mut(
         &mut self,
-        points: impl IntoIterator<Item = impl Borrow<[f64; N]>> + Clone,
-        cutoff: Option<f64>,
+        points: impl IntoIterator<Item = impl Borrow<[T; N]>> + Clone,
+        cutoff: Option<T>,
     ) {
         if self.index.rebuild_mut(points, cutoff) {
             self.cells.clear();
@@ -162,7 +171,7 @@ impl<const N: usize> CellGrid<N> {
         self.index.grid_info.shape()
     }
 
-    pub fn bounding_box(&self) -> &Aabb<N> {
+    pub fn bounding_box(&self) -> &Aabb<N, T> {
         &self.index.grid_info.aabb
     }
 
@@ -221,7 +230,10 @@ impl<const N: usize> CellGrid<N> {
 }
 
 #[cfg(feature = "rayon")]
-impl<const N: usize> CellGrid<N> {
+impl<const N: usize, T: Float + Send + Sync> CellGrid<N, T>
+where
+    T: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
+{
     /// Iterate in parallel over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`.
     /// Try to avoid filtering this [`ParallelIterator`] to avoid significant overhead:
     /// ```ignore

@@ -5,17 +5,32 @@
 //TODO: i.e. index in flatindex corresponds to index in point cloud
 use crate::cellgrid::util::*;
 use itertools::Itertools;
+use nalgebra::*;
+use num_traits::{AsPrimitive, Float, NumAssignOps, ConstZero, ConstOne};
 use std::borrow::Borrow;
 
-#[derive(Debug, PartialEq, Default, Clone)]
-pub struct FlatIndex<const N: usize> {
-    pub(crate) grid_info: GridInfo<N>,
+#[derive(Debug, PartialEq, Clone)]
+pub struct FlatIndex<const N: usize = 3, F: Float + std::fmt::Debug + 'static = f64> {
+    pub(crate) grid_info: GridInfo<N, F>,
     pub(crate) index: Vec<i32>,
     pub(crate) neighbor_indices: Vec<i32>,
 }
 
-impl<const N: usize> FlatIndex<N> {
-    pub fn with_capacity(info: GridInfo<N>, capacity: usize) -> Self {
+pub type FlatIndex64<const N: usize> = FlatIndex<N, f64>;
+pub type FlatIndex32<const N: usize> = FlatIndex<N, f32>;
+
+impl<const N: usize, F> Default for FlatIndex<N, F>
+where
+    F: Float + std::fmt::Debug + Default + NumAssignOps + AsPrimitive<i32> + ConstOne,
+{
+    fn default() -> Self
+    {
+        FlatIndex::with_capacity(GridInfo::default(), 0)
+    }
+}
+
+impl<const N: usize, F: Float + std::fmt::Debug> FlatIndex<N, F> {
+    pub fn with_capacity(info: GridInfo<N, F>, capacity: usize) -> Self {
         Self {
             grid_info: info,
             index: Vec::with_capacity(capacity),
@@ -27,9 +42,12 @@ impl<const N: usize> FlatIndex<N> {
     //TODO: or can I chunk iterators such that rustc auto-vectorizes?
     //TODO: see https://www.nickwilcox.com/blog/autovec/
     pub fn from_points(
-        points: impl IntoIterator<Item = impl Borrow<[f64; N]>> + Clone,
-        cutoff: f64,
-    ) -> Self {
+        points: impl IntoIterator<Item = impl Borrow<[F; N]>> + Clone,
+        cutoff: F,
+    ) -> Self
+    where
+        F: ConstZero + NumAssignOps + SimdPartialOrd + AsPrimitive<i32>,
+    {
         let aabb = Aabb::from_points(points.clone().into_iter());
         let grid_info = GridInfo::new(aabb, cutoff);
         let index = points
@@ -48,9 +66,12 @@ impl<const N: usize> FlatIndex<N> {
     //TODO: Documentation: return bool indicating whether the index changed at all (in length or any individual entry)
     pub fn rebuild_mut(
         &mut self,
-        points: impl IntoIterator<Item = impl Borrow<[f64; N]>> + Clone,
-        cutoff: Option<f64>,
-    ) -> bool {
+        points: impl IntoIterator<Item = impl Borrow<[F; N]>> + Clone,
+        cutoff: Option<F>,
+    ) -> bool
+    where
+        F: ConstZero + NumAssignOps + SimdPartialOrd + AsPrimitive<i32>,
+    {
         let cutoff = cutoff.unwrap_or(self.grid_info.cutoff);
         let aabb = Aabb::from_points(points.clone().into_iter());
         let grid_info = GridInfo::new(aabb, cutoff);
@@ -93,9 +114,9 @@ impl<const N: usize> FlatIndex<N> {
 // TODO: this could easily handle full space as well (just have to ignore center of the neighborhood)
 // TODO: in this case (-rank..rank+1) is not quite ideal. sth. like (0..rank+1).chain(-rank..0)
 // TODO: and then skip first element of cartesian product
-impl<const N: usize> FlatIndex<N> {
+impl<const N: usize, F: Float + std::fmt::Debug> FlatIndex<N, F> {
     // TODO: see iters.rs could remove intra_cell_pairs() if neighbor_indices() includes `0`
-    fn neighbor_indices(grid_info: GridInfo<N>) -> Vec<i32> {
+    fn neighbor_indices(grid_info: GridInfo<N, F>) -> Vec<i32> {
         // this is the rank of the neighborhood, 1 -> 3^N, 2 -> 5^N
         const RANK: i32 = 1;
 
