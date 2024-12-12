@@ -37,13 +37,16 @@ where
     index: FlatIndex<N, T>,
 }
 
-impl<const N: usize, T: Float + Send + Sync> CellGrid<N, T>
+impl<const N: usize, T> CellGrid<N, T>
 where
-    T: NumAssignOps
+    T: Float
+        + NumAssignOps
         + ConstOne
         + ConstZero
         + AsPrimitive<i32>
         + SimdPartialOrd
+        + Send
+        + Sync
         + std::fmt::Debug
         + Default,
 {
@@ -235,9 +238,9 @@ where
 }
 
 #[cfg(feature = "rayon")]
-impl<const N: usize, T: Float + Send + Sync> CellGrid<N, T>
+impl<const N: usize, T> CellGrid<N, T>
 where
-    T: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
+    T: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
 {
     /// Iterate in parallel over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`.
     /// Try to avoid filtering this [`ParallelIterator`] to avoid significant overhead:
