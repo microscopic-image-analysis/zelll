@@ -10,7 +10,10 @@ use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 use std::borrow::Borrow;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct FlatIndex<const N: usize = 3, F: Float + std::fmt::Debug + 'static = f64> {
+pub struct FlatIndex<const N: usize = 3, F: Float = f64>
+where
+    F: std::fmt::Debug + 'static,
+{
     pub(crate) grid_info: GridInfo<N, F>,
     pub(crate) index: Vec<i32>,
     pub(crate) neighbor_indices: Vec<i32>,
@@ -28,7 +31,10 @@ where
     }
 }
 
-impl<const N: usize, F: Float + std::fmt::Debug> FlatIndex<N, F> {
+impl<const N: usize, F> FlatIndex<N, F>
+where
+    F: Float + std::fmt::Debug,
+{
     pub fn with_capacity(info: GridInfo<N, F>, capacity: usize) -> Self {
         Self {
             grid_info: info,
@@ -36,6 +42,35 @@ impl<const N: usize, F: Float + std::fmt::Debug> FlatIndex<N, F> {
             neighbor_indices: FlatIndex::neighbor_indices(info),
         }
     }
+
+    // TODO: maybe make it part of the public API to allow changing the rank of the neighborhood
+    // TODO: but then we should make sure to re-scale the cell edge lengths, i.e. GridInfo needs to know about the neighborhood
+    // TODO: GridInfo should store rank and cutoff, so neighbor_indices can access it.
+    // TODO: However, for rank > 1, HashMap is not the best choice anymore. for N=3: 62 vs 13 neighboring cells (half-space)
+    // TODO: that many random lookups add up. Also, more non-empty cells makes HashMap construction more expensive
+    // TODO: for higher ranks, we'd sth. with more spatial locality
+    // TODO:
+    // TODO: this could easily handle full space as well (just have to ignore center of the neighborhood)
+    // TODO: in this case (-rank..rank+1) is not quite ideal. sth. like (0..rank+1).chain(-rank..0)
+    // TODO: and then skip first element of cartesian product
+    fn neighbor_indices(grid_info: GridInfo<N, F>) -> Vec<i32> {
+        // this is the rank of the neighborhood, 1 -> 3^N, 2 -> 5^N
+        const RANK: i32 = 1;
+
+        (0..N)
+            .map(|_| (-RANK..RANK + 1))
+            .multi_cartesian_product()
+            .map(|idx| grid_info.flatten_index(TryInto::<[i32; N]>::try_into(idx).unwrap()))
+            //.take_while(|idx| *idx != 0) // not sure which one I like better
+            .take((2 * RANK + 1).pow(N as u32) as usize / 2) // equivalent to .div_euclid()
+            .collect()
+    }
+}
+
+impl<const N: usize, F> FlatIndex<N, F>
+where
+    F: Float + ConstZero + NumAssignOps + SimdPartialOrd + AsPrimitive<i32> + std::fmt::Debug,
+{
     //TODO: this is a candidate for SIMD AoSoA
     //TODO: see https://www.rustsim.org/blog/2020/03/23/simd-aosoa-in-nalgebra/#using-simd-aosoa-for-linear-algebra-in-rust-ultraviolet-and-nalgebra
     //TODO: or can I chunk iterators such that rustc auto-vectorizes?
@@ -43,10 +78,7 @@ impl<const N: usize, F: Float + std::fmt::Debug> FlatIndex<N, F> {
     pub fn from_points(
         points: impl IntoIterator<Item = impl Borrow<[F; N]>> + Clone,
         cutoff: F,
-    ) -> Self
-    where
-        F: ConstZero + NumAssignOps + SimdPartialOrd + AsPrimitive<i32>,
-    {
+    ) -> Self {
         let aabb = Aabb::from_points(points.clone().into_iter());
         let grid_info = GridInfo::new(aabb, cutoff);
         let index = points
@@ -67,10 +99,7 @@ impl<const N: usize, F: Float + std::fmt::Debug> FlatIndex<N, F> {
         &mut self,
         points: impl IntoIterator<Item = impl Borrow<[F; N]>> + Clone,
         cutoff: Option<F>,
-    ) -> bool
-    where
-        F: ConstZero + NumAssignOps + SimdPartialOrd + AsPrimitive<i32>,
-    {
+    ) -> bool {
         let cutoff = cutoff.unwrap_or(self.grid_info.cutoff);
         let aabb = Aabb::from_points(points.clone().into_iter());
         let grid_info = GridInfo::new(aabb, cutoff);
@@ -100,32 +129,6 @@ impl<const N: usize, F: Float + std::fmt::Debug> FlatIndex<N, F> {
                     }
                 });
         index_changed
-    }
-}
-
-// TODO: maybe make it part of the public API to allow changing the rank of the neighborhood
-// TODO: but then we should make sure to re-scale the cell edge lengths, i.e. GridInfo needs to know about the neighborhood
-// TODO: GridInfo should store rank and cutoff, so neighbor_indices can access it.
-// TODO: However, for rank > 1, HashMap is not the best choice anymore. for N=3: 62 vs 13 neighboring cells (half-space)
-// TODO: that many random lookups add up. Also, more non-empty cells makes HashMap construction more expensive
-// TODO: for higher ranks, we'd sth. with more spatial locality
-// TODO:
-// TODO: this could easily handle full space as well (just have to ignore center of the neighborhood)
-// TODO: in this case (-rank..rank+1) is not quite ideal. sth. like (0..rank+1).chain(-rank..0)
-// TODO: and then skip first element of cartesian product
-impl<const N: usize, F: Float + std::fmt::Debug> FlatIndex<N, F> {
-    // TODO: see iters.rs could remove intra_cell_pairs() if neighbor_indices() includes `0`
-    fn neighbor_indices(grid_info: GridInfo<N, F>) -> Vec<i32> {
-        // this is the rank of the neighborhood, 1 -> 3^N, 2 -> 5^N
-        const RANK: i32 = 1;
-
-        (0..N)
-            .map(|_| (-RANK..RANK + 1))
-            .multi_cartesian_product()
-            .map(|idx| grid_info.flatten_index(TryInto::<[i32; N]>::try_into(idx).unwrap()))
-            //.take_while(|idx| *idx != 0) // not sure which one I like better
-            .take((2 * RANK + 1).pow(N as u32) as usize / 2) // equivalent to .div_euclid()
-            .collect()
     }
 }
 

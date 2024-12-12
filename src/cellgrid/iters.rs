@@ -20,9 +20,9 @@ where
     pub(crate) index: i32,
 }
 
-impl<'g, const N: usize, F: Float + Send + Sync> GridCell<'g, N, F>
+impl<'g, const N: usize, F> GridCell<'g, N, F>
 where
-    F: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
+    F: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
 {
     /// Return the (flat) index of this (non-empty) `GridCell`.
     pub(crate) fn index(&self) -> i32 {
@@ -110,9 +110,9 @@ where
     }
 }
 
-impl<const N: usize, F: Float + Send + Sync> CellGrid<N, F>
+impl<const N: usize, F> CellGrid<N, F>
 where
-    F: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
+    F: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
 {
     /// Returns an iterator over all [`GridCell`]s in this `CellGrid`, excluding empty cells.
     /// A particular iteration order is not guaranteed.

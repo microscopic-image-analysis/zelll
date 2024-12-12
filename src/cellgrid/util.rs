@@ -8,7 +8,10 @@ pub type PointCloud<const N: usize> = Vec<[f64; N]>;
 
 //TODO: rename fields, infimum/supremum might be confusing outside of a lattice context
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
-pub struct Aabb<const N: usize = 3, F: Float + std::fmt::Debug + 'static = f64> {
+pub struct Aabb<const N: usize = 3, F: Float = f64>
+where
+    F: std::fmt::Debug + 'static,
+{
     inf: Point<F, N>,
     sup: Point<F, N>,
 }
@@ -16,11 +19,11 @@ pub struct Aabb<const N: usize = 3, F: Float + std::fmt::Debug + 'static = f64> 
 pub type Aabb64<const N: usize> = Aabb<N, f64>;
 pub type Aabb32<const N: usize> = Aabb<N, f32>;
 
-impl<const N: usize, F: Float + std::fmt::Debug> Aabb<N, F> {
-    pub fn from_points(mut points: impl Iterator<Item = impl Borrow<[F; N]>>) -> Self
-    where
-        F: SimdPartialOrd + ConstZero,
-    {
+impl<const N: usize, F> Aabb<N, F>
+where
+    F: Float + std::fmt::Debug + SimdPartialOrd + ConstZero,
+{
+    pub fn from_points(mut points: impl Iterator<Item = impl Borrow<[F; N]>>) -> Self {
         let init = points.next().map(|p| *p.borrow()).unwrap_or([F::ZERO; N]);
         let init = Point::from(init);
 
@@ -35,10 +38,7 @@ impl<const N: usize, F: Float + std::fmt::Debug> Aabb<N, F> {
     }
 
     //TODO: could also pass iterators here (single point could be wrapped by std::iter::once or Option::iter())
-    fn update(&mut self, point: impl Borrow<[F; N]>)
-    where
-        F: SimdPartialOrd,
-    {
+    fn update(&mut self, point: impl Borrow<[F; N]>) {
         let point = Point::from(*point.borrow());
         self.inf = point.inf(&self.inf);
         self.sup = point.sup(&self.sup);
@@ -55,7 +55,10 @@ impl<const N: usize, F: Float + std::fmt::Debug> Aabb<N, F> {
 
 /// The grid described by `GridInfo` may be slightly larger than the underlying bounding box `aabb`.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct GridInfo<const N: usize = 3, F: Float + std::fmt::Debug + 'static = f64> {
+pub struct GridInfo<const N: usize = 3, F: Float = f64>
+where
+    F: std::fmt::Debug + 'static,
+{
     pub(crate) aabb: Aabb<N, F>,
     pub(crate) cutoff: F,
     shape: SVector<i32, N>,
@@ -64,12 +67,36 @@ pub struct GridInfo<const N: usize = 3, F: Float + std::fmt::Debug + 'static = f
 
 pub type GridInfo64<const N: usize> = GridInfo<N, f64>; // = GridInfo<N> would suffice but let's be explicit here
 pub type GridInfo32<const N: usize> = GridInfo<N, f32>;
-// : Float + Scalar + SimdPartialOrd + std::ops::SubAssign + std::ops::DivAssign + AsPrimitive<i32>
-impl<const N: usize, F: Float + std::fmt::Debug> GridInfo<N, F> {
-    pub fn new(aabb: Aabb<N, F>, cutoff: F) -> Self
-    where
-        F: NumAssignOps + AsPrimitive<i32>,
-    {
+
+impl<const N: usize, F> GridInfo<N, F>
+where
+    F: Float + std::fmt::Debug,
+{
+    // TODO: check if returning references makes more sense
+    pub fn origin(&self) -> [F; N] {
+        self.aabb.inf.into()
+    }
+
+    pub fn shape(&self) -> [i32; N] {
+        self.shape.into()
+    }
+
+    pub fn strides(&self) -> [i32; N] {
+        self.strides.into()
+    }
+
+    pub fn flatten_index(&self, idx: impl Borrow<[i32; N]>) -> i32 {
+        let i = Vector::from(*idx.borrow());
+
+        i.dot(&self.strides)
+    }
+}
+
+impl<const N: usize, F> GridInfo<N, F>
+where
+    F: Float + NumAssignOps + AsPrimitive<i32> + std::fmt::Debug,
+{
+    pub fn new(aabb: Aabb<N, F>, cutoff: F) -> Self {
         let shape = ((aabb.sup - aabb.inf) / cutoff).map(|coord| coord.floor().as_() + 1);
 
         let mut strides = shape;
@@ -95,28 +122,11 @@ impl<const N: usize, F: Float + std::fmt::Debug> GridInfo<N, F> {
             strides,
         }
     }
-
-    // TODO: check if returning references makes more sense
-    pub fn origin(&self) -> [F; N] {
-        self.aabb.inf.into()
-    }
-
-    pub fn shape(&self) -> [i32; N] {
-        self.shape.into()
-    }
-
-    pub fn strides(&self) -> [i32; N] {
-        self.strides.into()
-    }
-
     //TODO: not sure where it fits better
     //TODO: GridInfo knows enough to compute the cell index for an arbitrary point
     //TODO: but might make more sense in FlatIndex?
     //TODO: sth. like Lattice trait maybe
-    pub fn cell_index(&self, point: impl Borrow<[F; N]>) -> [i32; N]
-    where
-        F: NumAssignOps + AsPrimitive<i32>,
-    {
+    pub fn cell_index(&self, point: impl Borrow<[F; N]>) -> [i32; N] {
         let point = Point::from(*point.borrow());
 
         let idx = ((point - self.aabb.inf) / self.cutoff).map(|coord| coord.floor().as_());
@@ -132,10 +142,7 @@ impl<const N: usize, F: Float + std::fmt::Debug> GridInfo<N, F> {
         idx.into()
     }
 
-    pub fn flat_cell_index(&self, point: impl Borrow<[F; N]>) -> i32
-    where
-        F: NumAssignOps + AsPrimitive<i32>,
-    {
+    pub fn flat_cell_index(&self, point: impl Borrow<[F; N]>) -> i32 {
         let point = Point::from(*point.borrow());
 
         ((point - self.aabb.inf) / self.cutoff)
@@ -145,12 +152,6 @@ impl<const N: usize, F: Float + std::fmt::Debug> GridInfo<N, F> {
         //TODO: bounds checks are a bit unintuitive now. might defer it to hashmap lookup?
         // note that the following line is not as efficient:
         // self.flatten_index(self.cell_index(point))
-    }
-
-    pub fn flatten_index(&self, idx: impl Borrow<[i32; N]>) -> i32 {
-        let i = Vector::from(*idx.borrow());
-
-        i.dot(&self.strides)
     }
 }
 
