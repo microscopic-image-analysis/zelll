@@ -59,6 +59,7 @@ impl<T> CellStorage<T> {
     //TODO: I'm not trying to reinvent ECS etc. I just want a simple wrapped Vec
     //TODO: actually might store a &'s CellStorage inside of CellSliceMeta<'s>?
     //TODO: I think this is no problem (well I think it is though...) even when I'm handling &mut CellSliceMeta?
+    //TODO: cf. https://github.com/CAD97/generativity but I'd like to avoid lifetime trickery
     //TODO: Then CellSliceMeta would be tied to specific storage
     pub fn truncate(&mut self, len: usize) {
         self.buffer.truncate(len);
@@ -116,12 +117,12 @@ impl CellSliceMeta {
 use core::iter::FusedIterator;
 
 #[derive(Debug, Default, Clone)]
-pub struct DenseMap {
+pub struct DenseMap<K, V> {
     // TODO: should make this a Vec<Option<(i32, CellSliceMeta)>>
-    inner: Vec<Option<(i32, CellSliceMeta)>>,
+    inner: Vec<Option<(K, V)>>,
 }
 
-impl DenseMap {
+impl<K, V> DenseMap<K, V> {
     pub fn new() -> Self {
         Self { inner: Vec::new() }
     }
@@ -133,8 +134,8 @@ impl DenseMap {
     }
 }
 
-impl GridStorage for DenseMap {
-    type Entry = CellSliceMeta;
+impl<T: Default + Clone> GridStorage for DenseMap<i32, T> {
+    type Entry = T;
 
     fn clear(&mut self) {
         self.inner.clear();
@@ -184,7 +185,7 @@ impl GridStorage for DenseMap {
 use std::iter::FromIterator;
 use std::ops::Index;
 
-impl Index<&i32> for DenseMap {
+impl Index<&i32> for DenseMap<i32, CellSliceMeta> {
     type Output = CellSliceMeta;
 
     fn index(&self, index: &i32) -> &Self::Output {
@@ -192,7 +193,7 @@ impl Index<&i32> for DenseMap {
     }
 }
 
-impl FromIterator<(i32, CellSliceMeta)> for DenseMap {
+impl FromIterator<(i32, CellSliceMeta)> for DenseMap<i32, CellSliceMeta> {
     fn from_iter<T: IntoIterator<Item = (i32, CellSliceMeta)>>(iter: T) -> Self {
         let iter = iter.into_iter();
         let mut dense_map = DenseMap::with_capacity(iter.size_hint().0);
@@ -201,6 +202,13 @@ impl FromIterator<(i32, CellSliceMeta)> for DenseMap {
     }
 }
 
+// FIXME: decide whether keep the trait methods' names as-is
+// FIXME: or find more unique names
+// FIXME: might be a bit inconvenient to use because
+// FIXME: we might have to use fully qualified syntax?
+// FIXME: actually that might not be a problem?
+// FIXME: it's rather users of `zelll` if they decide to change the storage type
+// FIXME: at the very least, we shouldn't re-export GridStorage?
 pub trait GridStorage: Default {
     type Entry; // = CellSliceMeta or Either<i32, CellSliceMeta> (if we want to count inside the same storage)
     // TODO: note that if I make this Either<i32, CellSliceMeta>, I could also remove CellSliceMeta entirely
@@ -222,10 +230,15 @@ pub trait GridStorage: Default {
         ()
     }
 
+    // TODO: documentation:
+    // TODO: clear this `impl GridStorage`
+    // TODO: this is required by implementors
+    // TODO: so that a grid storage type does not accumulate stale keys/cells
     fn clear(&mut self);
 
-    // TODO: this indicates our assumptions when inserting. That's all we need.
+    // TODO: document that this indicates our assumptions when inserting. That's all we need.
     // TODO: i.e. implementors don't have to perform lookup before insertion
+    // TODO: e.g. hashbrown provides `insert_unique_unchecked()` which is safe for our purposes
     fn insert_unique_unchecked(&mut self, k: i32, v: Self::Entry);
 
     fn get(&self, k: &i32) -> Option<&Self::Entry>;
@@ -240,7 +253,7 @@ pub trait GridStorage: Default {
 }
 
 use hashbrown::HashMap;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap as StdHashMap};
 
 impl GridStorage for HashMap<i32, CellSliceMeta> {
     type Entry = CellSliceMeta;
@@ -258,9 +271,48 @@ impl GridStorage for HashMap<i32, CellSliceMeta> {
     }
 
     fn insert_unique_unchecked(&mut self, k: i32, v: Self::Entry) {
+        // SAFETY:
+        // This is safe because CellGrid only inserts unique keys *once*
+        // or clears the whole impl GridStorage before inserting the same key again.
         unsafe {
             self.insert_unique_unchecked(k, v);
         }
+    }
+
+    fn get(&self, k: &i32) -> Option<&Self::Entry> {
+        self.get(k)
+    }
+
+    fn get_mut(&mut self, k: &i32) -> Option<&mut Self::Entry> {
+        self.get_mut(k)
+    }
+
+    fn iter(&self) -> impl FusedIterator<Item = (&i32, &Self::Entry)> + Clone + '_ {
+        self.iter()
+    }
+
+    fn keys(&self) -> impl FusedIterator<Item = &i32> + Clone + '_ {
+        self.keys()
+    }
+}
+
+impl GridStorage for StdHashMap<i32, CellSliceMeta> {
+    type Entry = CellSliceMeta;
+
+    fn reserve(&mut self, additional: usize) {
+        self.reserve(additional);
+    }
+
+    fn shrink_to_fit(&mut self) {
+        self.shrink_to_fit();
+    }
+
+    fn clear(&mut self) {
+        self.clear()
+    }
+
+    fn insert_unique_unchecked(&mut self, k: i32, v: Self::Entry) {
+        self.insert(k, v);
     }
 
     fn get(&self, k: &i32) -> Option<&Self::Entry> {
