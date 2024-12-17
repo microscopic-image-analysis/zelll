@@ -56,6 +56,10 @@ fn main() {
         cg.point_pairs()
             .filter(|&(i, j)| distance_squared(&pointcloud[i], &pointcloud[j]) <= _cutoff_squared)
             .for_each(|_| black_box(()));
+        // cg.point_pairs2()
+        //     .filter(|&((_i, p), (_j, q))| distance_squared(&p, &q) <= _cutoff_squared)
+        //     .for_each(|_| black_box(()));
+
         #[cfg(feature = "rayon")]
         cg.par_filter_point_pairs(
             |_, _| {

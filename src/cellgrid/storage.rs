@@ -61,6 +61,8 @@ impl<T> CellStorage<T> {
     //TODO: I think this is no problem (well I think it is though...) even when I'm handling &mut CellSliceMeta?
     //TODO: cf. https://github.com/CAD97/generativity but I'd like to avoid lifetime trickery
     //TODO: Then CellSliceMeta would be tied to specific storage
+    //TODO: So, maybe CellStorage/CellSliceMeta should not really be exposed to public-facing API
+    //TODO: in some sense, real `unsafe` for CellStorage would be more honest
     pub fn truncate(&mut self, len: usize) {
         self.buffer.truncate(len);
     }

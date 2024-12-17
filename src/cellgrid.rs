@@ -12,7 +12,7 @@ pub mod util;
 pub use flatindex::*;
 use hashbrown::HashMap;
 pub use iters::*;
-use nalgebra::SimdPartialOrd;
+use nalgebra::{Point, SimdPartialOrd};
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 #[cfg(feature = "rayon")]
 //TODO: should do a re-export of rayon?
@@ -33,7 +33,7 @@ where
     cells: HashMap<i32, CellSliceMeta>,
     //cells: DenseMap,
     // TODO: could make this CellStorage<(usize, [f64; N])>
-    cell_lists: CellStorage<usize>,
+    cell_lists: CellStorage<(usize, Point<T, N>)>,
     index: FlatIndex<N, T>,
 }
 
@@ -59,7 +59,11 @@ where
     // TODO: cf. https://docs.rs/pyo3/latest/pyo3/prelude/trait.PyAnyMethods.html#implementors
     // TODO: impl IntoIterator for T: PyAnyMethods (kann ich das? brauch ich wrapper/super trait?)
     // TODO: Bound<'py, PyAny> impl's PyAnyMethods + Clone
-    pub fn new(points: impl IntoIterator<Item = impl Borrow<[T; N]>> + Clone, cutoff: T) -> Self {
+    pub fn new<D, P>(points: P, cutoff: T) -> Self
+    where
+        P: IntoIterator<Item = D> + Clone,
+        D: Borrow<[T; N]>,
+    {
         CellGrid::default().rebuild(points, Some(cutoff))
     }
 
@@ -68,13 +72,13 @@ where
     //TODO: If FlatIndex did not change, we don't need to update.
     //TODO: Therefore we check for that and make CellGrid::new() just a wrapper around CellGrid::rebuild (with an initially empty FlatIndex)
     #[must_use = "rebuild() consumes `self` and returns the rebuilt `CellGrid`"]
-    pub fn rebuild(
-        self,
-        points: impl IntoIterator<Item = impl Borrow<[T; N]>> + Clone,
-        cutoff: Option<T>,
-    ) -> Self {
+    pub fn rebuild<D, P>(self, points: P, cutoff: Option<T>) -> Self
+    where
+        P: IntoIterator<Item = D> + Clone,
+        D: Borrow<[T; N]>,
+    {
         let cutoff = cutoff.unwrap_or(self.index.grid_info.cutoff);
-        let index = FlatIndex::from_points(points, cutoff);
+        let index = FlatIndex::from_points(points.clone(), cutoff);
 
         if index == self.index {
             self
@@ -100,11 +104,12 @@ where
             index
                 .index
                 .iter()
+                .zip(points)
                 .enumerate()
                 //TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
-                .for_each(|(i, cell)| {
+                .for_each(|(i, (cell, coords))| {
                     cell_lists.push(
-                        i,
+                        (i, Point::from(*coords.borrow())),
                         cells
                             .get_mut(cell)
                             .expect("cell grid should contain every cell in the grid index"),
@@ -119,12 +124,12 @@ where
         }
     }
 
-    pub fn rebuild_mut(
-        &mut self,
-        points: impl IntoIterator<Item = impl Borrow<[T; N]>> + Clone,
-        cutoff: Option<T>,
-    ) {
-        if self.index.rebuild_mut(points, cutoff) {
+    pub fn rebuild_mut<D, P>(&mut self, points: P, cutoff: Option<T>)
+    where
+        P: IntoIterator<Item = D> + Clone,
+        D: Borrow<[T; N]>,
+    {
+        if self.index.rebuild_mut(points.clone(), cutoff) {
             self.cells.clear();
             self.cell_lists.clear();
 
@@ -161,12 +166,13 @@ where
             self.index
                 .index
                 .iter()
+                .zip(points)
                 .enumerate()
                 //TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
                 //TODO: could use unwrap_unchecked() since this can't/shouldn't fail
-                .for_each(|(i, cell)| {
+                .for_each(|(i, (cell, coords))| {
                     self.cell_lists.push(
-                        i,
+                        (i, Point::from(*coords.borrow())),
                         self.cells
                             .get_mut(cell)
                             .expect("cell grid should contain every cell in the grid index"),
@@ -196,6 +202,12 @@ where
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn point_pairs<'p>(&'p self) -> impl Iterator<Item = (usize, usize)> + Clone + 'p {
         self.iter().flat_map(|cell| cell.point_pairs())
+    }
+
+    pub fn point_pairs2<'p>(
+        &'p self,
+    ) -> impl Iterator<Item = ((usize, [T; N]), (usize, [T; N]))> + Clone + 'p {
+        self.iter().flat_map(|cell| cell.point_pairs2())
     }
 
     /// Call a closure on each relevant (i.e. within cutoff threshold + some extra) unique pair of points in this `CellGrid`.
@@ -260,6 +272,11 @@ where
             //.flat_map(|cell| cell.point_pairs().collect::<Vec<_>>())
             //.flat_map_iter(|cell| cell.point_pairs().collect::<Vec<_>>())
             .flat_map_iter(|cell| cell.point_pairs())
+    }
+    pub fn par_point_pairs2(
+        &self,
+    ) -> impl ParallelIterator<Item = ((usize, [T; N]), (usize, [T; N]))> + '_ {
+        self.par_iter().flat_map_iter(|cell| cell.point_pairs2())
     }
 
     #[deprecated(note = "Please use [`par_point_pairs()`](#method.par_point_pairs) instead.")]
