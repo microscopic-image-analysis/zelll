@@ -208,9 +208,13 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
                         distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared
                     },
                 );*/
-                cg.point_pairs()
-                    .filter(|&(i, j)| {
-                        distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared
+                // cg.point_pairs()
+                //     .filter(|&(i, j)| {
+                //         distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared
+                //     })
+                cg.point_pairs2()
+                    .filter(|&((_i, p), (_j, q))| {
+                        distance_squared(&p.into(), &q.into()) <= cutoff_squared
                     })
                     .for_each(|_| {});
             })
@@ -241,8 +245,13 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
                     })
                     .for_each(|_| {});
                     */
-                    cg.par_point_pairs().for_each(|(i, j)| {
-                        if distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared {
+                    // cg.par_point_pairs().for_each(|(i, j)| {
+                    //     if distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared {
+                    //     } else {
+                    //     }
+                    // });
+                    cg.par_point_pairs2().for_each(|((_i, p), (_j, q))| {
+                        if distance_squared(&p.into(), &q.into()) <= cutoff_squared {
                         } else {
                         }
                     });

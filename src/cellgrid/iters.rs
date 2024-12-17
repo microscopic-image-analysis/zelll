@@ -4,6 +4,7 @@ use super::CellGrid;
 use core::iter::FusedIterator;
 use core::slice::Iter;
 use itertools::Itertools;
+use nalgebra::Point;
 use num_traits::{AsPrimitive, ConstOne, Float, NumAssignOps};
 #[cfg(feature = "rayon")]
 use rayon::prelude::ParallelIterator;
@@ -30,7 +31,7 @@ where
     }
 
     // TODO: should probably rather impl IntoIterator to match consuming/copy behaviour of neighbors()/point_pairs()?
-    pub fn iter(&self) -> Iter<'g, usize> {
+    pub fn iter(&self) -> Iter<'g, (usize, Point<F, N>)> {
         self.grid
             .cell_lists
             .cell_slice(
@@ -89,6 +90,7 @@ where
             .copied()
             .enumerate()
             .flat_map(move |(n, i)| self.iter().copied().skip(n + 1).map(move |j| (i, j)))
+            .map(|((i, _p), (j, _q))| (i, j))
     }
 
     /// Iterate over all unique pairs of points in this `GridCell` with points of the neighboring cells.
@@ -97,6 +99,34 @@ where
         self.iter()
             .copied()
             .cartesian_product(self.neighbors().flat_map(|cell| cell.iter().copied()))
+            .map(|((i, _p), (j, _q))| (i, j))
+    }
+
+    #[inline]
+    fn intra_cell_pairs2(
+        self,
+    ) -> impl FusedIterator<Item = ((usize, Point<F, N>), (usize, Point<F, N>))> + Clone + 'g {
+        self.iter()
+            .copied()
+            .enumerate()
+            .flat_map(move |(n, i)| self.iter().copied().skip(n + 1).map(move |j| (i, j)))
+    }
+
+    /// Iterate over all unique pairs of points in this `GridCell` with points of the neighboring cells.
+    #[inline]
+    fn inter_cell_pairs2(
+        self,
+    ) -> impl FusedIterator<Item = ((usize, Point<F, N>), (usize, Point<F, N>))> + Clone + 'g {
+        self.iter()
+            .copied()
+            .cartesian_product(self.neighbors().flat_map(|cell| cell.iter().copied()))
+    }
+
+    pub fn point_pairs2(
+        self,
+    ) -> impl FusedIterator<Item = ((usize, [F; N]), (usize, [F; N]))> + Clone + Send + Sync + 'g
+    {
+        self.intra_cell_pairs2().chain(self.inter_cell_pairs2()).map(|((i, p), (j, q))| ((i, p.into()), (j, q.into())))
     }
 
     /// Iterate over all "relevant" pairs of points within in the neighborhood of this `GridCell`.
