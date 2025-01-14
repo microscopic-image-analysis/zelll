@@ -126,7 +126,9 @@ where
         self,
     ) -> impl FusedIterator<Item = ((usize, [F; N]), (usize, [F; N]))> + Clone + Send + Sync + 'g
     {
-        self.intra_cell_pairs2().chain(self.inter_cell_pairs2()).map(|((i, p), (j, q))| ((i, p.into()), (j, q.into())))
+        self.intra_cell_pairs2()
+            .chain(self.inter_cell_pairs2())
+            .map(|((i, p), (j, q))| ((i, p.into()), (j, q.into())))
     }
 
     /// Iterate over all "relevant" pairs of points within in the neighborhood of this `GridCell`.
