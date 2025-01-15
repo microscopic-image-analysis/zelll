@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use crate::Particle;
 use nalgebra::*;
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 use std::borrow::Borrow;
@@ -23,14 +24,19 @@ impl<const N: usize, F> Aabb<N, F>
 where
     F: Float + std::fmt::Debug + SimdPartialOrd + ConstZero,
 {
-    pub fn from_points(mut points: impl Iterator<Item = impl Borrow<[F; N]>>) -> Self {
-        let init = points.next().map(|p| *p.borrow()).unwrap_or([F::ZERO; N]);
+    pub fn from_points<P: Particle<[F; N]>>(
+        mut points: impl Iterator<Item = impl Borrow<P>>,
+    ) -> Self {
+        let init = points
+            .next()
+            .map(|p| p.borrow().coords())
+            .unwrap_or([F::ZERO; N]);
         let init = Point::from(init);
 
         let (inf, sup) = points
             .take(i32::MAX as usize) //TODO: this works but maybe explicit try_into() would be better?
             .fold((init, init), |(i, s), point| {
-                let point = Point::from(*point.borrow());
+                let point = Point::from(point.borrow().coords());
                 (i.inf(&point), s.sup(&point))
             });
 
@@ -38,8 +44,8 @@ where
     }
 
     //TODO: could also pass iterators here (single point could be wrapped by std::iter::once or Option::iter())
-    fn update(&mut self, point: impl Borrow<[F; N]>) {
-        let point = Point::from(*point.borrow());
+    fn update<P: Particle<[F; N]>>(&mut self, point: impl Borrow<P>) {
+        let point = Point::from(point.borrow().coords());
         self.inf = point.inf(&self.inf);
         self.sup = point.sup(&self.sup);
     }
@@ -239,7 +245,7 @@ mod tests {
         let points = generate_points([3, 3, 3], 1.0, [0.2, 0.25, 0.3]);
         assert_eq!(points.len(), 28, "testing PointCloud.len()");
 
-        let aabb = Aabb::from_points(points.iter());
+        let aabb = Aabb::from_points::<[_; 3]>(points.iter());
         assert_eq!(
             aabb,
             Aabb {

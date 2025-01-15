@@ -1,29 +1,31 @@
 //TODO iterate over all neighboured cells (full/half space), pairs of particles
 //TODO: perhaps move parallel iteration into separate submodule
 use super::CellGrid;
+use crate::Particle;
 use core::iter::FusedIterator;
 use core::slice::Iter;
 use itertools::Itertools;
-use nalgebra::Point;
 use num_traits::{AsPrimitive, ConstOne, Float, NumAssignOps};
 #[cfg(feature = "rayon")]
 use rayon::prelude::ParallelIterator;
 
 /// `GridCell` represents a non-empty (by construction) cell of a `CellGrid`.
 #[derive(Debug, Clone, Copy)]
-pub struct GridCell<'g, const N: usize = 3, F: Float = f64>
+pub struct GridCell<'g, P, const N: usize = 3, F: Float = f64>
 where
     F: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
+    P: Particle<[F; N]>,
 {
     //TODO: maybe provide proper accessors to these fields for neighbors.rs to use?
     //TODO: is there a better way than having a reference to the containing CellGrid?
-    pub(crate) grid: &'g CellGrid<N, F>,
+    pub(crate) grid: &'g CellGrid<P, N, F>,
     pub(crate) index: i32,
 }
 
-impl<'g, const N: usize, F> GridCell<'g, N, F>
+impl<'g, P, const N: usize, F> GridCell<'g, P, N, F>
 where
     F: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
+    P: Particle<[F; N]> + Send + Sync,
 {
     /// Return the (flat) index of this (non-empty) `GridCell`.
     pub(crate) fn index(&self) -> i32 {
@@ -31,7 +33,7 @@ where
     }
 
     // TODO: should probably rather impl IntoIterator to match consuming/copy behaviour of neighbors()/point_pairs()?
-    pub fn iter(&self) -> Iter<'g, (usize, Point<F, N>)> {
+    pub fn iter(&self) -> Iter<'g, (usize, P)> {
         self.grid
             .cell_lists
             .cell_slice(
@@ -62,7 +64,7 @@ where
     //TODO: currently only half-space and aperiodic boundaries
     //TODO: handle half-/full-space  and (a-)periodic boundary conditions
     //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
-    pub fn neighbors(self) -> impl FusedIterator<Item = GridCell<'g, N, F>> + Clone {
+    pub fn neighbors(self) -> impl FusedIterator<Item = GridCell<'g, P, N, F>> + Clone {
         self.grid
             .index
             .neighbor_indices
@@ -103,9 +105,7 @@ where
     }
 
     #[inline]
-    fn intra_cell_pairs2(
-        self,
-    ) -> impl FusedIterator<Item = ((usize, Point<F, N>), (usize, Point<F, N>))> + Clone + 'g {
+    fn intra_cell_pairs2(self) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone + 'g {
         self.iter()
             .copied()
             .enumerate()
@@ -114,9 +114,7 @@ where
 
     /// Iterate over all unique pairs of points in this `GridCell` with points of the neighboring cells.
     #[inline]
-    fn inter_cell_pairs2(
-        self,
-    ) -> impl FusedIterator<Item = ((usize, Point<F, N>), (usize, Point<F, N>))> + Clone + 'g {
+    fn inter_cell_pairs2(self) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone + 'g {
         self.iter()
             .copied()
             .cartesian_product(self.neighbors().flat_map(|cell| cell.iter().copied()))
@@ -124,8 +122,7 @@ where
 
     pub fn point_pairs2(
         self,
-    ) -> impl FusedIterator<Item = ((usize, [F; N]), (usize, [F; N]))> + Clone + Send + Sync + 'g
-    {
+    ) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone + Send + Sync + 'g {
         self.intra_cell_pairs2()
             .chain(self.inter_cell_pairs2())
             .map(|((i, p), (j, q))| ((i, p.into()), (j, q.into())))
@@ -142,9 +139,10 @@ where
     }
 }
 
-impl<const N: usize, F> CellGrid<N, F>
+impl<P, const N: usize, F> CellGrid<P, N, F>
 where
     F: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
+    P: Particle<[F; N]>,
 {
     /// Returns an iterator over all [`GridCell`]s in this `CellGrid`, excluding empty cells.
     /// A particular iteration order is not guaranteed.
@@ -161,7 +159,7 @@ where
     /// cell_grid.iter().flat_map(|cell| cell.iter()).count();
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn iter(&self) -> impl FusedIterator<Item = GridCell<N, F>> + Clone {
+    pub fn iter(&self) -> impl FusedIterator<Item = GridCell<P, N, F>> + Clone {
         // note that ::keys() does not keep a stable iteration order!
         self.cells.keys().map(|&index| GridCell {
             grid: self,
@@ -171,7 +169,7 @@ where
 
     #[cfg(feature = "rayon")]
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<N, F>> {
+    pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<P, N, F>> {
         self.cells
             .par_keys()
             .map(|&index| GridCell { grid: self, index })
@@ -187,7 +185,7 @@ mod tests {
     fn test_cellgrid_iter() {
         // Using 0-origin to avoid floating point errors
         let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
-        let cell_grid: CellGrid<3> = CellGrid::new(points.iter(), 1.0);
+        let cell_grid: CellGrid<[_; 3], 3> = CellGrid::new(points.iter(), 1.0);
 
         assert_eq!(cell_grid.iter().count(), 14, "testing iter()");
 
@@ -199,7 +197,7 @@ mod tests {
     fn test_gridcell_iter() {
         // Using 0-origin to avoid floating point errors
         let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
-        let cell_grid: CellGrid<3> = CellGrid::new(points.iter(), 1.0);
+        let cell_grid: CellGrid<[_; 3], 3> = CellGrid::new(points.iter(), 1.0);
 
         assert_eq!(
             cell_grid.iter().flat_map(|cell| cell.iter()).count(),
@@ -224,7 +222,7 @@ mod tests {
     fn test_neighborcell_pointpairs() {
         // Using 0-origin to avoid floating point errors
         let points = generate_points([2, 2, 2], 1.0, [0.0, 0.0, 0.0]);
-        let cell_grid: CellGrid<3> = CellGrid::new(points.iter(), 1.0);
+        let cell_grid: CellGrid<[_; 3], 3> = CellGrid::new(points.iter(), 1.0);
 
         assert_eq!(
             cell_grid

@@ -3,7 +3,7 @@
 //TODO: maybe FlatIndex should know about a point cloud (i.e. store a reference?)
 //TODO: Also: currently assuming that the order of points in point cloud does not change
 //TODO: i.e. index in flatindex corresponds to index in point cloud
-use crate::cellgrid::util::*;
+use crate::{cellgrid::util::*, Particle};
 use itertools::Itertools;
 use nalgebra::*;
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
@@ -75,8 +75,8 @@ where
     //TODO: see https://www.rustsim.org/blog/2020/03/23/simd-aosoa-in-nalgebra/#using-simd-aosoa-for-linear-algebra-in-rust-ultraviolet-and-nalgebra
     //TODO: or can I chunk iterators such that rustc auto-vectorizes?
     //TODO: see https://www.nickwilcox.com/blog/autovec/
-    pub fn from_points(
-        points: impl IntoIterator<Item = impl Borrow<[F; N]>> + Clone,
+    pub fn from_points<P: Particle<[F; N]>>(
+        points: impl IntoIterator<Item = impl Borrow<P>> + Clone,
         cutoff: F,
     ) -> Self {
         let aabb = Aabb::from_points(points.clone().into_iter());
@@ -84,7 +84,7 @@ where
         let index = points
             .into_iter()
             .take(i32::MAX as usize)
-            .map(|point| grid_info.flat_cell_index(point.borrow()))
+            .map(|point| grid_info.flat_cell_index(point.borrow().coords()))
             .collect();
 
         Self {
@@ -95,9 +95,9 @@ where
     }
     // there is no rebuild(), named it rebuild_mut() to match CellGrid::rebuild_mut()
     //TODO: Documentation: return bool indicating whether the index changed at all (in length or any individual entry)
-    pub fn rebuild_mut(
+    pub fn rebuild_mut<P: Particle<[F; N]>>(
         &mut self,
-        points: impl IntoIterator<Item = impl Borrow<[F; N]>> + Clone,
+        points: impl IntoIterator<Item = impl Borrow<P>> + Clone,
         cutoff: Option<F>,
     ) -> bool {
         let cutoff = cutoff.unwrap_or(self.grid_info.cutoff);
@@ -110,7 +110,7 @@ where
         let new_index = points
             .into_iter()
             .take(i32::MAX as usize)
-            .map(|point| grid_info.flat_cell_index(point.borrow()));
+            .map(|point| grid_info.flat_cell_index(point.borrow().coords()));
         self.grid_info = grid_info;
 
         // FIXME: there seems to be a bug in shape/stride computation, causing redundant indices for small shapes e.g. (2,2,2)?
@@ -140,7 +140,7 @@ mod tests {
     fn test_flatindex() {
         // using 0-origin for simplicity and to avoid floating point errors
         let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
-        let index = FlatIndex::from_points(points.iter(), 1.0);
+        let index = FlatIndex::from_points::<[_; 3]>(points.iter(), 1.0);
         let mut idx = Vec::with_capacity(points.len());
 
         for x in 0..3 {
