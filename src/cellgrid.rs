@@ -9,10 +9,11 @@ pub mod storage;
 #[allow(dead_code)]
 pub mod util;
 
+use crate::Particle;
 pub use flatindex::*;
 use hashbrown::HashMap;
 pub use iters::*;
-use nalgebra::{Point, SimdPartialOrd};
+use nalgebra::SimdPartialOrd;
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 #[cfg(feature = "rayon")]
 //TODO: should do a re-export of rayon?
@@ -26,18 +27,19 @@ pub use util::*;
 //TODO: I wonder if I could benefit from https://docs.rs/hashbrown/latest/hashbrown/struct.HashTable.html
 //TODO: https://docs.rs/indexmap/latest/indexmap/ is essentially using HashTable but it has too much overhead for us
 #[derive(Debug, Default, Clone)]
-pub struct CellGrid<const N: usize = 3, T: Float = f64>
+pub struct CellGrid<P: Particle<[T; N]>, const N: usize = 3, T: Float = f64>
 where
     T: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
 {
     cells: HashMap<i32, CellSliceMeta>,
     //cells: DenseMap,
     // TODO: could make this CellStorage<(usize, [f64; N])>
-    cell_lists: CellStorage<(usize, Point<T, N>)>,
+    // cell_lists: CellStorage<(usize, Point<T, N>)>,
+    cell_lists: CellStorage<(usize, P)>,
     index: FlatIndex<N, T>,
 }
 
-impl<const N: usize, T> CellGrid<N, T>
+impl<P: Particle<[T; N]>, const N: usize, T> CellGrid<P, N, T>
 where
     T: Float
         + NumAssignOps
@@ -59,10 +61,11 @@ where
     // TODO: cf. https://docs.rs/pyo3/latest/pyo3/prelude/trait.PyAnyMethods.html#implementors
     // TODO: impl IntoIterator for T: PyAnyMethods (kann ich das? brauch ich wrapper/super trait?)
     // TODO: Bound<'py, PyAny> impl's PyAnyMethods + Clone
-    pub fn new<D, P>(points: P, cutoff: T) -> Self
+    pub fn new<B, I>(points: I, cutoff: T) -> Self
     where
-        P: IntoIterator<Item = D> + Clone,
-        D: Borrow<[T; N]>,
+        I: IntoIterator<Item = B> + Clone,
+        B: Borrow<P>,
+        P: Default,
     {
         CellGrid::default().rebuild(points, Some(cutoff))
     }
@@ -72,10 +75,11 @@ where
     //TODO: If FlatIndex did not change, we don't need to update.
     //TODO: Therefore we check for that and make CellGrid::new() just a wrapper around CellGrid::rebuild (with an initially empty FlatIndex)
     #[must_use = "rebuild() consumes `self` and returns the rebuilt `CellGrid`"]
-    pub fn rebuild<D, P>(self, points: P, cutoff: Option<T>) -> Self
+    pub fn rebuild<B, I>(self, points: I, cutoff: Option<T>) -> Self
     where
-        P: IntoIterator<Item = D> + Clone,
-        D: Borrow<[T; N]>,
+        I: IntoIterator<Item = B> + Clone,
+        B: Borrow<P>,
+        P: Default,
     {
         let cutoff = cutoff.unwrap_or(self.index.grid_info.cutoff);
         let index = FlatIndex::from_points(points.clone(), cutoff);
@@ -107,9 +111,9 @@ where
                 .zip(points)
                 .enumerate()
                 //TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
-                .for_each(|(i, (cell, coords))| {
+                .for_each(|(i, (cell, point))| {
                     cell_lists.push(
-                        (i, Point::from(*coords.borrow())),
+                        (i, *point.borrow()),
                         cells
                             .get_mut(cell)
                             .expect("cell grid should contain every cell in the grid index"),
@@ -124,10 +128,11 @@ where
         }
     }
 
-    pub fn rebuild_mut<D, P>(&mut self, points: P, cutoff: Option<T>)
+    pub fn rebuild_mut<B, I>(&mut self, points: I, cutoff: Option<T>)
     where
-        P: IntoIterator<Item = D> + Clone,
-        D: Borrow<[T; N]>,
+        I: IntoIterator<Item = B> + Clone,
+        B: Borrow<P>,
+        P: Default,
     {
         if self.index.rebuild_mut(points.clone(), cutoff) {
             self.cells.clear();
@@ -170,9 +175,9 @@ where
                 .enumerate()
                 //TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
                 //TODO: could use unwrap_unchecked() since this can't/shouldn't fail
-                .for_each(|(i, (cell, coords))| {
+                .for_each(|(i, (cell, point))| {
                     self.cell_lists.push(
-                        (i, Point::from(*coords.borrow())),
+                        (i, *point.borrow()),
                         self.cells
                             .get_mut(cell)
                             .expect("cell grid should contain every cell in the grid index"),
@@ -188,7 +193,13 @@ where
     pub fn bounding_box(&self) -> &Aabb<N, T> {
         &self.index.grid_info.aabb
     }
+}
 
+impl<P: Particle<[T; N]>, const N: usize, T> CellGrid<P, N, T>
+where
+    T: Float + ConstOne + AsPrimitive<i32> + std::fmt::Debug + NumAssignOps + Send + Sync,
+    P: Send + Sync,
+{
     /// Iterate over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`.
     /// ```ignore
     /// cell_grid.point_pairs()
@@ -206,7 +217,7 @@ where
 
     pub fn point_pairs2<'p>(
         &'p self,
-    ) -> impl Iterator<Item = ((usize, [T; N]), (usize, [T; N]))> + Clone + 'p {
+    ) -> impl Iterator<Item = ((usize, P), (usize, P))> + Clone + 'p {
         self.iter().flat_map(|cell| cell.point_pairs2())
     }
 
@@ -232,10 +243,10 @@ where
     }
 
     #[deprecated(note = "Please use [`point_pairs()`](#method.point_pairs) instead.")]
-    pub fn filter_point_pairs<F, P>(&self, mut f: F, p: P)
+    pub fn filter_point_pairs<F, Q>(&self, mut f: F, p: Q)
     where
         F: FnMut(usize, usize),
-        P: Fn(usize, usize) -> bool,
+        Q: Fn(usize, usize) -> bool,
     {
         //TODO: array_chunks() could be nice for autovectorization?
         //TODO: see https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.array_chunks
@@ -250,9 +261,10 @@ where
 }
 
 #[cfg(feature = "rayon")]
-impl<const N: usize, T> CellGrid<N, T>
+impl<P, const N: usize, T> CellGrid<P, N, T>
 where
     T: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
+    P: Send + Sync,
 {
     /// Iterate in parallel over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`.
     /// Try to avoid filtering this [`ParallelIterator`] to avoid significant overhead:
@@ -292,10 +304,10 @@ where
     }
 
     #[deprecated(note = "Please use [`par_point_pairs()`](#method.par_point_pairs) instead.")]
-    pub fn par_filter_point_pairs<F, P>(&self, f: F, p: P)
+    pub fn par_filter_point_pairs<F, Q>(&self, f: F, p: Q)
     where
         F: Fn(usize, usize) + Send + Sync,
-        P: Fn(usize, usize) -> bool + Send + Sync,
+        Q: Fn(usize, usize) -> bool + Send + Sync,
     {
         self.par_iter().for_each(|cell| {
             cell.point_pairs()
