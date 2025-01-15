@@ -30,7 +30,7 @@ where
 {
     #[inline]
     fn coords(&self) -> T /* [T; N] */ {
-        (*self).into()
+        <P as Into<T>>::into(*self)
     }
 }
 
