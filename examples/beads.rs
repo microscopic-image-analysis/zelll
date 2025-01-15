@@ -121,7 +121,8 @@ fn main() {
 
     let accelerations: DashMap<usize, Vector3<f64>> = DashMap::with_capacity(NBEADS);
 
-    let mut cell_grid = CellGrid::new(beads.position.iter().map(|p| p.coords.as_ref()), CUTOFF);
+    let mut cell_grid: CellGrid<[_; 3], 3, _> =
+        CellGrid::new(beads.position.iter().map(|p| p.coords.as_ref()), CUTOFF);
 
     while window.render_with_camera(&mut cam) {
         //TODO: unfortunately, soa_derive doesn't support rayon directly

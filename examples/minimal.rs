@@ -39,7 +39,8 @@ fn main() {
         // linear probing in HashMap would help maybe?
         //pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
 
-        let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords.as_ref()), cutoff);
+        let cg: CellGrid<[_; 3], 3, _> =
+            CellGrid::new(pointcloud.iter().map(|p| p.coords.as_ref()), cutoff);
         println!("{:?}", cg.shape());
         let _cutoff_squared = cutoff.powi(2);
 
