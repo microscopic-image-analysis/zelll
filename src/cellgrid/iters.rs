@@ -155,7 +155,7 @@ where
     /// # use nalgebra::Point;
     /// # let points = [Point::from([0.0, 0.0, 0.0]), Point::from([1.0,2.0,0.0]), Point::from([0.0, 0.1, 0.2])];
     /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
-    /// # let cell_grid = CellGrid::new(points.iter(), 1.0);
+    /// # let cell_grid: CellGrid<[_; 3]> = CellGrid::new(points.iter(), 1.0);
     /// cell_grid.iter().flat_map(|cell| cell.iter()).count();
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
@@ -169,7 +169,10 @@ where
 
     #[cfg(feature = "rayon")]
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<P, N, F>> {
+    pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<P, N, F>>
+    where
+        P: Send + Sync,
+    {
         self.cells
             .par_keys()
             .map(|&index| GridCell { grid: self, index })

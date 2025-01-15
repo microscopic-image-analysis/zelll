@@ -27,7 +27,7 @@ pub use util::*;
 //TODO: I wonder if I could benefit from https://docs.rs/hashbrown/latest/hashbrown/struct.HashTable.html
 //TODO: https://docs.rs/indexmap/latest/indexmap/ is essentially using HashTable but it has too much overhead for us
 #[derive(Debug, Default, Clone)]
-pub struct CellGrid<P: Particle<[T; N]>, const N: usize = 3, T: Float = f64>
+pub struct CellGrid<P, const N: usize = 3, T: Float = f64>
 where
     T: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
 {
@@ -38,6 +38,8 @@ where
     cell_lists: CellStorage<(usize, P)>,
     index: FlatIndex<N, T>,
 }
+
+// pub type ArrayParticleGrid<T, const N: usize> = CellGrid<[T; N], N, T>;
 
 impl<P: Particle<[T; N]>, const N: usize, T> CellGrid<P, N, T>
 where
@@ -264,7 +266,7 @@ where
 impl<P, const N: usize, T> CellGrid<P, N, T>
 where
     T: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
-    P: Send + Sync,
+    P: Particle<[T; N]> + Send + Sync,
 {
     /// Iterate in parallel over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`.
     /// Try to avoid filtering this [`ParallelIterator`] to avoid significant overhead:
@@ -285,9 +287,7 @@ where
             //.flat_map_iter(|cell| cell.point_pairs().collect::<Vec<_>>())
             .flat_map_iter(|cell| cell.point_pairs())
     }
-    pub fn par_point_pairs2(
-        &self,
-    ) -> impl ParallelIterator<Item = ((usize, [T; N]), (usize, [T; N]))> + '_ {
+    pub fn par_point_pairs2(&self) -> impl ParallelIterator<Item = ((usize, P), (usize, P))> + '_ {
         self.par_iter().flat_map_iter(|cell| cell.point_pairs2())
     }
 

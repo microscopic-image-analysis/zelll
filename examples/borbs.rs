@@ -105,7 +105,7 @@ fn main() {
     let white = Point3::new(1.0, 1.0, 1.0);
     let red = Point3::new(1.0, 0.0, 0.0);
 
-    let mut cell_grid = CellGrid::new(
+    let mut cell_grid: CellGrid<[_; 3], 3, _> = CellGrid::new(
         borbs.position.iter().map(|p| p.coords.as_ref()),
         OUTER_RADIUS,
     );
