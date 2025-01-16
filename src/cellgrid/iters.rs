@@ -155,7 +155,7 @@ where
     /// # use nalgebra::Point;
     /// # let points = [Point::from([0.0, 0.0, 0.0]), Point::from([1.0,2.0,0.0]), Point::from([0.0, 0.1, 0.2])];
     /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
-    /// # let cell_grid: CellGrid<[_; 3]> = CellGrid::new(points.iter(), 1.0);
+    /// # let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
     /// cell_grid.iter().flat_map(|cell| cell.iter()).count();
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
@@ -188,7 +188,7 @@ mod tests {
     fn test_cellgrid_iter() {
         // Using 0-origin to avoid floating point errors
         let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
-        let cell_grid: CellGrid<[_; 3], 3> = CellGrid::new(points.iter(), 1.0);
+        let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
 
         assert_eq!(cell_grid.iter().count(), 14, "testing iter()");
 
@@ -200,7 +200,7 @@ mod tests {
     fn test_gridcell_iter() {
         // Using 0-origin to avoid floating point errors
         let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
-        let cell_grid: CellGrid<[_; 3], 3> = CellGrid::new(points.iter(), 1.0);
+        let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
 
         assert_eq!(
             cell_grid.iter().flat_map(|cell| cell.iter()).count(),
@@ -225,7 +225,7 @@ mod tests {
     fn test_neighborcell_pointpairs() {
         // Using 0-origin to avoid floating point errors
         let points = generate_points([2, 2, 2], 1.0, [0.0, 0.0, 0.0]);
-        let cell_grid: CellGrid<[_; 3], 3> = CellGrid::new(points.iter(), 1.0);
+        let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
 
         assert_eq!(
             cell_grid

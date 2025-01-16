@@ -54,19 +54,17 @@ where
         + std::fmt::Debug
         + Default,
 {
-    // TODO: whereever I need impl Iterator<>
-    // TODO: I should probably use impl IntoIterator<Item = &'p [f64; N]> (+ Clone or + Borrow?)
-    // TODO: usually this means, that the type impl'ing IntoIterator is a reference so it can be safely copied and iterated over
-    // TODO: also maybe Item = impl Deref<Target = [f64; N]>? e.g. DashMap's iterators iterate over custom reference types
-    // TODO: cf. https://users.rust-lang.org/t/declaring-associated-item-whose-references-implement-intoiterator/17103/6
-    // TODO: cf. https://doc.rust-lang.org/stable/std/primitive.reference.html
-    // TODO: cf. https://docs.rs/pyo3/latest/pyo3/prelude/trait.PyAnyMethods.html#implementors
-    // TODO: impl IntoIterator for T: PyAnyMethods (kann ich das? brauch ich wrapper/super trait?)
-    // TODO: Bound<'py, PyAny> impl's PyAnyMethods + Clone
-    pub fn new<B, I>(points: I, cutoff: T) -> Self
+
+    // TODO: document that P: Copy is important here
+    // TODO: intended usage: CellGrid::new(points.iter().copied())
+    // TODO: previously we required <I as IntoIterator>::Item: Borrow<P>
+    // TODO: which provided more flexibility (accepting P and &P)
+    // TODO: but this required lots of type annotations for the user
+    // TODO: since Particle<T>: Copy anyway, we'll sacrifices this flexibility
+    // TODO: in favor of not cluttering user code with type annotations
+    pub fn new<I>(points: I, cutoff: T) -> Self
     where
-        I: IntoIterator<Item = B> + Clone,
-        B: Borrow<P>,
+        I: IntoIterator<Item = P> + Clone,
         P: Default,
     {
         CellGrid::default().rebuild(points, Some(cutoff))
@@ -77,10 +75,9 @@ where
     //TODO: If FlatIndex did not change, we don't need to update.
     //TODO: Therefore we check for that and make CellGrid::new() just a wrapper around CellGrid::rebuild (with an initially empty FlatIndex)
     #[must_use = "rebuild() consumes `self` and returns the rebuilt `CellGrid`"]
-    pub fn rebuild<B, I>(self, points: I, cutoff: Option<T>) -> Self
+    pub fn rebuild<I>(self, points: I, cutoff: Option<T>) -> Self
     where
-        I: IntoIterator<Item = B> + Clone,
-        B: Borrow<P>,
+        I: IntoIterator<Item = P> + Clone,
         P: Default,
     {
         let cutoff = cutoff.unwrap_or(self.index.grid_info.cutoff);
@@ -130,10 +127,9 @@ where
         }
     }
 
-    pub fn rebuild_mut<B, I>(&mut self, points: I, cutoff: Option<T>)
+    pub fn rebuild_mut<I>(&mut self, points: I, cutoff: Option<T>)
     where
-        I: IntoIterator<Item = B> + Clone,
-        B: Borrow<P>,
+        I: IntoIterator<Item = P> + Clone,
         P: Default,
     {
         if self.index.rebuild_mut(points.clone(), cutoff) {

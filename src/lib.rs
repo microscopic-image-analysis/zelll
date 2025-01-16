@@ -34,73 +34,43 @@ where
     }
 }
 
-struct PStorage<P> {
-    buffer: Vec<P>,
-}
-
-impl<P> PStorage<P> {
-    fn new<Q, I>(points: I) -> Self
-    where
-        I: IntoIterator<Item = Q>,
-        P: Copy,
-        Q: std::borrow::Borrow<P>,
-    {
-        Self {
-            buffer: points.into_iter().map(|p| *p.borrow()).collect(),
-        }
-    }
-
-    fn convert<T>(&self) -> Vec<T>
-    where
-        P: Particle<T>,
-    {
-        let out = self.buffer.iter().map(|p| p.coords()).collect();
-
-        out
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use nalgebra::SVector;
 
-    #[test]
-    fn test_impl_particle() {
-        let p0 = [0.0f64; 3];
-        let p1 = &p0;
-        let p2 = SVector::from(p0);
+    struct PStorage<P> {
+        buffer: Vec<P>,
+    }
 
-        fn test<P>(point: P) -> [f64; 3]
+    impl<P> PStorage<P> {
+        fn new<I>(points: I) -> Self
         where
-            P: Particle<[f64; 3]>,
-            // Q: std::borrow::Borrow<P>,
+            I: IntoIterator<Item = P>,
+            P: Copy,
         {
-            // (*point.borrow()).coords()
-            point.coords()
+            Self {
+                buffer: points.into_iter().collect(),
+            }
         }
 
-        let points = vec![[0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3]];
-
-        points.iter().for_each(|&p| assert_eq!(test(p), p));
-
-        assert_eq!(test(p0), p0);
-        assert_eq!(test(*p1), *p1);
-        // assert_eq!(test(p1), *p1);
-        assert_eq!(test(p2), p0);
-        // assert_eq!(test(&p2), p0);
-        assert_eq!(test(*&p2), p0);
-
-        let _: [_; 3] = p0.coords();
-        let _: [_; 3] = p2.coords();
+        fn convert<T>(&self) -> Vec<T>
+        where
+            P: Particle<T>,
+        {
+            self.buffer.iter().map(|p| p.coords()).collect()
+        }
     }
 
     #[test]
-    fn test_impl_particle2() {
+    fn test_impl_particle() {
         let points = vec![[0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3]];
 
-        let ps: PStorage<[f32; 3]> = PStorage::new(points.iter().clone());
-        let ps: PStorage<[f32; 3]> = PStorage::new(points.into_iter().clone());
+        let ps = PStorage::new(points.iter().copied());
+        let ps = PStorage::new(points.clone().into_iter());
+
+        let points: Vec<_> = points.into_iter().map(|p| SVector::from(p)).collect();
+        let ps = PStorage::new(points.iter().copied());
 
         let _: Vec<[_; 3]> = ps.convert();
     }
