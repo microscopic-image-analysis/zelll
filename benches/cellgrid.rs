@@ -34,92 +34,6 @@ fn generate_points_random(
     .collect()
 }
 
-pub fn bench_cellgrid_random(c: &mut Criterion) {
-    let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
-    let mut group = c.benchmark_group("CellGrid");
-    group
-        .sampling_mode(SamplingMode::Flat)
-        .plot_config(plot_config.clone());
-
-    group.bench_with_input(BenchmarkId::new("Gonnet2007", 1000), &1000, |b, size| {
-        let pointcloud = generate_points_random(*size, [3.166; 3], [0.0, 0.0, 0.0], None);
-        let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), 1.0);
-        b.iter(|| {
-            cg.for_each_point_pair(|_, _| {});
-        })
-    });
-
-    #[cfg(feature = "rayon")]
-    group.bench_with_input(
-        BenchmarkId::new("Gonnet2007_par", 1000),
-        &1000,
-        |b, size| {
-            let pointcloud = generate_points_random(*size, [3.166; 3], [0.0, 0.0, 0.0], None);
-            let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), 1.0);
-            b.iter(|| {
-                cg.par_for_each_point_pair(|_, _| {});
-            })
-        },
-    );
-
-    for size in (0..=5).map(|exp| 10usize.pow(exp)) {
-        let pointcloud = generate_points_random(size, [100.0; 3], [0.0, 0.0, 0.0], None);
-
-        group.bench_with_input(
-            BenchmarkId::new("::new()", size),
-            &pointcloud,
-            |b, pointcloud| {
-                b.iter(|| {
-                    CellGrid::new(pointcloud.iter().map(|p| p.coords), 10.0);
-                })
-            },
-        );
-    }
-
-    //TODO: Would expect ~350ms for 10e6 points but I'm getting 1s consistently...
-    //TODO: compare iteration against Itertools::tuple_combinations() (as naive N^2 version)
-    //TODO: Also: count interactions, benchmark other iteration variants
-    //TODO: also: benchmark with constant density instead of constant volume
-    for size in (0..=5).map(|exp| 10usize.pow(exp)) {
-        let pointcloud = generate_points_random(size, [100.0; 3], [0.0, 0.0, 0.0], None);
-        let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), 10.0);
-
-        group.bench_with_input(
-            BenchmarkId::new("::for_each_point_pair()", size),
-            &cg,
-            |b, cg| {
-                b.iter(|| {
-                    cg.for_each_point_pair(|_, _| {
-                        //std::hint::black_box(distance_squared(&pointcloud[i], &pointcloud[j]));
-                    });
-                })
-            },
-        );
-
-        #[cfg(feature = "rayon")]
-        group.bench_with_input(
-            BenchmarkId::new("::par_for_each_point_pair()", size),
-            &cg,
-            |b, cg| {
-                b.iter(|| {
-                    cg.par_for_each_point_pair(|_, _| {});
-                })
-            },
-        );
-
-        let pointcloud = generate_points_random(size, [100.0; 3], [0.0, 0.0, 0.0], None);
-
-        group.bench_with_input(BenchmarkId::new("::rebuild_mut()", size), &cg, |b, cg| {
-            let mut cg = cg.clone();
-            b.iter(|| {
-                cg.rebuild_mut(pointcloud.iter().map(|p| p.coords), None);
-            })
-        });
-    }
-
-    group.finish();
-}
-
 pub fn bench_cellgrid_concentration(c: &mut Criterion) {
     let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
     let mut group = c.benchmark_group("CellGrid");
@@ -131,15 +45,9 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
         let pointcloud = generate_points_random(*size, [3.166; 3], [0.0, 0.0, 0.0], None);
         let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), 1.0);
         b.iter(|| {
-            //cg.for_each_point_pair(|_, _| {});
-            cg.filter_point_pairs(
-                |_, _| {},
-                |i, j| {
-                    /*UniformNorm.metric_distance(&pointcloud[i].coords, &pointcloud[j].coords) <= 1.0
-                    && */
-                    distance_squared(&pointcloud[i], &pointcloud[j]) <= 1.0
-                },
-            );
+            cg.point_pairs()
+                .filter(|&((_i, p), (_j, q))| distance_squared(&p.into(), &q.into()) <= 1.0)
+                .for_each(|_| {});
         })
     });
 
@@ -151,15 +59,9 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
             let pointcloud = generate_points_random(*size, [3.166; 3], [0.0, 0.0, 0.0], None);
             let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), 1.0);
             b.iter(|| {
-                //cg.par_for_each_point_pair(|_, _| {});
-                cg.par_filter_point_pairs(
-                    |_, _| {},
-                    |i, j| {
-                        /*UniformNorm.metric_distance(&pointcloud[i].coords, &pointcloud[j].coords)
-                        <= 1.0 &&*/
-                        distance_squared(&pointcloud[i], &pointcloud[j]) <= 1.0
-                    },
-                );
+                cg.par_point_pairs()
+                    .filter(|&((_i, p), (_j, q))| distance_squared(&p.into(), &q.into()) <= 1.0)
+                    .for_each(|_| {});
             })
         },
     );
@@ -198,21 +100,7 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("::point_pairs()", size), &cg, |b, cg| {
             let cutoff_squared = cutoff.powi(2);
             b.iter(|| {
-                //cg.for_each_point_pair(|_, _| {});
-                /*cg.filter_point_pairs(
-                    |_, _| {},
-                    |i, j| {
-                        /*UniformNorm
-                        .metric_distance(&pointcloud[i].coords, &pointcloud[j].coords)
-                        <= cutoff && */
-                        distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared
-                    },
-                );*/
-                // cg.point_pairs()
-                //     .filter(|&(i, j)| {
-                //         distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared
-                //     })
-                cg.point_pairs2()
+                cg.point_pairs()
                     .filter(|&((_i, p), (_j, q))| {
                         distance_squared(&p.into(), &q.into()) <= cutoff_squared
                     })
@@ -227,30 +115,7 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
             |b, cg| {
                 let cutoff_squared = cutoff.powi(2);
                 b.iter(|| {
-                    //cg.par_for_each_point_pair(|_, _| {});
-                    /*
-                    cg.par_filter_point_pairs(
-                        |_, _| {},
-                        |i, j| {
-                            /*UniformNorm
-                            .metric_distance(&pointcloud[i].coords, &pointcloud[j].coords)
-                            <= cutoff && */
-                            distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared
-                        },
-                    );
-                    */
-                    /*
-                    cg.par_point_pairs().filter(|&(i, j)| {
-                        distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared
-                    })
-                    .for_each(|_| {});
-                    */
-                    // cg.par_point_pairs().for_each(|(i, j)| {
-                    //     if distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared {
-                    //     } else {
-                    //     }
-                    // });
-                    cg.par_point_pairs2().for_each(|((_i, p), (_j, q))| {
+                    cg.par_point_pairs().for_each(|((_i, p), (_j, q))| {
                         if distance_squared(&p.into(), &q.into()) <= cutoff_squared {
                         } else {
                         }

@@ -54,20 +54,22 @@ fn main() {
         );*/
         // let count = cg.point_pairs().count();
         cg.point_pairs()
-            .filter(|&(i, j)| distance_squared(&pointcloud[i], &pointcloud[j]) <= _cutoff_squared)
+            .filter(|&((_i, p), (_j, q))| distance_squared(&p.into(), &q.into()) <= _cutoff_squared)
             .for_each(|_| black_box(()));
         // cg.point_pairs2()
         //     .filter(|&((_i, p), (_j, q))| distance_squared(&p, &q) <= _cutoff_squared)
         //     .for_each(|_| black_box(()));
 
         #[cfg(feature = "rayon")]
-        cg.par_filter_point_pairs(
-            |_, _| {
+        cg.par_point_pairs()
+            .filter(|&((_i, p), (_j, q))| {
+                true //distance_squared(&p.into(), &q.into()) <= _cutoff_squared)
+            })
+            .for_each(|_| {
                 //count += 1;
                 black_box(());
-            },
-            |_i, _j| true, //distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared,
-        );
+            });
+
         //let count = cg.par_point_pairs().count();
         //println!("{}", count);
     }

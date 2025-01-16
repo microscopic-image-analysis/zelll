@@ -54,7 +54,6 @@ where
         + std::fmt::Debug
         + Default,
 {
-
     // TODO: document that P: Copy is important here
     // TODO: intended usage: CellGrid::new(points.iter().copied())
     // TODO: previously we required <I as IntoIterator>::Item: Borrow<P>
@@ -209,52 +208,17 @@ where
     ///     });
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn point_pairs<'p>(&'p self) -> impl Iterator<Item = (usize, usize)> + Clone + 'p {
+    pub fn point_pairs<'p>(
+        &'p self,
+    ) -> impl Iterator<Item = ((usize, P), (usize, P))> + Clone + 'p {
         self.iter().flat_map(|cell| cell.point_pairs())
     }
 
-    pub fn point_pairs2<'p>(
-        &'p self,
-    ) -> impl Iterator<Item = ((usize, P), (usize, P))> + Clone + 'p {
-        self.iter().flat_map(|cell| cell.point_pairs2())
-    }
-
-    /// Call a closure on each relevant (i.e. within cutoff threshold + some extra) unique pair of points in this `CellGrid`.
-    /// `for_each_point_pair()` is equivalent to a nested loop:
-    /// ```ignore
-    /// for cell in cell_grid.iter() {
-    ///     for (borb, other) in cell.point_pairs() {
-    ///         ...
-    ///     }
-    /// }
-    /// ```
-    #[deprecated(note = "Please use [`point_pairs()`](#method.point_pairs) instead.")]
-    pub fn for_each_point_pair<F>(&self, mut f: F)
-    where
-        F: FnMut(usize, usize),
-    {
-        self.iter().for_each(|cell| {
-            cell.point_pairs().for_each(|(i, j)| {
-                f(i, j);
-            })
-        });
-    }
-
-    #[deprecated(note = "Please use [`point_pairs()`](#method.point_pairs) instead.")]
-    pub fn filter_point_pairs<F, Q>(&self, mut f: F, p: Q)
-    where
-        F: FnMut(usize, usize),
-        Q: Fn(usize, usize) -> bool,
-    {
-        //TODO: array_chunks() could be nice for autovectorization?
-        //TODO: see https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.array_chunks
-        self.iter().for_each(|cell| {
-            cell.point_pairs()
-                .filter(|(i, j)| p(*i, *j))
-                .for_each(|(i, j)| {
-                    f(i, j);
-                });
-        });
+    #[must_use = "iterators are lazy and do nothing unless consumed"]
+    pub fn pair_indices<'p>(&'p self) -> impl Iterator<Item = (usize, usize)> + Clone + 'p {
+        self.iter()
+            .flat_map(|cell| cell.point_pairs())
+            .map(|((i, _p), (j, _q))| (i, j))
     }
 }
 
@@ -277,40 +241,16 @@ where
     ///     });
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn par_point_pairs(&self) -> impl ParallelIterator<Item = (usize, usize)> + '_ {
+    pub fn par_point_pairs(&self) -> impl ParallelIterator<Item = ((usize, P), (usize, P))> + '_ {
+        self.par_iter().flat_map_iter(|cell| cell.point_pairs())
+    }
+
+    #[must_use = "iterators are lazy and do nothing unless consumed"]
+    pub fn par_pair_indices(&self) -> impl ParallelIterator<Item = (usize, usize)> + '_ {
         self.par_iter()
             //.flat_map(|cell| cell.point_pairs().collect::<Vec<_>>())
             //.flat_map_iter(|cell| cell.point_pairs().collect::<Vec<_>>())
             .flat_map_iter(|cell| cell.point_pairs())
-    }
-    pub fn par_point_pairs2(&self) -> impl ParallelIterator<Item = ((usize, P), (usize, P))> + '_ {
-        self.par_iter().flat_map_iter(|cell| cell.point_pairs2())
-    }
-
-    #[deprecated(note = "Please use [`par_point_pairs()`](#method.par_point_pairs) instead.")]
-    pub fn par_for_each_point_pair<F>(&self, f: F)
-    where
-        F: Fn(usize, usize) + Send + Sync,
-    {
-        self.par_iter().for_each(|cell| {
-            cell.point_pairs().for_each(|(i, j)| {
-                f(i, j);
-            })
-        });
-    }
-
-    #[deprecated(note = "Please use [`par_point_pairs()`](#method.par_point_pairs) instead.")]
-    pub fn par_filter_point_pairs<F, Q>(&self, f: F, p: Q)
-    where
-        F: Fn(usize, usize) + Send + Sync,
-        Q: Fn(usize, usize) -> bool + Send + Sync,
-    {
-        self.par_iter().for_each(|cell| {
-            cell.point_pairs()
-                .filter(|(i, j)| p(*i, *j))
-                .for_each(|(i, j)| {
-                    f(i, j);
-                })
-        });
+            .map(|((i, _p), (j, _q))| (i, j))
     }
 }
