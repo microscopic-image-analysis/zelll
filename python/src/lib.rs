@@ -50,7 +50,7 @@ impl<'py> Iterator for PointsIterator<'py> {
 /// 3D cell grid
 #[pyclass(name = "CellGrid", module = "zelll")]
 pub struct PyCellGrid {
-    inner: CellGrid<3>,
+    inner: CellGrid<[f64; 3]>,
 }
 
 #[pymethods]
@@ -94,7 +94,7 @@ pub struct PyCellGridIter {
     // `_keep_borrow` is enough to maintain correct drop order *and* prevents `PyCellGrid`
     // from being mutated while `PyCellGridIter` is still alive
     _keep_borrow: PyRef<'static, PyCellGrid>,
-    iter: Box<dyn Iterator<Item = (usize, usize)>>,
+    iter: Box<dyn Iterator<Item = ((usize, [f64; 3]), (usize, [f64; 3]))>>,
 }
 
 impl PyCellGridIter {
@@ -108,8 +108,8 @@ impl PyCellGridIter {
         // https://github.com/PyO3/pyo3/issues/1089
         let iter = unsafe {
             std::mem::transmute::<
-                Box<dyn Iterator<Item = (usize, usize)> + '_>,
-                Box<dyn Iterator<Item = (usize, usize)> + 'static>,
+                Box<dyn Iterator<Item = ((usize, [f64; 3]), (usize, [f64; 3]))> + '_>,
+                Box<dyn Iterator<Item = ((usize, [f64; 3]), (usize, [f64; 3]))> + 'static>,
             >(iter)
         };
         // SAFETY: lol
@@ -144,7 +144,7 @@ impl PyCellGridIter {
         slf
     }
 
-    fn __next__(mut slf: PyRefMut<'_, Self>) -> Option<(usize, usize)> {
+    fn __next__(mut slf: PyRefMut<'_, Self>) -> Option<((usize, [f64; 3]), (usize, [f64; 3]))> {
         slf.iter.next()
     }
 }
