@@ -157,7 +157,7 @@ fn main() {
             }
         });
         #[cfg(feature = "rayon")]
-        cell_grid.par_for_each_point_pair(|bead, other| {
+        cell_grid.par_pair_indices().for_each(|(bead, other)| {
             let mut acc = beads.position[other] - beads.position[bead];
             let radius = acc.norm();
 

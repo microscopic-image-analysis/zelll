@@ -113,7 +113,7 @@ fn main() {
     let mut neighborhood: Vec<usize> = vec![0; NBORBS];
 
     while window.render_with_camera(&mut cam) {
-        cell_grid.for_each_point_pair(|borb, other| {
+        cell_grid.pair_indices().for_each(|(borb, other)| {
             let relative_pos = borbs.position[borb] - borbs.position[other];
 
             if relative_pos.norm() <= OUTER_RADIUS
