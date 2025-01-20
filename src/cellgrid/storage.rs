@@ -134,7 +134,7 @@ impl CellSliceMeta {
 use core::iter::FusedIterator;
 
 #[derive(Debug, Default, Clone)]
-pub struct DenseMap<K, V> {
+pub(crate) struct DenseMap<K, V> {
     // TODO: should make this a Vec<Option<(i32, CellSliceMeta)>>
     inner: Vec<Option<(K, V)>>,
 }
@@ -232,7 +232,7 @@ impl<V: Clone + Default> FromIterator<(i32, V)> for DenseMap<i32, V> {
 // FIXME: it's rather users of `zelll` if they decide to change the storage type
 // FIXME: at the very least, we shouldn't re-export GridStorage?
 // TODO: might need GridStorage: FromIterator<(K, V)> + Default
-pub trait GridStorage<V = CellSliceMeta>: Default {
+pub(crate) trait GridStorage<V = CellSliceMeta>: Default {
     // TODO: make Entry a generic parameter or hardcode it to CellSliceMeta?
     // default implementation is a no-op
     // but overriding this helps to replicate with_capacity() (since Default is super trait)
