@@ -39,11 +39,45 @@ mod tests {
     use super::*;
     use nalgebra::SVector;
 
-    struct PStorage<P> {
+    // TODO: API experiments for GridStorage trait in CellGrid
+    trait Grid<T = ()>: Default {}
+
+    #[derive(Default)]
+    struct SparseGrid;
+    #[derive(Default)]
+    struct DenseGrid;
+
+    impl<T> Grid<T> for SparseGrid {}
+    impl<T> Grid<T> for DenseGrid {}
+
+    struct PStorage<P, G: Grid<()> = SparseGrid> {
         buffer: Vec<P>,
+        grid: G,
     }
 
-    impl<P> PStorage<P> {
+    impl<P> PStorage<P, SparseGrid> {
+        #[inline]
+        fn new_sparse<I>(points: I) -> Self
+        where
+            I: IntoIterator<Item = P>,
+            P: Copy,
+        {
+            PStorage::new(points)
+        }
+    }
+
+    impl<P> PStorage<P, DenseGrid> {
+        #[inline]
+        fn new_dense<I>(points: I) -> Self
+        where
+            I: IntoIterator<Item = P>,
+            P: Copy,
+        {
+            PStorage::new(points)
+        }
+    }
+
+    impl<P, G: Grid<()>> PStorage<P, G> {
         fn new<I>(points: I) -> Self
         where
             I: IntoIterator<Item = P>,
@@ -51,6 +85,7 @@ mod tests {
         {
             Self {
                 buffer: points.into_iter().collect(),
+                grid: <G as Default>::default(),
             }
         }
 
@@ -66,11 +101,11 @@ mod tests {
     fn test_impl_particle() {
         let points = vec![[0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3]];
 
-        let ps = PStorage::new(points.iter().copied());
-        let ps = PStorage::new(points.clone().into_iter());
+        let ps = PStorage::<_, SparseGrid>::new(points.iter().copied());
+        let ps: PStorage<_> = PStorage::new(points.clone().into_iter());
 
         let points: Vec<_> = points.into_iter().map(|p| SVector::from(p)).collect();
-        let ps = PStorage::new(points.iter().copied());
+        let ps = PStorage::new_sparse(points.iter().copied());
 
         let _: Vec<[_; 3]> = ps.convert();
     }

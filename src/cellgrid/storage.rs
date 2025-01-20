@@ -1,26 +1,26 @@
-//TODO: document motivation for this
-//TODO: in principle we could solve this using slices instead of CellSliceMeta
-//TODO: but then we'd have to distingquish mutability when storing the slices
-//TODO: Also, bumpalo would be a nice approach too but there we'd have
-//TODO: to use allocator-api2 and resetting bumpalo is not nice (again because of mutability)
-//TODO: So instead let's just use a simple wrapper type around Vec with some specialized functionality
-//TODO: This wrapper could have a field len/cursor s.t. resizing and stuff does not drop values
-//TODO: but essentially we're doing the same things as Vec anyway and usize doesn't implement Drop
-//TODO: The downside of this approach (compared to e.g. Bumpalo) is that we have less guarantees
-//TODO: CellSliceMeta is decoupled from CellStorage (on purpose)
-//TODO: we're basically doing "unsafe" stuff using indices instead of pointers
-//TODO: (resulting in potential `panic!()`s instead of unsound stuff. Well, unsound stuff results now in logic errors)
-//TODO: Basically my only issue with bumpalo is that I can't have a persistent HashMap<usize, Vec<usize, &Bump>>
-//TODO: in CellGrid. I'd have to re-allocate this whenever CellGrid is rebuilt
-//TODO: but maybe this is not an issue anyway. This CellStorage wrapper type only solves this issue
-//TODO: Also hashbrown supports bumpalo, so I could have a separate Bump instance if I'd care about this
-//TODO: or can I do this:
-//TODO: https://users.rust-lang.org/t/reuse-a-vec-t-s-allocation-beyond-the-scope-of-its-content/66398/4
-//TODO: with hashbrown::HashMap? So far I didn't manage to do it
-//TODO: I can:
-//TODO: https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&code=use+hashbrown%3A%3AHashMap%3B%0A%0Afn+main%28%29+%7B%0A++++let+mut+empty_hm%3A+HashMap%3Cusize%2C+usize%3E+%3D+HashMap%3A%3Anew%28%29%3B%0A%0A++++for+i+in+0..10+%7B%0A++++++++let+mut+hm+%3D+empty_hm%3B%0A%0A++++++++%2F%2F+Fill+the+hashmap+with+some+data+bound+to+the+scope+of+the+loop.%0A++++++++for+j+in+0..i+%7B%0A++++++++hm.insert%28j%2C+i%29%3B++++%0A++++++++%7D%0A++++++++%0A++++%0A++++++++%2F%2F+sanity+check%3A+address+stays+the+same%0A++++++++println%21%28%22%7B%3Ap%7D%22%2C+%26hm%29%3B%0A++++%0A++++++++%2F%2F+Do+things+with+the+data.%0A++++++++for+s+in+%26hm+%7B+%0A++++++++++++std%3A%3Ahint%3A%3Ablack_box%28s%29%3B%0A++++++++%7D%0A++++%0A++++++++%2F%2F+Clear+the+vector%2C+ensuring+there+is+no+references+left+in+the+vector.%0A++++++++hm.clear%28%29%3B%0A++++++++empty_hm+%3D+hm.into_iter%28%29.map%28%7C_%7C+unreachable%21%28%29%29.collect%28%29%3B%0A++++%7D%0A%7D
-//TODO: but I need to check if this is still possible with values of type Vec<_, &Bump>
-//TODO: and see how this works without without this scoping
+// TODO: document motivation for this
+// TODO: in principle we could solve this using slices instead of CellSliceMeta
+// TODO: but then we'd have to distingquish mutability when storing the slices
+// TODO: Also, bumpalo would be a nice approach too but there we'd have
+// TODO: to use allocator-api2 and resetting bumpalo is not nice (again because of mutability)
+// TODO: So instead let's just use a simple wrapper type around Vec with some specialized functionality
+// TODO: This wrapper could have a field len/cursor s.t. resizing and stuff does not drop values
+// TODO: but essentially we're doing the same things as Vec anyway and usize doesn't implement Drop
+// TODO: The downside of this approach (compared to e.g. Bumpalo) is that we have less guarantees
+// TODO: CellSliceMeta is decoupled from CellStorage (on purpose)
+// TODO: we're basically doing "unsafe" stuff using indices instead of pointers
+// TODO: (resulting in potential `panic!()`s instead of unsound stuff. Well, unsound stuff results now in logic errors)
+// TODO: Basically my only issue with bumpalo is that I can't have a persistent HashMap<usize, Vec<usize, &Bump>>
+// TODO: in CellGrid. I'd have to re-allocate this whenever CellGrid is rebuilt
+// TODO: but maybe this is not an issue anyway. This CellStorage wrapper type only solves this issue
+// TODO: Also hashbrown supports bumpalo, so I could have a separate Bump instance if I'd care about this
+// TODO: or can I do this:
+// TODO: https://users.rust-lang.org/t/reuse-a-vec-t-s-allocation-beyond-the-scope-of-its-content/66398/4
+// TODO: with hashbrown::HashMap? So far I didn't manage to do it
+// TODO: I can:
+// TODO: https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&code=use+hashbrown%3A%3AHashMap%3B%0A%0Afn+main%28%29+%7B%0A++++let+mut+empty_hm%3A+HashMap%3Cusize%2C+usize%3E+%3D+HashMap%3A%3Anew%28%29%3B%0A%0A++++for+i+in+0..10+%7B%0A++++++++let+mut+hm+%3D+empty_hm%3B%0A%0A++++++++%2F%2F+Fill+the+hashmap+with+some+data+bound+to+the+scope+of+the+loop.%0A++++++++for+j+in+0..i+%7B%0A++++++++hm.insert%28j%2C+i%29%3B++++%0A++++++++%7D%0A++++++++%0A++++%0A++++++++%2F%2F+sanity+check%3A+address+stays+the+same%0A++++++++println%21%28%22%7B%3Ap%7D%22%2C+%26hm%29%3B%0A++++%0A++++++++%2F%2F+Do+things+with+the+data.%0A++++++++for+s+in+%26hm+%7B+%0A++++++++++++std%3A%3Ahint%3A%3Ablack_box%28s%29%3B%0A++++++++%7D%0A++++%0A++++++++%2F%2F+Clear+the+vector%2C+ensuring+there+is+no+references+left+in+the+vector.%0A++++++++hm.clear%28%29%3B%0A++++++++empty_hm+%3D+hm.into_iter%28%29.map%28%7C_%7C+unreachable%21%28%29%29.collect%28%29%3B%0A++++%7D%0A%7D
+// TODO: but I need to check if this is still possible with values of type Vec<_, &Bump>
+// TODO: and see how this works without without this scoping
 use core::ops::Range;
 
 #[derive(Debug, Default, Clone)]
@@ -35,47 +35,47 @@ impl<T> CellStorage<T> {
         }
     }
 
-    //TODO: provide fallible version of this
+    // TODO: provide fallible version of this
     pub fn cell_slice(&self, metadata: &CellSliceMeta) -> &[T] {
         &self.buffer[metadata.range.clone()]
     }
 
-    //TODO: choose appropriate Error type
+    // TODO: choose appropriate Error type
     pub fn try_push(&mut self, _value: T, _metadata: &mut CellSliceMeta) {
         todo!()
     }
 
-    //TODO: `panic!()`s if OOB
+    // TODO: `panic!()`s if OOB
     pub fn push(&mut self, value: T, metadata: &mut CellSliceMeta) {
         let slice = &mut self.buffer[metadata.range.clone()];
         slice[metadata.cursor] = value;
-        //TODO: use ::move_cursor(1)?
+        // TODO: use ::move_cursor(1)?
         metadata.cursor += 1;
     }
 
-    //TODO: potentially makes existing slice metadata unsound
-    //TODO: does not shrink capacity
-    //TODO: generational indices/ranges for metadata would make sense here but
-    //TODO: I'm not trying to reinvent ECS etc. I just want a simple wrapped Vec
-    //TODO: actually might store a &'s CellStorage inside of CellSliceMeta<'s>?
-    //TODO: I think this is no problem (well I think it is though...) even when I'm handling &mut CellSliceMeta?
-    //TODO: cf. https://github.com/CAD97/generativity but I'd like to avoid lifetime trickery
-    //TODO: Then CellSliceMeta would be tied to specific storage
-    //TODO: So, maybe CellStorage/CellSliceMeta should not really be exposed to public-facing API
-    //TODO: in some sense, real `unsafe` for CellStorage would be more honest
+    // TODO: potentially makes existing slice metadata unsound
+    // TODO: does not shrink capacity
+    // TODO: generational indices/ranges for metadata would make sense here but
+    // TODO: I'm not trying to reinvent ECS etc. I just want a simple wrapped Vec
+    // TODO: actually might store a &'s CellStorage inside of CellSliceMeta<'s>?
+    // TODO: I think this is no problem (well I think it is though...) even when I'm handling &mut CellSliceMeta?
+    // TODO: cf. https://github.com/CAD97/generativity but I'd like to avoid lifetime trickery
+    // TODO: Then CellSliceMeta would be tied to specific storage
+    // TODO: So, maybe CellStorage/CellSliceMeta should not really be exposed to public-facing API
+    // TODO: in some sense, real `unsafe` for CellStorage would be more honest
     pub fn truncate(&mut self, len: usize) {
         self.buffer.truncate(len);
     }
 
-    //TODO: this does not overwrite any memory
-    //TODO: document the behaviour and intention clearly
+    // TODO: this does not overwrite any memory
+    // TODO: document the behaviour and intention clearly
     pub fn clear(&mut self) {
         self.buffer.clear()
     }
 }
 
 impl<T: Default> CellStorage<T> {
-    //TODO: this resizes dynamically (but this only happens if we add particles to the point cloud)
+    // TODO: this resizes dynamically (but this only happens if we add particles to the point cloud)
     pub fn reserve_cell(&mut self, capacity: usize) -> CellSliceMeta {
         let range = self.buffer.len()..(self.buffer.len() + capacity);
         self.buffer.resize_with(range.end, Default::default);
@@ -84,12 +84,12 @@ impl<T: Default> CellStorage<T> {
     }
 }
 
-//TODO: this type does not check bounds, this is responsibility of CellStorage
+// TODO: this type does not check bounds, this is responsibility of CellStorage
 #[derive(Debug, Default, Clone)]
 pub struct CellSliceMeta {
     cursor: usize,
-    //TODO: Range is not Copy
-    //TODO: see https://github.com/rust-lang/rust/pull/27186
+    // TODO: Range is not Copy
+    // TODO: see https://github.com/rust-lang/rust/pull/27186
     range: Range<usize>,
 }
 // TODO: note that if I make this Either<i32, CellSliceMeta>, I could also remove CellSliceMeta entirely
@@ -105,17 +105,17 @@ impl CellSliceMeta {
     fn new(range: Range<usize>) -> Self {
         Self { cursor: 0, range }
     }
-    //TODO: probably won't need this but in principle, we just reset the cursor to clear
+    // TODO: probably won't need this but in principle, we just reset the cursor to clear
     pub fn clear(&mut self) {
         self.cursor = 0;
     }
 
-    //TODO: document OOB behavior (based on debug_assert/assert and CellStorage::push() behavior)
+    // TODO: document OOB behavior (based on debug_assert/assert and CellStorage::push() behavior)
     pub(crate) fn move_cursor(&mut self, steps: usize) {
-        //TODO: could use Range::contains() here but I think that would be actually more complicated?
+        // TODO: could use Range::contains() here but I think that would be actually more complicated?
         //Range<usize> impl ExactSizeIterator (and TrustedLen)
-        //TODO: make this a debug_assert!() ?
-        //TODO: might be actually okay since CellStorage::push() does perform bounds checks on the actual slice anyway
+        // TODO: make this a debug_assert!() ?
+        // TODO: might be actually okay since CellStorage::push() does perform bounds checks on the actual slice anyway
         debug_assert!(self.cursor + steps < self.range.len());
         self.cursor += steps;
     }
@@ -125,7 +125,7 @@ impl CellSliceMeta {
         self.cursor
     }
 
-    //TODO: proper error type?
+    // TODO: proper error type?
     pub fn try_move_cursor(&mut self, _steps: usize) {
         todo!()
     }
@@ -151,20 +151,18 @@ impl<K, V> DenseMap<K, V> {
     }
 }
 
-impl<T: Default + Clone> GridStorage for DenseMap<i32, T> {
-    type Entry = T;
-
+impl<V: Default + Clone> GridStorage<V> for DenseMap<i32, V> {
     fn clear(&mut self) {
         self.inner.clear();
     }
 
-    fn get(&self, k: &i32) -> Option<&Self::Entry> {
+    fn get(&self, k: &i32) -> Option<&V> {
         self.inner
             .get(*k as usize)
             .and_then(|c| c.as_ref().map(|(_, v)| v))
     }
 
-    fn get_mut(&mut self, k: &i32) -> Option<&mut Self::Entry> {
+    fn get_mut(&mut self, k: &i32) -> Option<&mut V> {
         self.inner
             .get_mut(*k as usize)
             .and_then(|c| c.as_mut().map(|(_, v)| v))
@@ -174,7 +172,8 @@ impl<T: Default + Clone> GridStorage for DenseMap<i32, T> {
         self.inner.shrink_to_fit();
     }
 
-    fn insert_unique_unchecked(&mut self, k: i32, v: Self::Entry) {
+    // FIXME: need entry API here instead
+    fn insert(&mut self, k: i32, v: V) {
         if k as usize >= self.inner.len() {
             self.inner.resize(k as usize + 1, None);
         }
@@ -188,33 +187,39 @@ impl<T: Default + Clone> GridStorage for DenseMap<i32, T> {
     // TODO: would have to prepulate vecmap-rs to make it a dense storage...
     // TODO: or simply keep my wrapper DenseMap
     // TODO: https://docs.rs/ordered-vecmap/latest/ordered_vecmap/ would also be interesting
-    fn keys(&self) -> impl FusedIterator<Item = &i32> + Clone + '_ {
-        self.inner.iter().filter_map(|c| c.as_ref().map(|(k, _)| k))
-    }
-
-    fn iter(&self) -> impl FusedIterator<Item = (&i32, &Self::Entry)> + Clone + '_ {
+    fn iter<'a>(&'a self) -> impl FusedIterator<Item = (&'a i32, &'a V)> + Clone + 'a
+    where
+        V: 'a,
+    {
         self.inner
             .iter()
             .filter_map(|c| c.as_ref().map(|(k, v)| (k, v)))
+    }
+
+    fn keys<'a>(&'a self) -> impl FusedIterator<Item = &'a i32> + Clone + 'a
+    where
+        V: 'a,
+    {
+        self.inner.iter().filter_map(|c| c.as_ref().map(|(k, _)| k))
     }
 }
 
 use std::iter::FromIterator;
 use std::ops::Index;
 
-impl Index<&i32> for DenseMap<i32, CellSliceMeta> {
-    type Output = CellSliceMeta;
+impl<V: Clone + Default> Index<&i32> for DenseMap<i32, V> {
+    type Output = V;
 
     fn index(&self, index: &i32) -> &Self::Output {
         self.get(index).expect("index should not be out of bounds.")
     }
 }
 
-impl FromIterator<(i32, CellSliceMeta)> for DenseMap<i32, CellSliceMeta> {
-    fn from_iter<T: IntoIterator<Item = (i32, CellSliceMeta)>>(iter: T) -> Self {
+impl<V: Clone + Default> FromIterator<(i32, V)> for DenseMap<i32, V> {
+    fn from_iter<T: IntoIterator<Item = (i32, V)>>(iter: T) -> Self {
         let iter = iter.into_iter();
         let mut dense_map = DenseMap::with_capacity(iter.size_hint().0);
-        iter.for_each(|(k, v)| dense_map.insert_unique_unchecked(k, v));
+        iter.for_each(|(k, v)| dense_map.insert(k, v));
         dense_map
     }
 }
@@ -226,8 +231,9 @@ impl FromIterator<(i32, CellSliceMeta)> for DenseMap<i32, CellSliceMeta> {
 // FIXME: actually that might not be a problem?
 // FIXME: it's rather users of `zelll` if they decide to change the storage type
 // FIXME: at the very least, we shouldn't re-export GridStorage?
-pub trait GridStorage: Default {
-    type Entry;
+// TODO: might need GridStorage: FromIterator<(K, V)> + Default
+pub trait GridStorage<V = CellSliceMeta>: Default {
+    // TODO: make Entry a generic parameter or hardcode it to CellSliceMeta?
     // default implementation is a no-op
     // but overriding this helps to replicate with_capacity() (since Default is super trait)
     fn reserve(&mut self, additional: usize) {
@@ -244,18 +250,22 @@ pub trait GridStorage: Default {
     // TODO: so that a grid storage type does not accumulate stale keys/cells
     fn clear(&mut self);
 
-    // TODO: document that this indicates our assumptions when inserting. That's all we need.
-    // TODO: i.e. implementors don't have to perform lookup before insertion
-    // TODO: e.g. hashbrown provides `insert_unique_unchecked()` which is safe for our purposes
-    fn insert_unique_unchecked(&mut self, k: i32, v: Self::Entry);
+    // FIXME: actually would rather like ::entry() API here
+    fn insert(&mut self, k: i32, v: V);
 
-    fn get(&self, k: &i32) -> Option<&Self::Entry>;
+    fn get(&self, k: &i32) -> Option<&V>;
 
-    fn get_mut(&mut self, k: &i32) -> Option<&mut Self::Entry>;
+    fn get_mut(&mut self, k: &i32) -> Option<&mut V>;
 
-    fn iter(&self) -> impl FusedIterator<Item = (&i32, &Self::Entry)> + Clone + '_;
+    // FIXME: need also iter_mut()
+    fn iter<'a>(&'a self) -> impl FusedIterator<Item = (&'a i32, &'a V)> + Clone + 'a
+    where
+        V: 'a;
 
-    fn keys(&self) -> impl FusedIterator<Item = &i32> + Clone + '_ {
+    fn keys<'a>(&'a self) -> impl FusedIterator<Item = &'a i32> + Clone + 'a
+    where
+        V: 'a,
+    {
         GridStorage::iter(self).map(|(k, _)| k)
     }
 }
@@ -263,9 +273,7 @@ pub trait GridStorage: Default {
 use hashbrown::HashMap;
 use std::collections::{BTreeMap, HashMap as StdHashMap};
 
-impl GridStorage for HashMap<i32, CellSliceMeta> {
-    type Entry = CellSliceMeta;
-
+impl<V> GridStorage<V> for HashMap<i32, V> {
     fn reserve(&mut self, additional: usize) {
         self.reserve(additional);
     }
@@ -278,35 +286,39 @@ impl GridStorage for HashMap<i32, CellSliceMeta> {
         self.clear()
     }
 
-    fn insert_unique_unchecked(&mut self, k: i32, v: Self::Entry) {
+    fn insert(&mut self, k: i32, v: V) {
         // SAFETY:
         // This is safe because CellGrid only inserts unique keys *once*
         // or clears the whole impl GridStorage before inserting the same key again.
         unsafe {
-            self.insert_unique_unchecked(k, v);
+            self.insert(k, v);
         }
     }
 
-    fn get(&self, k: &i32) -> Option<&Self::Entry> {
+    fn get(&self, k: &i32) -> Option<&V> {
         self.get(k)
     }
 
-    fn get_mut(&mut self, k: &i32) -> Option<&mut Self::Entry> {
+    fn get_mut(&mut self, k: &i32) -> Option<&mut V> {
         self.get_mut(k)
     }
 
-    fn iter(&self) -> impl FusedIterator<Item = (&i32, &Self::Entry)> + Clone + '_ {
+    fn iter<'a>(&'a self) -> impl FusedIterator<Item = (&'a i32, &'a V)> + Clone + 'a
+    where
+        V: 'a,
+    {
         self.iter()
     }
 
-    fn keys(&self) -> impl FusedIterator<Item = &i32> + Clone + '_ {
+    fn keys<'a>(&'a self) -> impl FusedIterator<Item = &'a i32> + Clone + 'a
+    where
+        V: 'a,
+    {
         self.keys()
     }
 }
 
-impl GridStorage for StdHashMap<i32, CellSliceMeta> {
-    type Entry = CellSliceMeta;
-
+impl<V> GridStorage<V> for StdHashMap<i32, V> {
     fn reserve(&mut self, additional: usize) {
         self.reserve(additional);
     }
@@ -319,51 +331,61 @@ impl GridStorage for StdHashMap<i32, CellSliceMeta> {
         self.clear()
     }
 
-    fn insert_unique_unchecked(&mut self, k: i32, v: Self::Entry) {
+    fn insert(&mut self, k: i32, v: V) {
         self.insert(k, v);
     }
 
-    fn get(&self, k: &i32) -> Option<&Self::Entry> {
+    fn get(&self, k: &i32) -> Option<&V> {
         self.get(k)
     }
 
-    fn get_mut(&mut self, k: &i32) -> Option<&mut Self::Entry> {
+    fn get_mut(&mut self, k: &i32) -> Option<&mut V> {
         self.get_mut(k)
     }
 
-    fn iter(&self) -> impl FusedIterator<Item = (&i32, &Self::Entry)> + Clone + '_ {
+    fn iter<'a>(&'a self) -> impl FusedIterator<Item = (&'a i32, &'a V)> + Clone + 'a
+    where
+        V: 'a,
+    {
         self.iter()
     }
 
-    fn keys(&self) -> impl FusedIterator<Item = &i32> + Clone + '_ {
+    fn keys<'a>(&'a self) -> impl FusedIterator<Item = &'a i32> + Clone + 'a
+    where
+        V: 'a,
+    {
         self.keys()
     }
 }
 
-impl GridStorage for BTreeMap<i32, CellSliceMeta> {
-    type Entry = CellSliceMeta;
-
+impl<V> GridStorage<V> for BTreeMap<i32, V> {
     fn clear(&mut self) {
         self.clear()
     }
 
-    fn insert_unique_unchecked(&mut self, k: i32, v: Self::Entry) {
+    fn insert(&mut self, k: i32, v: V) {
         self.insert(k, v);
     }
 
-    fn get(&self, k: &i32) -> Option<&Self::Entry> {
+    fn get(&self, k: &i32) -> Option<&V> {
         self.get(k)
     }
 
-    fn get_mut(&mut self, k: &i32) -> Option<&mut Self::Entry> {
+    fn get_mut(&mut self, k: &i32) -> Option<&mut V> {
         self.get_mut(k)
     }
 
-    fn iter(&self) -> impl FusedIterator<Item = (&i32, &Self::Entry)> + Clone + '_ {
+    fn iter<'a>(&'a self) -> impl FusedIterator<Item = (&'a i32, &'a V)> + Clone + 'a
+    where
+        V: 'a,
+    {
         self.iter()
     }
 
-    fn keys(&self) -> impl FusedIterator<Item = &i32> + Clone + '_ {
+    fn keys<'a>(&'a self) -> impl FusedIterator<Item = &'a i32> + Clone + 'a
+    where
+        V: 'a,
+    {
         self.keys()
     }
 }
