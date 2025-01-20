@@ -1,5 +1,3 @@
-//TODO: - allow both &[Point<f64, N>] and impl Iterator<Item = Point<f64, N>> (or IntoIterator)?
-//TODO: - possible approach: require impl Iterator and then .take(usize::MAX) to ensure we have only finite point clouds
 #[allow(dead_code)]
 pub mod flatindex;
 #[allow(dead_code)]
@@ -20,25 +18,15 @@ use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 pub use rayon::prelude::ParallelIterator;
 pub use storage::*;
 pub use util::*;
-//TODO: make CellGrid and related stuff generic over (internally) used numeric types: https://docs.rs/num-traits/latest/num_traits/
-//TODO: expose type aliases for practical combinations of numeric primitive types
-//TODO: decide what's getting re-exported at the crate root
-//TODO: I wonder if I could benefit from https://docs.rs/hashbrown/latest/hashbrown/struct.HashTable.html
-//TODO: https://docs.rs/indexmap/latest/indexmap/ is essentially using HashTable but it has too much overhead for us
-#[derive(Debug, Default, Clone)]
+//TODO: decide what's getting re-exported at the crate root#[derive(Debug, Default, Clone)]
 pub struct CellGrid<P, const N: usize = 3, T: Float = f64>
 where
     T: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
 {
     cells: HashMap<i32, CellSliceMeta>,
-    //cells: DenseMap,
-    // TODO: could make this CellStorage<(usize, [f64; N])>
-    // cell_lists: CellStorage<(usize, Point<T, N>)>,
     cell_lists: CellStorage<(usize, P)>,
     index: FlatIndex<N, T>,
 }
-
-// pub type ArrayParticleGrid<T, const N: usize> = CellGrid<[T; N], N, T>;
 
 impl<P: Particle<[T; N]>, const N: usize, T> CellGrid<P, N, T>
 where
@@ -87,11 +75,11 @@ where
             let mut cell_lists = CellStorage::with_capacity(index.index.len());
 
             // FIXME: This should be HashMap<i32, Either<usize, CellSliceMeta>> or CellSliceMeta an enum
-            let mut cells: HashMap<i32, CellSliceMeta> =
-                index.index.iter().fold(HashMap::new(), |mut map, idx| {
-                    map.entry(*idx).or_default().move_cursor(1);
-                    map
-                });
+            let mut cells: HashMap<i32, CellSliceMeta> = HashMap::new();
+            index.index.iter().for_each(|idx| {
+                // FIXME: this will trigger debug_assert!() in CellSliceMeta::move_cursor()
+                cells.entry(*idx).or_default().move_cursor(1);
+            });
 
             cells.iter_mut().for_each(|(_, slice)| {
                 *slice = cell_lists.reserve_cell(slice.cursor());
@@ -119,7 +107,20 @@ where
             }
         }
     }
+    // TODO: rebuild() could simply do this but rebuild_mut() on
+    // TODO: an empty CellGrid does have some overhead due to FlatIndex::rebuild_mut()
+    // {
+    //     let mut cellgrid = self;
+    //     cellgrid.rebuild_mut(points, cutoff);
+    //     cellgrid
+    // }
 
+    // TODO: documentation
+    // TODO: currently, rebuild_mut() will usually be more expensive than rebuild() even though it does not
+    // TODO: allocate.
+    // TODO: it makes mostly sense to use this when it's unlikely that the index changed
+    // TODO: when a simulation reaches a stable state or cutoff is larger than the max. interaction distance
+    // TODO: (cutoff-interaction distance >= max. distance particles might travel in one simulation step (similar to verlet lists))
     pub fn rebuild_mut<I>(&mut self, points: I, cutoff: Option<T>)
     where
         I: IntoIterator<Item = P> + Clone,
@@ -131,6 +132,7 @@ where
 
             // FIXME: This should be HashMap<i32, Either<usize, CellSliceMeta>> or CellSliceMeta an enum
             self.index.index.iter().for_each(|idx| {
+                // FIXME: this will trigger debug_assert!() in CellSliceMeta::move_cursor()
                 self.cells.entry(*idx).or_default().move_cursor(1);
             });
 
@@ -184,10 +186,10 @@ where
     /// Iterate over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`.
     /// ```ignore
     /// cell_grid.point_pairs()
-    ///     .filter(|&(i, j)| {
-    ///         distance_squared(&points[i], &points[j]) <= cutoff_squared
+    ///     .filter(|&((_i, p), (_j, q))| {
+    ///         distance_squared(&p.into(), &q.into()) <= cutoff_squared
     ///     })
-    ///     .for_each(|&(i, j)| {
+    ///     .for_each(|&((_i, p), (_j, q))| {
     ///         ...
     ///     });
     /// ```
@@ -216,8 +218,8 @@ where
     /// Try to avoid filtering this [`ParallelIterator`] to avoid significant overhead:
     /// ```ignore
     /// cell_grid.par_point_pairs()
-    ///     .for_each(|(i, j)| {
-    ///         if distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared {
+    ///     .for_each(|&((_i, p), (_j, q))| {
+    ///         if distance_squared(&p.into(), &q.into()) <= cutoff_squared {
     ///             ...
     ///         } else {
     ///             ...
@@ -232,8 +234,6 @@ where
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn par_pair_indices(&self) -> impl ParallelIterator<Item = (usize, usize)> + '_ {
         self.par_iter()
-            //.flat_map(|cell| cell.point_pairs().collect::<Vec<_>>())
-            //.flat_map_iter(|cell| cell.point_pairs().collect::<Vec<_>>())
             .flat_map_iter(|cell| cell.point_pairs())
             .map(|((i, _p), (j, _q))| (i, j))
     }

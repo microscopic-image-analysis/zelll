@@ -43,22 +43,12 @@ fn main() {
         println!("{:?}", cg.shape());
         let _cutoff_squared = cutoff.powi(2);
 
-        //cg.for_each_point_pair(|_, _| black_box(()));
         //let mut count: usize = 0;
         #[cfg(not(feature = "rayon"))]
-        /*cg.filter_point_pairs(
-            |_, _| {
-                count += 1;
-            },
-            |_i, _j| true, //distance_squared(&pointcloud[i], &pointcloud[j]) <= cutoff_squared,
-        );*/
         // let count = cg.point_pairs().count();
         cg.point_pairs()
             .filter(|&((_i, p), (_j, q))| distance_squared(&p.into(), &q.into()) <= _cutoff_squared)
             .for_each(|_| black_box(()));
-        // cg.point_pairs2()
-        //     .filter(|&((_i, p), (_j, q))| distance_squared(&p, &q) <= _cutoff_squared)
-        //     .for_each(|_| black_box(()));
 
         #[cfg(feature = "rayon")]
         cg.par_point_pairs()

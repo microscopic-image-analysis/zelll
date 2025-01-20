@@ -116,6 +116,7 @@ impl CellSliceMeta {
         //Range<usize> impl ExactSizeIterator (and TrustedLen)
         // TODO: make this a debug_assert!() ?
         // TODO: might be actually okay since CellStorage::push() does perform bounds checks on the actual slice anyway
+        // FIXME: this will be triggered on CellGrid::rebuild(_mut)()
         debug_assert!(self.cursor + steps < self.range.len());
         self.cursor += steps;
     }

@@ -94,7 +94,8 @@ where
         }
     }
     // there is no rebuild(), named it rebuild_mut() to match CellGrid::rebuild_mut()
-    //TODO: Documentation: return bool indicating whether the index changed at all (in length or any individual entry)
+    // TODO: Documentation: return bool indicating whether the index changed at all (in length or any individual entry)
+    // TODO: benchmark with changing point iterators
     pub fn rebuild_mut<P: Particle<[F; N]>>(
         &mut self,
         points: impl IntoIterator<Item = impl Borrow<P>> + Clone,
@@ -105,12 +106,15 @@ where
         let grid_info = GridInfo::new(aabb, cutoff);
 
         let size = points.clone().into_iter().take(i32::MAX as usize).count();
+        // TODO: should benchmark this
+        let size_changed = size != self.index.len();
         self.index.resize(size, 0);
 
         let new_index = points
             .into_iter()
             .take(i32::MAX as usize)
             .map(|point| grid_info.flat_cell_index(point.borrow().coords()));
+
         self.grid_info = grid_info;
 
         // FIXME: there seems to be a bug in shape/stride computation, causing redundant indices for small shapes e.g. (2,2,2)?
@@ -121,7 +125,7 @@ where
                 .iter_mut()
                 .zip(new_index)
                 .fold(false, |has_changed, (old, new)| {
-                    if *old != new {
+                    if size_changed || *old != new {
                         *old = new;
                         true
                     } else {
