@@ -18,7 +18,6 @@ use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 #[cfg(feature = "rayon")]
 //TODO: should do a re-export of rayon?
 pub use rayon::prelude::ParallelIterator;
-use std::borrow::Borrow;
 pub use storage::*;
 pub use util::*;
 //TODO: make CellGrid and related stuff generic over (internally) used numeric types: https://docs.rs/num-traits/latest/num_traits/
