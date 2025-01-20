@@ -18,7 +18,8 @@ use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 pub use rayon::prelude::ParallelIterator;
 pub use storage::*;
 pub use util::*;
-//TODO: decide what's getting re-exported at the crate root#[derive(Debug, Default, Clone)]
+//TODO: decide what's getting re-exported at the crate root
+#[derive(Debug, Default, Clone)]
 pub struct CellGrid<P, const N: usize = 3, T: Float = f64>
 where
     T: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,

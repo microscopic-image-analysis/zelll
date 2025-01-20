@@ -1,8 +1,5 @@
-//TODO: impl GridIndex trait
-//TODO: impl Deref/AsRef? to index
-//TODO: maybe FlatIndex should know about a point cloud (i.e. store a reference?)
-//TODO: Also: currently assuming that the order of points in point cloud does not change
-//TODO: i.e. index in flatindex corresponds to index in point cloud
+//TODO: currently assuming that the order of points in point cloud does not change
+//TODO: i.e. index in flatindex corresponds to index in point cloud, this should be documented
 use crate::{cellgrid::util::*, Particle};
 use itertools::Itertools;
 use nalgebra::*;
@@ -107,7 +104,7 @@ where
 
         let size = points.clone().into_iter().take(i32::MAX as usize).count();
         // TODO: should benchmark this
-        let size_changed = size != self.index.len();
+        // let size_changed = size != self.index.len();
         self.index.resize(size, 0);
 
         let new_index = points
@@ -125,7 +122,9 @@ where
                 .iter_mut()
                 .zip(new_index)
                 .fold(false, |has_changed, (old, new)| {
-                    if size_changed || *old != new {
+                    if
+                    /* size_changed || */
+                    *old != new {
                         *old = new;
                         true
                     } else {
