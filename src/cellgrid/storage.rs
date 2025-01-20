@@ -92,6 +92,14 @@ pub struct CellSliceMeta {
     //TODO: see https://github.com/rust-lang/rust/pull/27186
     range: Range<usize>,
 }
+// TODO: note that if I make this Either<i32, CellSliceMeta>, I could also remove CellSliceMeta entirely
+// TODO: if I create a  custom Enum for us:
+// enum CellSlice {
+//     Capacity(i32),
+//     Slice(&[usize]),
+//     MutSlice(&mut [usize]),
+// }
+// TODO: would then need to convert from Capacity(i32) to MutSlice by repeatedly calling split_at_mut()
 
 impl CellSliceMeta {
     fn new(range: Range<usize>) -> Self {
@@ -102,12 +110,19 @@ impl CellSliceMeta {
         self.cursor = 0;
     }
 
-    //TODO: panics on OOB
-    pub fn move_cursor(&mut self, steps: usize) {
+    //TODO: document OOB behavior (based on debug_assert/assert and CellStorage::push() behavior)
+    pub(crate) fn move_cursor(&mut self, steps: usize) {
         //TODO: could use Range::contains() here but I think that would be actually more complicated?
         //Range<usize> impl ExactSizeIterator (and TrustedLen)
-        assert!(self.cursor + steps < self.range.len());
+        //TODO: make this a debug_assert!() ?
+        //TODO: might be actually okay since CellStorage::push() does perform bounds checks on the actual slice anyway
+        debug_assert!(self.cursor + steps < self.range.len());
         self.cursor += steps;
+    }
+
+    //FIXME: technically a len() but might be misleading because cursor might exceed range.end...
+    pub(crate) fn cursor(&self) -> usize {
+        self.cursor
     }
 
     //TODO: proper error type?
@@ -212,16 +227,7 @@ impl FromIterator<(i32, CellSliceMeta)> for DenseMap<i32, CellSliceMeta> {
 // FIXME: it's rather users of `zelll` if they decide to change the storage type
 // FIXME: at the very least, we shouldn't re-export GridStorage?
 pub trait GridStorage: Default {
-    type Entry; // = CellSliceMeta or Either<i32, CellSliceMeta> (if we want to count inside the same storage)
-    // TODO: note that if I make this Either<i32, CellSliceMeta>, I could also remove CellSliceMeta entirely
-    // TODO: if I create a  custom Enum for us:
-    // enum CellSlice {
-    //     Capacity(i32),
-    //     Slice(&[usize]),
-    //     MutSlice(&mut [usize]),
-    // }
-    // TODO: would then need to convert from Capacity(i32) to MutSlice by repeatedly calling split_at_mut()
-
+    type Entry;
     // default implementation is a no-op
     // but overriding this helps to replicate with_capacity() (since Default is super trait)
     fn reserve(&mut self, additional: usize) {
