@@ -131,6 +131,15 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
             Some(3079380797442975920),
         );
 
+        // FIXME: this does not scale linearly because:
+        // FIXME: 1. we generate new random point cloud (so FlatIndex does change massively)
+        // FIXME: 2. cutoff remains unchanged
+        // FIXME: Therefore it's increasingly unlikely that rebuild_mut() can spare some extra work
+        // FIXME: In fact, for size=10_000_000 runtime is comparable to CellGrid::new()/rebuild()
+        // FIXME: for size=1_000_000 this is not the case
+        // FIXME: maybe some more investigation is needed.
+        // FIXME: actually 3s warmup phase does differ from ::new()... why?
+        // FIXME: (estimating target time ~130s vs 60s for 100 samples)
         group.bench_with_input(BenchmarkId::new("::rebuild_mut()", size), &cg, |b, cg| {
             let mut cg = cg.clone();
             b.iter(|| {

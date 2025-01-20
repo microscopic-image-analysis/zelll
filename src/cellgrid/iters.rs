@@ -33,7 +33,7 @@ where
     }
 
     // TODO: should probably rather impl IntoIterator to match consuming/copy behaviour of neighbors()/point_pairs()?
-    pub fn iter(&self) -> Iter<'g, (usize, P)> {
+    pub fn iter(self) -> Iter<'g, (usize, P)> {
         self.grid
             .cell_lists
             .cell_slice(
