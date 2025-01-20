@@ -87,21 +87,16 @@ where
         } else {
             let mut cell_lists = CellStorage::with_capacity(index.index.len());
 
-            //TODO: there might be a better way for this temporary multiset/hashbag/histogram
-            //TODO: e.g. have sth. like cells: HashMap<i32, Either<CellSliceMeta, usize>>
-            //TODO: or divert CellSliceMeta from it's intended use and use CellSliceMeta::cursor as a counter
-            //TODO: and initialize CellSliceMeta::range later once all counts are known
-            let cell_sizes: HashMap<i32, usize> =
+            // FIXME: This should be HashMap<i32, Either<usize, CellSliceMeta>> or CellSliceMeta an enum
+            let mut cells: HashMap<i32, CellSliceMeta> =
                 index.index.iter().fold(HashMap::new(), |mut map, idx| {
-                    *map.entry(*idx).or_default() += 1;
+                    map.entry(*idx).or_default().move_cursor(1);
                     map
                 });
 
-            let mut cells: HashMap<i32, CellSliceMeta> = cell_sizes
-                //let mut cells: DenseMap = cell_sizes
-                .iter()
-                .map(|(idx, count)| (*idx, cell_lists.reserve_cell(*count)))
-                .collect();
+            cells.iter_mut().for_each(|(_, slice)| {
+                *slice = cell_lists.reserve_cell(slice.cursor());
+            });
 
             index
                 .index
@@ -111,7 +106,7 @@ where
                 //TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
                 .for_each(|(i, (cell, point))| {
                     cell_lists.push(
-                        (i, *point.borrow()),
+                        (i, point),
                         cells
                             .get_mut(cell)
                             .expect("cell grid should contain every cell in the grid index"),
@@ -135,23 +130,13 @@ where
             self.cells.clear();
             self.cell_lists.clear();
 
-            let cell_sizes: HashMap<i32, usize> =
-                self.index
-                    .index
-                    .iter()
-                    .fold(HashMap::new(), |mut map, idx| {
-                        *map.entry(*idx).or_default() += 1;
-                        map
-                    });
+            // FIXME: This should be HashMap<i32, Either<usize, CellSliceMeta>> or CellSliceMeta an enum
+            self.index.index.iter().for_each(|idx| {
+                self.cells.entry(*idx).or_default().move_cursor(1);
+            });
 
-            cell_sizes.iter().for_each(|(idx, count)| {
-                // SAFETY:
-                // `insert_unique_unchecked()` is safe because `idx` is unique in `cell_sizes`
-                // and `self.cells` has been cleared before.
-                unsafe {
-                    self.cells
-                        .insert_unique_unchecked(*idx, self.cell_lists.reserve_cell(*count));
-                }
+            self.cells.iter_mut().for_each(|(_, slice)| {
+                *slice = self.cell_lists.reserve_cell(slice.cursor());
             });
 
             //TODO: we'll re-evaluate this once benchmarks with sparse data have been added
@@ -174,7 +159,7 @@ where
                 //TODO: could use unwrap_unchecked() since this can't/shouldn't fail
                 .for_each(|(i, (cell, point))| {
                     self.cell_lists.push(
-                        (i, *point.borrow()),
+                        (i, point),
                         self.cells
                             .get_mut(cell)
                             .expect("cell grid should contain every cell in the grid index"),
