@@ -84,6 +84,19 @@ where
             .map(|point| grid_info.flat_cell_index(point.borrow().coords()))
             .collect();
 
+        // TODO: this does seem to have a *small* effect due to autovectorization?
+        // TODO: (although often buried by cache effects)
+        // TODO: should examine more closely
+        // let mut it = points.into_iter()
+        //     .map(|p| grid_info.flat_cell_index(p.borrow().coords()));
+        // let mut index: Vec<i32> = Vec::with_capacity(it.size_hint().0);
+
+        // while let Some(chunk) = it.next_array::<16>() {
+        //     index.extend_from_slice(&chunk);
+        // }
+
+        // index.extend(it);
+
         Self {
             grid_info,
             index,
