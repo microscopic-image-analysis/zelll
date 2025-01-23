@@ -239,13 +239,18 @@ where
     P: Send + Sync,
 {
     /// Iterate over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`.
-    /// ```ignore
+    /// ```
+    /// # use zelll::cellgrid::CellGrid;
+    /// use nalgebra::distance_squared;
+    /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+    /// # let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
     /// cell_grid.point_pairs()
+    ///     // usually, .filter_map() is preferable (so distance computations can be re-used)
     ///     .filter(|&((_i, p), (_j, q))| {
-    ///         distance_squared(&p.into(), &q.into()) <= cutoff_squared
+    ///         distance_squared(&p.into(), &q.into()) <= 1.0
     ///     })
-    ///     .for_each(|&((_i, p), (_j, q))| {
-    ///         ...
+    ///     .for_each(|((_i, p), (_j, q))| {
+    ///         /* do some work */
     ///     });
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
@@ -270,14 +275,19 @@ where
     P: Particle<[T; N]> + Send + Sync,
 {
     /// Iterate in parallel over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`.
+    /// TODO: fact-check the statement below:
     /// Try to avoid filtering this [`ParallelIterator`] to avoid significant overhead:
-    /// ```ignore
+    /// ```
+    /// # // TODO: re-export ParallelIterator
+    /// # use crate::zelll::cellgrid::ParallelIterator;
+    /// # use zelll::cellgrid::CellGrid;
+    /// use nalgebra::distance_squared;
+    /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+    /// # let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
     /// cell_grid.par_point_pairs()
-    ///     .for_each(|&((_i, p), (_j, q))| {
-    ///         if distance_squared(&p.into(), &q.into()) <= cutoff_squared {
-    ///             ...
-    ///         } else {
-    ///             ...
+    ///     .for_each(|((_i, p), (_j, q))| {
+    ///         if distance_squared(&p.into(), &q.into()) <= 1.0 {
+    ///             /* do some work */
     ///         }
     ///     });
     /// ```
