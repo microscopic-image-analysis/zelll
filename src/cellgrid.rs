@@ -29,6 +29,13 @@ where
     index: FlatIndex<N, T>,
 }
 
+// TODO: maybe should provide ::rebuild_from_internal()? that feeds cellgrid with iterator over internal CellStorage
+// TODO: then we should also provide point_pairs_mut() that directly allows to overwrite points in cell storage?
+// TODO: although that complicates leapfrog integration
+// TODO: instead provide convenience method to chain GridCell::iter()'s or directly iterate over CellStorage
+// TODO: however for sequential data (biomolecules) this may destroy implicit order (so that would have to be modelled implicitley)
+// TODO: also, with reordered data, leapfrog integration buffers have to be shuffled accordingly
+// TODO: which is not that nice
 impl<P: Particle<[T; N]>, const N: usize, T> CellGrid<P, N, T>
 where
     T: Float
@@ -82,6 +89,37 @@ where
                 cells.entry(*idx).or_default().move_cursor(1);
             });
 
+            // TODO: could also use Itertools::next_array() here
+            // TODO: could count in chunk using Itertools::counts()
+            // TODO: but then I'd have to put those into an array of chunk size (with purposefully invalid/non-existing keys)
+            // let mut sliced = &index.index[..];
+            // while let Some((&chunk, tail)) = sliced.split_first_chunk::<8>() {
+            // for idx in chunk[..].iter() {
+            //     cells.entry(*idx).or_default().move_cursor(1);
+            // }
+
+            //     use itertools::Itertools;
+            //     let occurrences = chunk.iter().counts();
+            //     occurrences.into_iter().for_each(|(idx, count)| {
+            //         cells.entry(*idx).or_default().move_cursor(count);
+            //     });
+
+            //     sliced = tail;
+            // }
+
+            // sliced.iter().for_each(|idx| {
+            //     cells.entry(*idx).or_default().move_cursor(1);
+            // });
+
+            // use itertools::Itertools;
+            // index.index.iter().chunks(8).into_iter().for_each(|chunk| {
+            //     let occurrences = chunk.counts();
+
+            //     for (idx, count) in occurrences {
+            //         cells.entry(*idx).or_default().move_cursor(count);
+            //     }
+            // });
+
             cells.iter_mut().for_each(|(_, slice)| {
                 *slice = cell_lists.reserve_cell(slice.cursor());
             });
@@ -93,6 +131,9 @@ where
                 .enumerate()
                 //TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
                 .for_each(|(i, (cell, point))| {
+                    // FIXME: in principle could have multiple &mut slices into CellStorage (for parallel pushing)
+                    // FIXME: would just have to make sure that cell is always unique when operating on chunks
+                    // FIXME: (pretty much the same issue as with counting cell sizes concurrently)
                     cell_lists.push(
                         (i, point),
                         cells
@@ -136,6 +177,19 @@ where
                 // FIXME: this will trigger debug_assert!() in CellSliceMeta::move_cursor()
                 self.cells.entry(*idx).or_default().move_cursor(1);
             });
+
+            // let mut sliced = &self.index.index[..];
+            // while let Some((&chunk, tail)) = sliced.split_first_chunk::<4>() {
+            //     self.cells.entry(chunk[0]).or_default().move_cursor(1);
+            //     self.cells.entry(chunk[1]).or_default().move_cursor(1);
+            //     self.cells.entry(chunk[2]).or_default().move_cursor(1);
+            //     self.cells.entry(chunk[3]).or_default().move_cursor(1);
+            //     sliced = tail;
+            // }
+
+            // sliced.iter().for_each(|idx| {
+            //     self.cells.entry(*idx).or_default().move_cursor(1);
+            // });
 
             self.cells.iter_mut().for_each(|(_, slice)| {
                 *slice = self.cell_lists.reserve_cell(slice.cursor());
