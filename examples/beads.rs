@@ -144,7 +144,7 @@ fn main() {
         }
         // 3b. non-bonded interactions:
         #[cfg(not(feature = "rayon"))]
-        cell_grid.for_each_point_pair(|bead, other| {
+        cell_grid.pair_indices().for_each(|(bead, other)| {
             let mut acc = beads.position[other] - beads.position[bead];
             let radius = acc.norm();
 
