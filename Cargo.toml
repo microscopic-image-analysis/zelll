@@ -24,7 +24,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-itertools = "0.13"
+itertools = "0.14"
 nalgebra = "0.33"
 hashbrown = "0.15"
 num-traits = "0.2"
