@@ -254,14 +254,12 @@ where
     ///     });
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn point_pairs<'p>(
-        &'p self,
-    ) -> impl Iterator<Item = ((usize, P), (usize, P))> + Clone + 'p {
+    pub fn point_pairs(&self) -> impl Iterator<Item = ((usize, P), (usize, P))> + Clone + '_ {
         self.iter().flat_map(|cell| cell.point_pairs())
     }
 
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn pair_indices<'p>(&'p self) -> impl Iterator<Item = (usize, usize)> + Clone + 'p {
+    pub fn pair_indices(&self) -> impl Iterator<Item = (usize, usize)> + Clone + '_ {
         self.iter()
             .flat_map(|cell| cell.point_pairs())
             .map(|((i, _p), (j, _q))| (i, j))
