@@ -74,6 +74,8 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
         let c = (size as F32or64 / conc) / a / b;
         let vol_edges = (size as F32or64 / conc).cbrt();
         let pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0], None);
+        // FIXME: ::new() from (z-)sorted pointcloud does scale better (but not quite linearly)
+        // pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
 
         group.bench_with_input(
             BenchmarkId::new("::new()", size),
@@ -95,6 +97,7 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
         let vol_edges = (size as F32or64 / conc).cbrt();
 
         let pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0], None);
+        // pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
         let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
 
         group.bench_with_input(BenchmarkId::new("::point_pairs()", size), &cg, |b, cg| {
@@ -130,6 +133,7 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
             [0.0, 0.0, 0.0],
             Some(3079380797442975920),
         );
+        // pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
 
         // FIXME: this does not scale linearly because:
         // FIXME: 1. we generate new random point cloud (so FlatIndex does change massively)
@@ -140,6 +144,15 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
         // FIXME: maybe some more investigation is needed.
         // FIXME: actually 3s warmup phase does differ from ::new()... why?
         // FIXME: (estimating target time ~130s vs 60s for 100 samples)
+        // FIXME: rebuilding from same point cloud does scale perfectly linear (as it should)
+        // FIXME: rebuilding from new sorted pointcloud does not quite scale linearly (but better)
+        // FIXME: so these effects are likely from changing the hashmap lookup pattern for cell size counting
+        // FIXME: 1. live with it (document that we benefit from non-random structure in point cloud, such as for (sequential) biomolecules)
+        // FIXME: 2. somehow batch hashmap lookups (for counting cell sizes) using get_many_(key_value_)mut (kinda promising but a bit of work due to API limitations) and slice::split_first_chunk()
+        // FIXME:    (might not work, internally it also just uses find_mut())
+        // FIXME: 3. use 1 Vec<> per cell instead of one large Vec for all cells (i.e. sporadic Vec resizing instead of prior counting)
+        // FIXME: 4. pre-sorting point cloud or temporarily sort flatindex (which would be O(n*log(n))...)
+        // FIXME: 5. can we benefit from hashbrown::HashTable to construct something more low-level?
         group.bench_with_input(BenchmarkId::new("::rebuild_mut()", size), &cg, |b, cg| {
             let mut cg = cg.clone();
             b.iter(|| {
