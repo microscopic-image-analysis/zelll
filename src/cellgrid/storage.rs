@@ -24,7 +24,7 @@
 use core::ops::Range;
 
 #[derive(Debug, Default, Clone)]
-pub struct CellStorage<T> {
+pub(crate) struct CellStorage<T> {
     buffer: Vec<T>,
 }
 
@@ -49,8 +49,7 @@ impl<T> CellStorage<T> {
     pub fn push(&mut self, value: T, metadata: &mut CellSliceMeta) {
         let slice = &mut self.buffer[metadata.range.clone()];
         slice[metadata.cursor] = value;
-        // TODO: use ::move_cursor(1)?
-        metadata.cursor += 1;
+        metadata.move_cursor(1);
     }
 
     // TODO: potentially makes existing slice metadata unsound
@@ -292,7 +291,7 @@ impl<V> GridStorage<V> for HashMap<i32, V> {
         // This is safe because CellGrid only inserts unique keys *once*
         // or clears the whole impl GridStorage before inserting the same key again.
         unsafe {
-            self.insert(k, v);
+            self.insert_unique_unchecked(k, v);
         }
     }
 
