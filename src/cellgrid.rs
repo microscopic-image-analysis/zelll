@@ -289,12 +289,10 @@ where
     ///         }
     ///     });
     /// ```
-    #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn par_point_pairs(&self) -> impl ParallelIterator<Item = ((usize, P), (usize, P))> + '_ {
         self.par_iter().flat_map_iter(|cell| cell.point_pairs())
     }
 
-    #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn par_pair_indices(&self) -> impl ParallelIterator<Item = (usize, usize)> + '_ {
         self.par_iter()
             .flat_map_iter(|cell| cell.point_pairs())
