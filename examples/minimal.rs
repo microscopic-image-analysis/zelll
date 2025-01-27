@@ -7,7 +7,7 @@ use rand::prelude::*;
 use rayon::prelude::ParallelIterator;
 use std::hint::black_box;
 use std::iter::FromIterator;
-use zelll::cellgrid::CellGrid;
+use zelll::CellGrid;
 
 type PointCloud<const N: usize> = Vec<Point<f64, N>>;
 /// Generate a uniformly random 3D point cloud of size `n` in a cuboid of edge lengths `vol` centered around `origin`.
@@ -40,7 +40,7 @@ fn main() {
         //pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
 
         let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
-        println!("{:?}", cg.shape());
+        println!("{:?}", cg.info().shape());
         let _cutoff_squared = cutoff.powi(2);
 
         //let mut count: usize = 0;

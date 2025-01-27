@@ -1,24 +1,25 @@
+//! cellgrid stuff
 #[allow(dead_code)]
-pub mod flatindex;
+mod flatindex;
 #[allow(dead_code)]
-pub mod iters;
+mod iters;
 #[allow(dead_code)]
-pub mod storage;
+mod storage;
 #[allow(dead_code)]
 pub mod util;
 
+#[cfg(feature = "rayon")]
+use crate::rayon::ParallelIterator;
 use crate::Particle;
-pub use flatindex::*;
+use flatindex::FlatIndex;
 use hashbrown::HashMap;
-pub use iters::*;
+pub use iters::GridCell;
 use nalgebra::SimdPartialOrd;
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
-#[cfg(feature = "rayon")]
-//TODO: should do a re-export of rayon?
-pub use rayon::prelude::ParallelIterator;
-pub use storage::*;
-pub use util::*;
-//TODO: decide what's getting re-exported at the crate root
+use storage::{CellSliceMeta, CellStorage};
+pub use util::{generate_points, Aabb, GridInfo};
+
+///
 #[derive(Debug, Default, Clone)]
 pub struct CellGrid<P, const N: usize = 3, T: Float = f64>
 where
@@ -224,12 +225,8 @@ where
         }
     }
 
-    pub fn shape(&self) -> [i32; N] {
-        self.index.grid_info.shape()
-    }
-
-    pub fn bounding_box(&self) -> &Aabb<N, T> {
-        &self.index.grid_info.aabb
+    pub fn info(&self) -> &GridInfo<N, T> {
+        &self.index.grid_info
     }
 }
 
@@ -240,7 +237,7 @@ where
 {
     /// Iterate over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`.
     /// ```
-    /// # use zelll::cellgrid::CellGrid;
+    /// # use zelll::CellGrid;
     /// use nalgebra::distance_squared;
     /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
     /// # let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
@@ -277,8 +274,8 @@ where
     /// Try to avoid filtering this [`ParallelIterator`] to avoid significant overhead:
     /// ```
     /// # // TODO: re-export ParallelIterator
-    /// # use crate::zelll::cellgrid::ParallelIterator;
-    /// # use zelll::cellgrid::CellGrid;
+    /// # use zelll::CellGrid;
+    /// use zelll::rayon::ParallelIterator;
     /// use nalgebra::distance_squared;
     /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
     /// # let cell_grid = CellGrid::new(points.iter().copied(), 1.0);

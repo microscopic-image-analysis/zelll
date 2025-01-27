@@ -7,7 +7,9 @@ use kiss3d::window::Window;
 use rand::distributions::Standard;
 use rand::prelude::*;
 use soa_derive::StructOfArray;
-use zelll::cellgrid::*;
+#[cfg(feature = "rayon")]
+use zelll::rayon::ParallelIterator;
+use zelll::*;
 
 const NBEADS: usize = 2000;
 const TDELTA: f64 = 0.015;

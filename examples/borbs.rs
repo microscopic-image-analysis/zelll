@@ -5,8 +5,8 @@ use kiss3d::window::Window;
 use rand::distributions::Standard;
 use rand::prelude::*;
 use soa_derive::StructOfArray;
-use zelll::cellgrid::Aabb;
-use zelll::cellgrid::*;
+use zelll::grid::Aabb;
+use zelll::*;
 
 const NBORBS: usize = 20000;
 const DELTA: f64 = 0.015;
@@ -158,7 +158,7 @@ fn main() {
             );*/
         }
 
-        for (a, b) in aabb_vertices(cell_grid.bounding_box()) {
+        for (a, b) in aabb_vertices(cell_grid.info().bounding_box()) {
             window.draw_line(&a.cast::<f32>(), &b.cast::<f32>(), &red);
         }
 

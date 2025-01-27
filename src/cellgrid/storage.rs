@@ -29,24 +29,24 @@ pub(crate) struct CellStorage<T> {
 }
 
 impl<T> CellStorage<T> {
-    pub fn with_capacity(capacity: usize) -> Self {
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
         Self {
             buffer: Vec::with_capacity(capacity),
         }
     }
 
     // TODO: provide fallible version of this
-    pub fn cell_slice(&self, metadata: &CellSliceMeta) -> &[T] {
+    pub(crate) fn cell_slice(&self, metadata: &CellSliceMeta) -> &[T] {
         &self.buffer[metadata.range.clone()]
     }
 
     // TODO: choose appropriate Error type
-    pub fn try_push(&mut self, _value: T, _metadata: &mut CellSliceMeta) {
+    pub(crate) fn try_push(&mut self, _value: T, _metadata: &mut CellSliceMeta) {
         todo!()
     }
 
     // TODO: `panic!()`s if OOB
-    pub fn push(&mut self, value: T, metadata: &mut CellSliceMeta) {
+    pub(crate) fn push(&mut self, value: T, metadata: &mut CellSliceMeta) {
         let slice = &mut self.buffer[metadata.range.clone()];
         slice[metadata.cursor] = value;
         metadata.move_cursor(1);
@@ -62,20 +62,20 @@ impl<T> CellStorage<T> {
     // TODO: Then CellSliceMeta would be tied to specific storage
     // TODO: So, maybe CellStorage/CellSliceMeta should not really be exposed to public-facing API
     // TODO: in some sense, real `unsafe` for CellStorage would be more honest
-    pub fn truncate(&mut self, len: usize) {
+    pub(crate) fn truncate(&mut self, len: usize) {
         self.buffer.truncate(len);
     }
 
     // TODO: this does not overwrite any memory
     // TODO: document the behaviour and intention clearly
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.buffer.clear()
     }
 }
 
 impl<T: Default> CellStorage<T> {
     // TODO: this resizes dynamically (but this only happens if we add particles to the point cloud)
-    pub fn reserve_cell(&mut self, capacity: usize) -> CellSliceMeta {
+    pub(crate) fn reserve_cell(&mut self, capacity: usize) -> CellSliceMeta {
         let range = self.buffer.len()..(self.buffer.len() + capacity);
         self.buffer.resize_with(range.end, Default::default);
 
@@ -85,7 +85,7 @@ impl<T: Default> CellStorage<T> {
 
 // TODO: this type does not check bounds, this is responsibility of CellStorage
 #[derive(Debug, Default, Clone)]
-pub struct CellSliceMeta {
+pub(crate) struct CellSliceMeta {
     cursor: usize,
     // TODO: Range is not Copy
     // TODO: see https://github.com/rust-lang/rust/pull/27186
@@ -101,11 +101,11 @@ pub struct CellSliceMeta {
 // TODO: would then need to convert from Capacity(i32) to MutSlice by repeatedly calling split_at_mut()
 
 impl CellSliceMeta {
-    fn new(range: Range<usize>) -> Self {
+    pub(crate) fn new(range: Range<usize>) -> Self {
         Self { cursor: 0, range }
     }
     // TODO: probably won't need this but in principle, we just reset the cursor to clear
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.cursor = 0;
     }
 
@@ -126,7 +126,7 @@ impl CellSliceMeta {
     }
 
     // TODO: proper error type?
-    pub fn try_move_cursor(&mut self, _steps: usize) {
+    pub(crate) fn try_move_cursor(&mut self, _steps: usize) {
         todo!()
     }
 }
