@@ -1,13 +1,12 @@
 //TODO iterate over all neighboured cells (full/half space), pairs of particles
 //TODO: perhaps move parallel iteration into separate submodule
-use super::CellGrid;
-use crate::Particle;
+#[cfg(feature = "rayon")]
+use crate::rayon::ParallelIterator;
+use crate::{CellGrid, Particle};
 use core::iter::FusedIterator;
 use core::slice::Iter;
 use itertools::Itertools;
 use num_traits::{AsPrimitive, ConstOne, Float, NumAssignOps};
-#[cfg(feature = "rayon")]
-use rayon::prelude::ParallelIterator;
 
 /// `GridCell` represents a non-empty (by construction) cell of a `CellGrid`.
 #[derive(Debug, Clone, Copy)]
@@ -125,7 +124,7 @@ where
     ///
     //TODO: this example should still work but it's nonsensical
     /// ```
-    /// # use zelll::cellgrid::CellGrid;
+    /// # use zelll::CellGrid;
     /// # use nalgebra::Point;
     /// # let points = [Point::from([0.0, 0.0, 0.0]), Point::from([1.0,2.0,0.0]), Point::from([0.0, 0.1, 0.2])];
     /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];

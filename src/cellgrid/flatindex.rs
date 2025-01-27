@@ -1,13 +1,14 @@
 //TODO: currently assuming that the order of points in point cloud does not change
 //TODO: i.e. index in flatindex corresponds to index in point cloud, this should be documented
-use crate::{cellgrid::util::*, Particle};
+use super::util::{Aabb, GridInfo};
+use crate::Particle;
 use itertools::Itertools;
-use nalgebra::*;
+use nalgebra::SimdPartialOrd;
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 use std::borrow::Borrow;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct FlatIndex<const N: usize = 3, F: Float = f64>
+pub(crate) struct FlatIndex<const N: usize = 3, F: Float = f64>
 where
     F: std::fmt::Debug + 'static,
 {
@@ -15,9 +16,6 @@ where
     pub(crate) index: Vec<i32>,
     pub(crate) neighbor_indices: Vec<i32>,
 }
-
-pub type FlatIndex64<const N: usize> = FlatIndex<N, f64>;
-pub type FlatIndex32<const N: usize> = FlatIndex<N, f32>;
 
 impl<const N: usize, F> Default for FlatIndex<N, F>
 where
@@ -151,6 +149,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cellgrid::util::generate_points;
 
     #[test]
     fn test_flatindex() {

@@ -5,9 +5,9 @@ use criterion::{
 use nalgebra::{distance_squared, Norm, Point, Point3, UniformNorm, Vector3};
 use rand::distributions::Standard;
 use rand::prelude::*;
-use zelll::cellgrid::CellGrid;
 #[cfg(feature = "rayon")]
-use zelll::cellgrid::ParallelIterator;
+use zelll::rayon::ParallelIterator;
+use zelll::CellGrid;
 
 type F32or64 = f64;
 

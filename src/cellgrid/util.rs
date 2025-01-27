@@ -1,10 +1,9 @@
 #![allow(dead_code)]
 use crate::Particle;
-use nalgebra::*;
+use nalgebra::{Point, SVector, SimdPartialOrd};
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 use std::borrow::Borrow;
 
-// TODO: remove this alias?
 pub type PointCloud<const N: usize> = Vec<[f64; N]>;
 
 //TODO: rename fields, infimum/supremum might be confusing outside of a lattice context
@@ -16,9 +15,6 @@ where
     inf: Point<F, N>,
     sup: Point<F, N>,
 }
-
-pub type Aabb64<const N: usize> = Aabb<N, f64>;
-pub type Aabb32<const N: usize> = Aabb<N, f32>;
 
 impl<const N: usize, F> Aabb<N, F>
 where
@@ -71,9 +67,6 @@ where
     strides: SVector<i32, N>,
 }
 
-pub type GridInfo64<const N: usize> = GridInfo<N, f64>; // = GridInfo<N> would suffice but let's be explicit here
-pub type GridInfo32<const N: usize> = GridInfo<N, f32>;
-
 impl<const N: usize, F> GridInfo<N, F>
 where
     F: Float + std::fmt::Debug,
@@ -90,8 +83,12 @@ where
         self.strides.into()
     }
 
+    pub fn bounding_box(&self) -> &Aabb<N, F> {
+        &self.aabb
+    }
+
     pub fn flatten_index(&self, idx: impl Borrow<[i32; N]>) -> i32 {
-        let i = Vector::from(*idx.borrow());
+        let i = SVector::from(*idx.borrow());
         i.dot(&self.strides)
     }
 }
@@ -168,10 +165,13 @@ where
     }
 }
 
-/// Generate generate 3-dimensional point arrays for testing purposes in the following fashion:
-/// In a grid with cells of length `cutoff` only cells with even linear index contain points (chessboard pattern).
+/// Generate a [`Vec`] of 3-dimensional points for testing purposes.
+///
+/// T
+/// In a grid of `shape` with cells of length `cutoff` only cells with even linear index contain points (chessboard pattern).
 /// These non-empty cells contain two points each:
-/// - the first at the origin of the cell (equivalent to the cell's multi-index + the origin of the grid)
+///
+/// - the first at the origin of the cell (equivalent to the cell's multi-index + the `origin` of the grid)
 /// - the second at the center of the cell
 // We'll stay in 3D for simplicity here
 pub fn generate_points(shape: [usize; 3], cutoff: f64, origin: [f64; 3]) -> PointCloud<3> {
