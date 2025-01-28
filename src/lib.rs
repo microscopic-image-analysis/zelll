@@ -1,28 +1,31 @@
-//! `zelll` provides a Rust implementation of the __cell lists__ algorithm.
+//! `zelll`[^etymology] provides a Rust implementation of the __cell lists__ algorithm.
 //!
 //! Particle simulations usually require to compute interactions between those particles.
-//! Considering all _pairwise_ interactions of _`n`_ particles would be _`O(n²)`_.
+//! Considering all _pairwise_ interactions of _`n`_ particles would be of time complexity _`O(n²)`_.\
 //! Cell lists facilitate _linear-time_ enumeration of particle pairs closer than a certain
 //! cutoff distance by dividing the enclosing bounding box into cuboid grid cells.
 //!
-//! `zelll` is motivated by _coarse-grained_ (bio-)molecular simulations but is not restricted to that.
+//! `zelll` is motivated by _coarse-grained_ (bio-)molecular simulations but is not restricted to that.\
 //! This is reflected by a few things:
 //!
-//! - internally, the simulation box is represented by a sparse hash map only storing non-empty grid cells
+//! - internally, the simulation box is represented by a (sparse) hash map only storing non-empty grid cells,
+//!   which gives an upper bound for memory usage given by _`n`_
+//! - bounding boxes are assumed to change and are computed from particle data
+//!   (future APIs may be added to set a fixed bounding box)
 //! - instead of cell _lists_, slices into a contiguous storage buffer are used
 //! - periodic boundary conditions are currently not supported
-//! - parts of this implementation are more cache-aware than others which becomes noticeable with
-//!   larger data sets (at `10⁶` - `10⁷` particles, mostly depending on L2 cache size)
+//! - parts of this implementation are more cache-aware than others which becomes noticeable with\
+//!   larger data sets (at `10⁶` -- `10⁷` particles, mostly depending on L2 cache size)\
 //!   but is less pronounced with sequential (or otherwise structured) data, such as biomolecules
 //!
-//! This crate only provides iteration over particle pairs. It is left to the user to filter
-//! (eg. by distance) and compute interaction potentials.
+//! This crate only provides iteration over particle pairs.
+//! It is left to the user to filter (eg. by distance) and compute interaction potentials.
 //! The `rayon` feature enables parallel iteration. Performance gains depend on data size and
 //! computational cost per pair though. Benchmarks are encouraged.
 //!
 //! While the main struct [`CellGrid`] is generic over dimension `N`,
 //! it is intended to be used with `N = 2` or `N = 3`.
-//! Particle data represented as fixed-size arrays is supported without additional work.
+//! Particle data represented as fixed-size arrays is supported without additional work.\
 //! Additionally, implementing [`Particle`] allows usage of custom types as particle data.
 //! This can be used to encode different kinds of particles or enable interior mutability if required.
 //!
@@ -38,7 +41,8 @@
 //!
 //! cg.rebuild_mut(points.iter().copied(), Some(0.5));
 //! ```
-
+//!
+//! [^etymology]: abbrv. from German _Zelllisten_ /ˈʦɛlɪstən/, for cell lists.
 #[allow(dead_code)]
 mod cellgrid;
 
@@ -57,33 +61,20 @@ pub mod grid {
 // inlined re-exports
 pub use crate::cellgrid::CellGrid;
 
-// TODO: could reduce boilerplate in current trait bounds
-// TODO: implementing this trait on a custom type allows to store metadata for each point
-// TODO: e.g. having an enum WaterAtom::{Hydrogen([T, N]), Oxygen([T, N])} impl Particle
-// TODO: allows to filter easily by those variants
-// TODO: another example would be enum Nucleotide::{A(...), C(...), G(...), U(...)}
-// TODO: or enum DiploidChromosome::{A(...), B(...)}
-// TODO: actually don't know why
-// TODO: maybe make it a subtrait of Copy? (check.)
-// TODO: implementors could choose to make their type only be a reference/slice (check. cf. tests below)
-// TODO: which means we would only store a reference in our cached CellStorage
-// TODO: (almost as before when we didn't store anything besides the index)
-// TODO: which would make sense for atomically/Mutex protected access
-// TODO: but usually implementors would keep their type small so it can be cached directly in CellStorage
 /// Particle data trait.
 ///
-/// This trait is required for types used with [`CellGrid`] which needs how to get coordinate data.
+/// This trait is required for types used with [`CellGrid`] which needs how to get coordinate data.\
 /// Only [`Copy`] types can be used.
 /// In general, the smaller the type, the better (for the CPU cache).
 ///
-/// A blanket implementation for types implementing `Into<T> + Copy` is provided.
+/// A blanket implementation for `Into<T> + Copy` types is provided.\
 /// [`CellGrid`] is slightly more specific and requires impl'ing `Particle<[{float}; N]>`.
 /// Therefore, fixed-size float arrays, [`nalgebra::SVector`], or types that can be `Deref`-coerced
 /// into the former or [`mint`](https://docs.rs/mint/latest/mint/) types, can be directly used.
 ///
-/// Having custom typs impl' this trait allows for patterns like interior mutability,
+/// Having custom types implement this trait allows for patterns like interior mutability,
 /// referencing separate storage (eg. with ECS, or concurrent storage types),
-/// or particle data having differend kinds.
+/// or particle data having differend kinds.\
 /// For example:
 ///
 /// ```
@@ -95,13 +86,15 @@ pub use crate::cellgrid::CellGrid;
 /// #    // ...
 /// # }
 /// #
-/// // typically, we would associate data with `AtomKind` variants for concise code instead of this
+/// // Typically, we would associate data with `AtomKind` variants for concise code
+/// // but here, every variant would carry the same type of data.
 /// #[derive(Clone, Copy)]
 /// struct Atom {
 ///     kind: AtomKind,
 ///     coords: [f64; 3],
 /// }
 /// impl Particle for Atom {
+///     #[inline]
 ///     fn coords(&self) -> [f64; 3] {
 ///         self.coords // no pattern matching required here
 ///     }
