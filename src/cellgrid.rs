@@ -1,6 +1,7 @@
-//! Primary module of this crate containing `CellGrid`, a type implementing the _cell lists_ algorithm.
+//! Primary module of this crate.
 //!
-//! Refer to [`CellGrid`] or submodules for more information.
+//! The most important items are available from the crate root.
+//! Refer to items and submodules for more information.
 #[allow(dead_code)]
 mod flatindex;
 #[allow(dead_code)]
@@ -15,10 +16,12 @@ use crate::rayon::ParallelIterator;
 use crate::Particle;
 use flatindex::FlatIndex;
 use hashbrown::HashMap;
+#[doc(inline)]
 pub use iters::GridCell;
 use nalgebra::SimdPartialOrd;
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 use storage::{CellSliceMeta, CellStorage};
+#[doc(inline)]
 pub use util::{generate_points, Aabb, GridInfo};
 
 /// The central type representing a grid of cells that provides an implementation of the _cell lists_ algorithm.
@@ -240,6 +243,8 @@ where
     P: Send + Sync,
 {
     /// Iterate over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`.
+    ///
+    /// # Examples
     /// ```
     /// # use zelll::CellGrid;
     /// use nalgebra::distance_squared;
@@ -273,17 +278,19 @@ where
     T: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
     P: Particle<[T; N]> + Send + Sync,
 {
-    /// Iterate in parallel over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`.
-    /// TODO: fact-check the statement below:
-    /// Try to avoid filtering this [`ParallelIterator`] to avoid significant overhead:
+    /// Iterate in parallel over all relevant (i.e. within cutoff threshold + some extra)
+    /// unique pairs of points in this `CellGrid`.
+    ///
+    /// # Examples
     /// ```
     /// # // TODO: re-export ParallelIterator
-    /// # use zelll::CellGrid;
-    /// use zelll::rayon::ParallelIterator;
+    /// # use zelll::{CellGrid, rayon::ParallelIterator};
     /// use nalgebra::distance_squared;
     /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
     /// # let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
     /// cell_grid.par_particle_pairs()
+    //      TODO: fact-check the statement below:
+    ///     // Try to avoid filtering this ParallelIterator to avoid significant overhead:
     ///     .for_each(|((_i, p), (_j, q))| {
     ///         if distance_squared(&p.into(), &q.into()) <= 1.0 {
     ///             /* do some work */
