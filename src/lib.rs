@@ -5,6 +5,8 @@
 //! Cell lists facilitate _linear-time_ enumeration of particle pairs closer than a certain
 //! cutoff distance by dividing the enclosing bounding box into cuboid grid cells.
 //!
+//! # Caveats
+//!
 //! `zelll` is motivated by _coarse-grained_ (bio-)molecular simulations but is not restricted to that.\
 //! This is reflected by a few things:
 //!
@@ -17,6 +19,15 @@
 //! - parts of this implementation are more cache-aware than others which becomes noticeable with\
 //!   larger data sets (at `10⁶` -- `10⁷` particles, mostly depending on L2 cache size)\
 //!   but is less pronounced with sequential (or otherwise structured) data, such as biomolecules
+//!
+//! # Usage
+//!
+//! The general pattern in which this crate is intended to be used is roughly:
+//!
+//! 1. construct `CellGrid` from particle positions
+//! 2. enumerate pairs in order to compute particle interactions
+//! 3. simulate particle motion
+//! 4. rebuild `CellGrid` from updated particle positions
 //!
 //! This crate only provides iteration over particle pairs.
 //! It is left to the user to filter (eg. by distance) and compute interaction potentials.
