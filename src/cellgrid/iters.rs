@@ -118,18 +118,15 @@ where
     P: Particle<[F; N]>,
 {
     /// Returns an iterator over all [`GridCell`]s in this `CellGrid`, excluding empty cells.
-    /// A particular iteration order is not guaranteed.
+    ///
+    /// <div class="warning">A particular iteration order is not guaranteed.</div>
     ///
     /// # Examples
-    ///
-    //TODO: this example should still work but it's nonsensical
     /// ```
     /// # use zelll::CellGrid;
-    /// # use nalgebra::Point;
-    /// # let points = [Point::from([0.0, 0.0, 0.0]), Point::from([1.0,2.0,0.0]), Point::from([0.0, 0.1, 0.2])];
-    /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
-    /// # let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
-    /// cell_grid.iter().flat_map(|cell| cell.iter()).count();
+    /// # let points = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+    /// # let cg = CellGrid::new(points.iter().copied(), 1.0);
+    /// assert_eq!(points.len(), cg.iter().flat_map(|cell| cell.iter()).count());
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn iter(&self) -> impl FusedIterator<Item = GridCell<P, N, F>> + Clone {
@@ -140,8 +137,20 @@ where
         })
     }
 
+    /// Returns a parallel iterator over all [`GridCell`]s in this `CellGrid`, excluding empty cells.
+    ///
+    /// <div class="warning">A particular iteration order is not guaranteed.</div>
+    ///
+    /// # Examples
+    /// ```
+    /// # use zelll::{CellGrid, rayon::ParallelIterator};
+    /// # let points = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+    /// # let cg = CellGrid::new(points.iter().copied(), 1.0);
+    /// // The number of non-empty cells in this cell grid does, in fact, not change
+    /// // when counted in parallel instead of sequentially.
+    /// assert_eq!(cg.iter().count(), cg.par_iter().count());
+    /// ```
     #[cfg(feature = "rayon")]
-    #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<P, N, F>>
     where
         P: Send + Sync,

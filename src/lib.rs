@@ -29,6 +29,7 @@
 //! Additionally, implementing [`Particle`] allows usage of custom types as particle data.
 //! This can be used to encode different kinds of particles or enable interior mutability if required.
 //!
+//! # Examples
 //! ```
 //! use zelll::CellGrid;
 //!
@@ -44,7 +45,7 @@
 //!
 //! [^etymology]: abbrv. from German _Zelllisten_ /ˈʦɛlɪstən/, for cell lists.
 #[allow(dead_code)]
-mod cellgrid;
+pub mod cellgrid;
 
 #[cfg(feature = "rayon")]
 pub mod rayon {
@@ -52,13 +53,8 @@ pub mod rayon {
     pub use rayon::prelude::ParallelIterator;
 }
 
-pub mod grid {
-    //! Primary module of this crate.
-    //! The most important items are available from the crate root.
-    pub use crate::cellgrid::*;
-}
-
 // inlined re-exports
+#[doc(inline)]
 pub use crate::cellgrid::CellGrid;
 
 /// Particle data trait.
@@ -75,8 +71,8 @@ pub use crate::cellgrid::CellGrid;
 /// Having custom types implement this trait allows for patterns like interior mutability,
 /// referencing separate storage (eg. with ECS, or concurrent storage types),
 /// or particle data having differend kinds.\
-/// For example:
 ///
+/// # Examples
 /// ```
 /// # use zelll::Particle;
 /// # #[derive(Clone, Copy)]
