@@ -1,4 +1,6 @@
-//! cellgrid stuff
+//! Primary module of this crate containing `CellGrid`, a type implementing the _cell lists_ algorithm.
+//!
+//! Refer to [`CellGrid`] or submodules for more information.
 #[allow(dead_code)]
 mod flatindex;
 #[allow(dead_code)]
@@ -19,7 +21,9 @@ use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 use storage::{CellSliceMeta, CellStorage};
 pub use util::{generate_points, Aabb, GridInfo};
 
+/// The central type representing a grid of cells that provides an implementation of the _cell lists_ algorithm.
 ///
+/// TODO
 #[derive(Debug, Default, Clone)]
 pub struct CellGrid<P, const N: usize = 3, T: Float = f64>
 where
