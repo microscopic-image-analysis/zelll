@@ -26,7 +26,17 @@ pub use util::{generate_points, Aabb, GridInfo};
 
 /// The central type representing a grid of cells that provides an implementation of the _cell lists_ algorithm.
 ///
-/// TODO
+/// # TODO: Algorithm sketch
+/// 1. compute (axis-aligned) bounding box
+/// 2. compute cell index _`i`_ for each particle
+/// 3. pre-allocate storage buffer for _`n`_ particles
+/// 4. count number of particles _`nᵢ`_ in cell _`i`_
+/// 5. slice storage buffer according to cell sizes
+/// 6. copy particles into cell slices and store cell slice information in hash map
+///
+/// # Examples
+/// TODO: examples with default/explicitly set type parameters (2D, 3D, f32/f64)\
+/// TODO: examples with different types impl'ing `Particle`
 #[derive(Debug, Default, Clone)]
 pub struct CellGrid<P, const N: usize = 3, T: Float = f64>
 where
