@@ -1,4 +1,4 @@
-use ::zelll::cellgrid::*;
+use ::zelll::*;
 use pyo3::prelude::*;
 use pyo3::types::PyIterator;
 
@@ -101,7 +101,7 @@ impl PyCellGridIter {
     fn new(py_cellgrid: PyRef<'_, PyCellGrid>) -> Self {
         let py = py_cellgrid.py();
         let _owner = (&py_cellgrid).into_py(py);
-        let iter = Box::new((&py_cellgrid).inner.point_pairs());
+        let iter = Box::new((&py_cellgrid).inner.particle_pairs());
         // SAFETY: lol
         // replicating some ideas from
         // https://github.com/PyO3/pyo3/issues/1085 and

@@ -245,7 +245,7 @@ where
     /// use nalgebra::distance_squared;
     /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
     /// # let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
-    /// cell_grid.point_pairs()
+    /// cell_grid.particle_pairs()
     ///     // usually, .filter_map() is preferable (so distance computations can be re-used)
     ///     .filter(|&((_i, p), (_j, q))| {
     ///         distance_squared(&p.into(), &q.into()) <= 1.0
@@ -255,14 +255,14 @@ where
     ///     });
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn point_pairs(&self) -> impl Iterator<Item = ((usize, P), (usize, P))> + Clone + '_ {
-        self.iter().flat_map(|cell| cell.point_pairs())
+    pub fn particle_pairs(&self) -> impl Iterator<Item = ((usize, P), (usize, P))> + Clone + '_ {
+        self.iter().flat_map(|cell| cell.particle_pairs())
     }
 
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn pair_indices(&self) -> impl Iterator<Item = (usize, usize)> + Clone + '_ {
         self.iter()
-            .flat_map(|cell| cell.point_pairs())
+            .flat_map(|cell| cell.particle_pairs())
             .map(|((i, _p), (j, _q))| (i, j))
     }
 }
@@ -283,20 +283,22 @@ where
     /// use nalgebra::distance_squared;
     /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
     /// # let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
-    /// cell_grid.par_point_pairs()
+    /// cell_grid.par_particle_pairs()
     ///     .for_each(|((_i, p), (_j, q))| {
     ///         if distance_squared(&p.into(), &q.into()) <= 1.0 {
     ///             /* do some work */
     ///         }
     ///     });
     /// ```
-    pub fn par_point_pairs(&self) -> impl ParallelIterator<Item = ((usize, P), (usize, P))> + '_ {
-        self.par_iter().flat_map_iter(|cell| cell.point_pairs())
+    pub fn par_particle_pairs(
+        &self,
+    ) -> impl ParallelIterator<Item = ((usize, P), (usize, P))> + '_ {
+        self.par_iter().flat_map_iter(|cell| cell.particle_pairs())
     }
 
     pub fn par_pair_indices(&self) -> impl ParallelIterator<Item = (usize, usize)> + '_ {
         self.par_iter()
-            .flat_map_iter(|cell| cell.point_pairs())
+            .flat_map_iter(|cell| cell.particle_pairs())
             .map(|((i, _p), (j, _q))| (i, j))
     }
 }

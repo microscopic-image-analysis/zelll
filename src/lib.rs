@@ -35,7 +35,7 @@
 //! let points = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
 //! let mut cg = CellGrid::new(points.iter().copied(), 1.0);
 //!
-//! for ((i, p), (j, q)) in cg.point_pairs() {
+//! for ((i, p), (j, q)) in cg.particle_pairs() {
 //!     /* do some work */
 //! }
 //!

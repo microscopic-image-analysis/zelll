@@ -35,7 +35,7 @@ fn main() {
         let mut pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0]);
         // This does seem to  improve cache hits in CellGrid::new()?
         // because particles are roughly sorted by their flat index. so lookup into the hashmap is likely to be cached
-        // otoh, ::point_pairs() is unaffected because neighbor cell lookup in hashmap is non-local
+        // otoh, ::particle_pairs() is unaffected because neighbor cell lookup in hashmap is non-local
         // linear probing in HashMap would help maybe?
         //pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
 
@@ -46,12 +46,12 @@ fn main() {
         //let mut count: usize = 0;
         #[cfg(not(feature = "rayon"))]
         // let count = cg.point_pairs().count();
-        cg.point_pairs()
+        cg.particle_pairs()
             .filter(|&((_i, p), (_j, q))| distance_squared(&p.into(), &q.into()) <= _cutoff_squared)
             .for_each(|_| black_box(()));
 
         #[cfg(feature = "rayon")]
-        cg.par_point_pairs()
+        cg.par_particle_pairs()
             .filter(|&((_i, p), (_j, q))| {
                 true //distance_squared(&p.into(), &q.into()) <= _cutoff_squared)
             })
@@ -60,7 +60,7 @@ fn main() {
                 black_box(());
             });
 
-        //let count = cg.par_point_pairs().count();
+        //let count = cg.par_particle_pairs().count();
         //println!("{}", count);
     }
 
