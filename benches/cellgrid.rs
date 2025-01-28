@@ -45,7 +45,7 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
         let pointcloud = generate_points_random(*size, [3.166; 3], [0.0, 0.0, 0.0], None);
         let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), 1.0);
         b.iter(|| {
-            cg.point_pairs()
+            cg.particle_pairs()
                 .filter(|&((_i, p), (_j, q))| distance_squared(&p.into(), &q.into()) <= 1.0)
                 .for_each(|_| {});
         })
@@ -59,7 +59,7 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
             let pointcloud = generate_points_random(*size, [3.166; 3], [0.0, 0.0, 0.0], None);
             let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), 1.0);
             b.iter(|| {
-                cg.par_point_pairs()
+                cg.par_particle_pairs()
                     .filter(|&((_i, p), (_j, q))| distance_squared(&p.into(), &q.into()) <= 1.0)
                     .for_each(|_| {});
             })
@@ -100,25 +100,29 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
         // pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
         let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
 
-        group.bench_with_input(BenchmarkId::new("::point_pairs()", size), &cg, |b, cg| {
-            let cutoff_squared = cutoff.powi(2);
-            b.iter(|| {
-                cg.point_pairs()
-                    .filter(|&((_i, p), (_j, q))| {
-                        distance_squared(&p.into(), &q.into()) <= cutoff_squared
-                    })
-                    .for_each(|_| {});
-            })
-        });
-
-        #[cfg(feature = "rayon")]
         group.bench_with_input(
-            BenchmarkId::new("::par_point_pairs()", size),
+            BenchmarkId::new("::particle_pairs()", size),
             &cg,
             |b, cg| {
                 let cutoff_squared = cutoff.powi(2);
                 b.iter(|| {
-                    cg.par_point_pairs().for_each(|((_i, p), (_j, q))| {
+                    cg.particle_pairs()
+                        .filter(|&((_i, p), (_j, q))| {
+                            distance_squared(&p.into(), &q.into()) <= cutoff_squared
+                        })
+                        .for_each(|_| {});
+                })
+            },
+        );
+
+        #[cfg(feature = "rayon")]
+        group.bench_with_input(
+            BenchmarkId::new("::par_particle_pairs()", size),
+            &cg,
+            |b, cg| {
+                let cutoff_squared = cutoff.powi(2);
+                b.iter(|| {
+                    cg.par_particle_pairs().for_each(|((_i, p), (_j, q))| {
                         if distance_squared(&p.into(), &q.into()) <= cutoff_squared {
                         } else {
                         }

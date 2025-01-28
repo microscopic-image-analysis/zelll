@@ -105,7 +105,7 @@ where
     //TODO: explain what "relevant" means here.
     //TODO: handle full-space as well
     //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
-    pub fn point_pairs(
+    pub fn particle_pairs(
         self,
     ) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone + Send + Sync + 'g {
         self.intra_cell_pairs().chain(self.inter_cell_pairs())
