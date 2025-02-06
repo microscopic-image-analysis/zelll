@@ -49,6 +49,7 @@ fn main() {
         cg.particle_pairs()
             .filter(|&((_i, p), (_j, q))| distance_squared(&p.into(), &q.into()) <= _cutoff_squared)
             .for_each(|_| black_box(()));
+        // cg.rebuild_mut(pointcloud.iter().rev().map(|p| p.coords), None);
 
         #[cfg(feature = "rayon")]
         cg.par_particle_pairs()

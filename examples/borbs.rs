@@ -5,8 +5,7 @@ use kiss3d::window::Window;
 use rand::distributions::Standard;
 use rand::prelude::*;
 use soa_derive::StructOfArray;
-use zelll::grid::Aabb;
-use zelll::*;
+use zelll::cellgrid::{Aabb, CellGrid};
 
 const NBORBS: usize = 20000;
 const DELTA: f64 = 0.015;
@@ -14,14 +13,6 @@ const OUTER_RADIUS: f64 = 1.0;
 const ALIGNMENT: f64 = 0.35;
 const SEPARATION: f64 = 0.45;
 const COHESION: f64 = 0.3;
-
-//TODO: lessons from cachegrind:
-//TODO: AddAssign<BalancedTrit> for BalancedTernary<N> no cache misses BUT: of course a lot of memory writes (maybe we can generate relative neighbors just once because BalancedTernary is const anyway?)
-//TODO: it seems AddAssign<BalancedTrit> actually has quite a few cache misses (not dramatically but also not negligable)
-//TODO: Copying CellNeighbors not expensive but happens often (a lot of writes/reads but no cache misses)
-//TODO: CellGrid::rebuild_mut() apparently a lot of cache misses (relatively speaking, need minimal benchmark code) (also consider indexing into ArrayD)
-//TODO: Itertools::adaptors::product() a lot of misses?
-//TODO: some misses with Iterator::fold()?
 
 fn aabb_vertices(aabb: &Aabb<3>) -> Vec<(Point3<f64>, Point3<f64>)> {
     let inf = aabb.inf();

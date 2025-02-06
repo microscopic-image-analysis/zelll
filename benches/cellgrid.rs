@@ -137,7 +137,13 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
             [0.0, 0.0, 0.0],
             Some(3079380797442975920),
         );
+
+        // let mut rng = StdRng::seed_from_u64(3079380797442975911);
+        // let pointcloud: Vec<_> = pointcloud.iter()
+        //     .map(|v| v - (Vector3::new(0.5, 0.5, 0.5) + Vector3::from_iterator((&mut rng).sample_iter(Standard))) * 0.1)
+        //     .collect();
         // pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
+        // pointcloud.sort_unstable_by(|p, q| p.coords.norm_squared().partial_cmp(&q.coords.norm_squared()).unwrap());
 
         // FIXME: this does not scale linearly because:
         // FIXME: 1. we generate new random point cloud (so FlatIndex does change massively)

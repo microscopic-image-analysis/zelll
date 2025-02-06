@@ -22,7 +22,7 @@ use nalgebra::SimdPartialOrd;
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 use storage::{CellSliceMeta, CellStorage};
 #[doc(inline)]
-pub use util::{generate_points, Aabb, GridInfo};
+pub use util::{Aabb, GridInfo};
 
 /// The central type representing a grid of cells that provides an implementation of the _cell lists_ algorithm.
 ///
@@ -42,7 +42,12 @@ pub struct CellGrid<P, const N: usize = 3, T: Float = f64>
 where
     T: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
 {
+    // TODO: experiment with hashbrown::HashTable
+    // FIXME should expose type parameter S: BuildHasher publically
     cells: HashMap<i32, CellSliceMeta>,
+    // TODO: rebuild from CellStorage iterator (boils down to counting/bucket sorting)
+    // TODO: iterate (mutably) over cell storage, iterate mutably over particle pairs
+    // TODO: make it responsibility of user to associate some index/label with P: Particle?
     cell_lists: CellStorage<(usize, P)>,
     index: FlatIndex<N, T>,
 }
@@ -100,8 +105,9 @@ where
         } else {
             let mut cell_lists = CellStorage::with_capacity(index.index.len());
 
+            // let estimated_cap = (index.grid_info.shape().iter().product::<i32>() as usize).min(index.index.len());
             // FIXME: This should be HashMap<i32, Either<usize, CellSliceMeta>> or CellSliceMeta an enum
-            let mut cells: HashMap<i32, CellSliceMeta> = HashMap::new();
+            let mut cells: HashMap<i32, CellSliceMeta> = HashMap::new(); // HashMap::with_capacity(estimated_cap);
             index.index.iter().for_each(|idx| {
                 // FIXME: this will trigger debug_assert!() in CellSliceMeta::move_cursor()
                 cells.entry(*idx).or_default().move_cursor(1);
@@ -169,6 +175,10 @@ where
     }
     // TODO: rebuild() could simply do this but rebuild_mut() on
     // TODO: an empty CellGrid does have some overhead due to FlatIndex::rebuild_mut()
+    // pub fn rebuild<I>(self, points: I, cutoff: Option<T>) -> Self
+    // where
+    //     I: IntoIterator<Item = P> + Clone,
+    //     P: Default,
     // {
     //     let mut cellgrid = self;
     //     cellgrid.rebuild_mut(points, cutoff);
@@ -189,6 +199,9 @@ where
         if self.index.rebuild_mut(points.clone(), cutoff) {
             self.cells.clear();
             self.cell_lists.clear();
+
+            // let estimated_cap = (self.index.grid_info.shape().iter().product::<i32>()).min(self.index.index.len() as i32);
+            // self.cells.reserve(0i32.max(estimated_cap - self.cells.capacity() as i32) as usize);
 
             // FIXME: This should be HashMap<i32, Either<usize, CellSliceMeta>> or CellSliceMeta an enum
             self.index.index.iter().for_each(|idx| {
