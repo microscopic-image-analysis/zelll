@@ -8,7 +8,7 @@ use core::slice::Iter;
 use itertools::Itertools;
 use num_traits::{AsPrimitive, ConstOne, Float, NumAssignOps};
 
-/// `GridCell` represents a non-empty (by construction) cell of a `CellGrid`.
+/// `GridCell` represents a non-empty (by construction) cell of a [`CellGrid`].
 #[derive(Debug, Clone, Copy)]
 pub struct GridCell<'g, P, const N: usize = 3, F: Float = f64>
 where
@@ -26,11 +26,15 @@ where
     F: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
     P: Particle<[F; N]> + Send + Sync,
 {
-    /// Return the (flat) index of this (non-empty) `GridCell`.
+    /// Returns the (flat) cell index of this (non-empty) `GridCell`.
     pub(crate) fn index(&self) -> i32 {
         self.index
     }
 
+    /// Returns an iterator over all particles in this `GridCell`.
+    ///
+    /// The item type is a pair consisting of the particle index as iterated during `CellGrid`
+    /// construction and the particle data itself.
     // TODO: should probably rather impl IntoIterator to match consuming/copy behaviour of neighbors()/point_pairs()?
     pub fn iter(self) -> Iter<'g, (usize, P)> {
         self.grid
@@ -59,7 +63,14 @@ where
         false
     }*/
 
-    /// Return an iterator over all (currently half-space) non-empty neighboring cells.
+    /// Returns an iterator over all (currently half-space) non-empty neighboring cells.
+    ///
+    /// <div class="warning">
+    ///
+    /// _half-space_ means that each _pair of cells_ is uniquely enumerated,
+    /// such that a `CellGrid` also produces unique particle pairs.
+    ///
+    /// </div>
     //TODO: currently only half-space and aperiodic boundaries
     //TODO: handle half-/full-space  and (a-)periodic boundary conditions
     //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
@@ -81,7 +92,7 @@ where
             })
     }
 
-    /// Iterate over all unique pairs of points in this `GridCell`.
+    /// Returns an iterator over all unique pairs of points in this `GridCell`.
     #[inline]
     fn intra_cell_pairs(self) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone + 'g {
         // this is equivalent to
@@ -93,7 +104,7 @@ where
             .flat_map(move |(n, i)| self.iter().copied().skip(n + 1).map(move |j| (i, j)))
     }
 
-    /// Iterate over all unique pairs of points in this `GridCell` with points of the neighboring cells.
+    /// Returns an iterator over all unique pairs of points in this `GridCell` with points of the neighboring cells.
     #[inline]
     fn inter_cell_pairs(self) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone + 'g {
         self.iter()
@@ -101,8 +112,11 @@ where
             .cartesian_product(self.neighbors().flat_map(|cell| cell.iter().copied()))
     }
 
-    /// Iterate over all "relevant" pairs of points within in the neighborhood of this `GridCell`.
-    //TODO: explain what "relevant" means here.
+    /// Returns an iterator over all _relevant_ pairs of particles within in the neighborhood of this `GridCell`.
+    ///
+    /// _Relevant_ means the distance between paired particles might be less than the `cutoff` but
+    /// this cannot be guaranteed.\
+    /// This method consumes `self` but `GridCell` implements [`Copy`].
     //TODO: handle full-space as well
     //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
     pub fn particle_pairs(
@@ -204,7 +218,7 @@ mod tests {
     }
 
     #[test]
-    fn test_neighborcell_pointpairs() {
+    fn test_neighborcell_particle_pairs() {
         // Using 0-origin to avoid floating point errors
         let points = generate_points([2, 2, 2], 1.0, [0.0, 0.0, 0.0]);
         let cell_grid = CellGrid::new(points.iter().copied(), 1.0);

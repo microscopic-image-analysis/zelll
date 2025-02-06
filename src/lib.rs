@@ -12,13 +12,14 @@
 //!
 //! - internally, the simulation box is represented by a (sparse) hash map only storing non-empty grid cells,
 //!   which gives an upper bound for memory usage given by _`n`_
-//! - bounding boxes are assumed to change and are computed from particle data
+//! - bounding boxes are assumed to change and are computed from particle data\
 //!   (future APIs may be added to set a fixed bounding box)
 //! - instead of cell _lists_, slices into a contiguous storage buffer are used
 //! - periodic boundary conditions are currently not supported
-//! - parts of this implementation are more cache-aware than others which becomes noticeable with\
-//!   larger data sets (at `10⁶` -- `10⁷` particles, mostly depending on L2 cache size)\
-//!   but is less pronounced with sequential (or otherwise structured) data, such as biomolecules
+//! - parts of this implementation are more cache-aware than others, which becomes noticeable with
+//!   larger data sets\
+//!   (at `10⁶` -- `10⁷` particles, mostly depending on L2 cache size)
+//!   but is less pronounced with structured data[^structureddata]
 //!
 //! # Usage
 //!
@@ -55,6 +56,10 @@
 //! ```
 //!
 //! [^etymology]: abbrv. from German _Zelllisten_ /ˈʦɛlɪstən/, for cell lists.
+//! [^structureddata]: Usually, (bio-)molecular data files are not completely unordered
+//! even though they could be.
+//! In practice, it may be a reasonable assumption that sequentially proximate
+//! particles often have spatially clustered coordinates as well.
 #[allow(dead_code)]
 pub mod cellgrid;
 
@@ -70,18 +75,19 @@ pub use crate::cellgrid::CellGrid;
 
 /// Particle data trait.
 ///
-/// This trait is required for types used with [`CellGrid`] which needs how to get coordinate data.\
+/// This trait is required for types used with [`CellGrid`]
+/// which needs to know how to get coordinate data.\
 /// Only [`Copy`] types can be used.
 /// In general, the smaller the type, the better (for the CPU cache).
 ///
 /// A blanket implementation for `Into<T> + Copy` types is provided.\
-/// [`CellGrid`] is slightly more specific and requires impl'ing `Particle<[{float}; N]>`.
+/// [`CellGrid`] is slightly more specific and requires implementing `Particle<[{float}; N]>`.
 /// Therefore, fixed-size float arrays, [`nalgebra::SVector`], or types that can be `Deref`-coerced
 /// into the former or [`mint`](https://docs.rs/mint/latest/mint/) types, can be directly used.
 ///
 /// Having custom types implement this trait allows for patterns like interior mutability,
 /// referencing separate storage (eg. with ECS, or concurrent storage types),
-/// or particle data having differend kinds.\
+/// or particle data being of different kinds.
 ///
 /// # Examples
 /// ```
@@ -108,7 +114,7 @@ pub use crate::cellgrid::CellGrid;
 /// }
 /// ```
 pub trait Particle<T = [f64; 3]>: Copy {
-    /// Return a copy of this particle's coordinates
+    /// Returns a copy of this particle's coordinates.
     fn coords(&self) -> T;
 }
 

@@ -74,6 +74,9 @@ where
         points: impl IntoIterator<Item = impl Borrow<P>> + Clone,
         cutoff: F,
     ) -> Self {
+        // TODO: We could actually use a fixed Aabb (cf. util::GridInfo::new_fixed())
+        // TODO: However, computing the bounding box is cheap enough
+        // TODO: We might reconsider this after experimenting with hashbrown::HashTable
         let aabb = Aabb::from_points(points.clone().into_iter());
         let grid_info = GridInfo::new(aabb, cutoff);
         let index = points
@@ -110,6 +113,7 @@ where
         cutoff: Option<F>,
     ) -> bool {
         let cutoff = cutoff.unwrap_or(self.grid_info.cutoff);
+        // TODO: see TODO notes for ::from_points()
         let aabb = Aabb::from_points(points.clone().into_iter());
         let grid_info = GridInfo::new(aabb, cutoff);
 

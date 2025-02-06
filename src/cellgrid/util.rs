@@ -1,11 +1,16 @@
+//! Several utility items that might be useful but usually do not need be interacted with.
 #![allow(dead_code)]
 use crate::Particle;
 use nalgebra::{Point, SVector, SimdPartialOrd};
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 use std::borrow::Borrow;
 
+/// A `Vec<[f64; N]>`, aliased for convenience and testing purposes.
 pub type PointCloud<const N: usize> = Vec<[f64; N]>;
 
+/// An axis-aligned bounding box constructed from particle data and used internally.
+///
+/// See also [`GridInfo::bounding_box()`].
 //TODO: rename fields, infimum/supremum might be confusing outside of a lattice context
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct Aabb<const N: usize = 3, F: Float = f64>
@@ -55,7 +60,14 @@ where
     }
 }
 
-/// The grid described by `GridInfo` may be slightly larger than the underlying bounding box `aabb`.
+/// A type containing geometry information necessary to compute cell indices
+/// of a [`CellGrid`](crate::CellGrid).
+///
+/// <div class="warning">
+///
+/// The grid described by `GridInfo` may be slightly larger than the underlying bounding box.
+///
+/// </div>
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GridInfo<const N: usize = 3, F: Float = f64>
 where
@@ -66,6 +78,48 @@ where
     shape: SVector<i32, N>,
     strides: SVector<i32, N>,
 }
+
+// impl<const N: usize, F> Default for Aabb<N, F>
+// where
+//     F: Float + std::fmt::Debug,
+// {
+//     fn default() -> Self {
+//         Self {
+//             inf: Point::from([F::min_value(); N]),
+//             sup: Point::from([F::max_value(); N]),
+//         }
+//     }
+// }
+
+// TODO: Experiment with a fixed shape/strides
+// TODO: technically, we don't even need a bounding box, arbitrarily big strides would suffice
+// TODO: not quite like this:
+// TODO: https://matthias-research.github.io/
+// TODO: which would require re-computing hashes to get neighbor cells, instead of just adding
+// TODO: however we can just arbitrarily big prime strides (and use ADD instead of XOR)
+// TODO: as long as point clouds fit into that shape
+// FIXME: this does improve cell grid construction/rebuild but penalizes particle_pairs()
+// impl<const N: usize, F> GridInfo<N, F>
+// where
+//     F: Float + NumAssignOps + AsPrimitive<i32> + std::fmt::Debug + Default,
+// {
+//     pub(crate) fn new_fixed(cutoff: F) -> Self {
+//         let shape = SVector::from([65536; N]);
+//         let mut strides = shape;
+//         strides.iter_mut().fold(1, |prev, curr| {
+//             let next = prev * (*curr + 1);
+//             *curr = prev;
+//             next
+//         });
+//
+//         Self {
+//             aabb: Aabb::default(),
+//             cutoff,
+//             shape,
+//             strides,
+//         }
+//     }
+// }
 
 impl<const N: usize, F> GridInfo<N, F>
 where
@@ -165,10 +219,11 @@ where
     }
 }
 
-/// Generate a [`Vec`] of 3-dimensional points for testing purposes.
+/// Generates a [`Vec`] of 3-dimensional points for testing purposes.
 ///
-/// T
-/// In a grid of `shape` with cells of length `cutoff` only cells with even linear index contain points (chessboard pattern).
+/// TODO: rename this like `generate_pointcloud()`/`generate_particles()`
+///
+/// In a grid of `shape` with cells of length `cutoff`, only cells with even linear index contain points (chessboard pattern).
 /// These non-empty cells contain two points each:
 ///
 /// - the first at the origin of the cell (equivalent to the cell's multi-index + the `origin` of the grid)
