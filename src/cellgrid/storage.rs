@@ -23,6 +23,19 @@
 // TODO: and see how this works without without this scoping
 use core::ops::Range;
 
+// TODO: impl<T> Deref<Target = Vec<T>> for CellStorage<T>
+// TODO: impl<T> DerefMut<Target = Vec<T>> for CellStorage<T>
+// FIXME: remove methods overlapping with Vec<T>/&[T]
+// FIXME: rename push() so it does not collide with Vec<T>
+// TODO: expose CellStorage field in CellGrid, so users can use std::mem::swap to cheaply obtain stored particles?
+// TODO: (for simulations, P: Particle should then also contain (references to) velocities/accelerations, position indices
+// TODO: because those should be associated with P after reordering/swapping)
+// TODO: (also tricky for HMC/NUTS, where we shouldn't shuffle parameters around)
+// TODO: problem with swapping: invalidates every `CellSliceMeta`
+// TODO: at least document that CellStorage allows to Deref for cheap swapping if the order of the data does not matter to the user
+// TODO: because they don't do e.g. HMC or just store references/std::cell::* types
+// TODO: (but the whole point of storing P: Particle in CellStorage is to avoid cache misses due to references...)
+// TODO: could also make CellStorage<T> generic over buffer and require Index/IndexMut/SliceIndex traits
 #[derive(Debug, Default, Clone)]
 pub(crate) struct CellStorage<T> {
     buffer: Vec<T>,
