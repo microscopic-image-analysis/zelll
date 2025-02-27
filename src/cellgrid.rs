@@ -255,12 +255,12 @@ where
     ///     });
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn particle_pairs(&self) -> impl Iterator<Item = ((usize, P), (usize, P))> + Clone + '_ {
+    pub fn particle_pairs(&self) -> impl Iterator<Item = ((usize, P), (usize, P))> + Clone {
         self.iter().flat_map(|cell| cell.particle_pairs())
     }
 
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn pair_indices(&self) -> impl Iterator<Item = (usize, usize)> + Clone + '_ {
+    pub fn pair_indices(&self) -> impl Iterator<Item = (usize, usize)> + Clone {
         self.iter()
             .flat_map(|cell| cell.particle_pairs())
             .map(|((i, _p), (j, _q))| (i, j))
@@ -292,13 +292,11 @@ where
     ///         }
     ///     });
     /// ```
-    pub fn par_particle_pairs(
-        &self,
-    ) -> impl ParallelIterator<Item = ((usize, P), (usize, P))> + '_ {
+    pub fn par_particle_pairs(&self) -> impl ParallelIterator<Item = ((usize, P), (usize, P))> {
         self.par_iter().flat_map_iter(|cell| cell.particle_pairs())
     }
 
-    pub fn par_pair_indices(&self) -> impl ParallelIterator<Item = (usize, usize)> + '_ {
+    pub fn par_pair_indices(&self) -> impl ParallelIterator<Item = (usize, usize)> {
         self.par_iter()
             .flat_map_iter(|cell| cell.particle_pairs())
             .map(|((i, _p), (j, _q))| (i, j))
