@@ -93,7 +93,7 @@ where
 
     /// Returns an iterator over all unique pairs of points in this `GridCell`.
     #[inline]
-    fn intra_cell_pairs(self) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone + 'g {
+    fn intra_cell_pairs(self) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone {
         // this is equivalent to
         // self.iter().copied().tuple_combinations::<((usize, P), (usize, P))>()
         // but faster for our specific case (pairs from slice of `Copy` values)
@@ -105,7 +105,7 @@ where
 
     /// Returns an iterator over all unique pairs of points in this `GridCell` with points of the neighboring cells.
     #[inline]
-    fn inter_cell_pairs(self) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone + 'g {
+    fn inter_cell_pairs(self) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone {
         self.iter()
             .copied()
             .cartesian_product(self.neighbors().flat_map(|cell| cell.iter().copied()))
@@ -120,7 +120,7 @@ where
     //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
     pub fn particle_pairs(
         self,
-    ) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone + Send + Sync + 'g {
+    ) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone + Send + Sync {
         self.intra_cell_pairs().chain(self.inter_cell_pairs())
     }
 }
