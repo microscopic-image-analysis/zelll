@@ -4,12 +4,11 @@
 //! valgrind --tool=callgrind --cache-sim=yes --instr-atstart=no ./minimal_new 100000 10
 //! ```
 
+use crabgrind::callgrind as valgrind;
 use nalgebra::{Point, Point3, Vector3};
 use rand::distributions::Standard;
 use rand::prelude::*;
 use zelll::CellGrid;
-use crabgrind::callgrind as valgrind;
-
 
 type PointCloud<const N: usize> = Vec<Point<f64, N>>;
 /// Generate a uniformly random 3D point cloud of size `n` in a cuboid of edge lengths `vol` centered around `origin`.
@@ -30,8 +29,14 @@ fn main() {
     let mut args = std::env::args();
     args.next();
 
-    let size = args.next().and_then(|arg| arg.parse::<usize>().ok()).unwrap_or(100);
-    let repeat = args.next().and_then(|arg| arg.parse::<usize>().ok()).unwrap_or(1);
+    let size = args
+        .next()
+        .and_then(|arg| arg.parse::<usize>().ok())
+        .unwrap_or(100);
+    let repeat = args
+        .next()
+        .and_then(|arg| arg.parse::<usize>().ok())
+        .unwrap_or(1);
 
     let cutoff: f64 = 10.0;
     let conc = 10.0 / cutoff.powi(3); //i.e. 100mol per 10^3 volume units

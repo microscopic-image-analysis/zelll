@@ -1,6 +1,6 @@
 use hashbrown::{HashMap, HashSet};
 //use nohash_hasher::BuildNoHashHasher;
-use nalgebra::{distance_squared, Point, Point3, Vector3};
+use nalgebra::{Point, Point3, Vector3, distance_squared};
 use rand::distributions::Standard;
 use rand::prelude::*;
 #[cfg(feature = "rayon")]

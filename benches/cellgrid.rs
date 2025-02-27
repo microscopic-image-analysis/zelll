@@ -1,13 +1,13 @@
 use criterion::{
-    black_box, criterion_group, criterion_main, AxisScale, BenchmarkId, Criterion,
-    PlotConfiguration, SamplingMode,
+    AxisScale, BenchmarkId, Criterion, PlotConfiguration, SamplingMode, black_box, criterion_group,
+    criterion_main,
 };
-use nalgebra::{distance_squared, Norm, Point, Point3, UniformNorm, Vector3};
+use nalgebra::{Norm, Point, Point3, UniformNorm, Vector3, distance_squared};
 use rand::distributions::Standard;
 use rand::prelude::*;
+use zelll::CellGrid;
 #[cfg(feature = "rayon")]
 use zelll::rayon::ParallelIterator;
-use zelll::CellGrid;
 
 type F32or64 = f64;
 

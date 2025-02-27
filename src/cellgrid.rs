@@ -11,9 +11,9 @@ mod storage;
 #[allow(dead_code)]
 pub mod util;
 
+use crate::Particle;
 #[cfg(feature = "rayon")]
 use crate::rayon::ParallelIterator;
-use crate::Particle;
 use flatindex::FlatIndex;
 use hashbrown::HashMap;
 #[doc(inline)]
