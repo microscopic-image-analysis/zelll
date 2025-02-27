@@ -40,8 +40,7 @@ where
         self.grid
             .cell_lists
             .cell_slice(
-                &self
-                    .grid
+                self.grid
                     .cells
                     .get(&self.index)
                     .expect("This GridCell should be contained in the CellGrid but it is not."),
@@ -145,10 +144,9 @@ where
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn iter(&self) -> impl FusedIterator<Item = GridCell<P, N, F>> + Clone {
         // note that ::keys() does not keep a stable iteration order!
-        self.cells.keys().map(|&index| GridCell {
-            grid: self,
-            index: index,
-        })
+        self.cells
+            .keys()
+            .map(|&index| GridCell { grid: self, index })
     }
 
     /// Returns a parallel iterator over all [`GridCell`]s in this `CellGrid`, excluding empty cells.

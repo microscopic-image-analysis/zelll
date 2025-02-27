@@ -1,5 +1,4 @@
 //! Several utility items that might be useful but usually do not need be interacted with.
-#![allow(dead_code)]
 use crate::Particle;
 use nalgebra::{Point, SVector, SimdPartialOrd};
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
