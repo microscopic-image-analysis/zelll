@@ -113,47 +113,31 @@ where
                 cells.entry(*idx).or_default().move_cursor(1);
             });
 
-            // TODO: could also use Itertools::next_array() here
-            // TODO: could count in chunk using Itertools::counts()
-            // TODO: but then I'd have to put those into an array of chunk size (with purposefully invalid/non-existing keys)
-            // let mut sliced = &index.index[..];
-            // while let Some((&chunk, tail)) = sliced.split_first_chunk::<8>() {
-            // for idx in chunk[..].iter() {
-            //     cells.entry(*idx).or_default().move_cursor(1);
-            // }
+            // cells.shrink_to_fit();
 
-            //     use itertools::Itertools;
-            //     let occurrences = chunk.iter().counts();
-            //     occurrences.into_iter().for_each(|(idx, count)| {
-            //         cells.entry(*idx).or_default().move_cursor(count);
-            //     });
-
-            //     sliced = tail;
-            // }
-
-            // sliced.iter().for_each(|idx| {
-            //     cells.entry(*idx).or_default().move_cursor(1);
-            // });
-
-            // use itertools::Itertools;
-            // index.index.iter().chunks(8).into_iter().for_each(|chunk| {
-            //     let occurrences = chunk.counts();
-
-            //     for (idx, count) in occurrences {
-            //         cells.entry(*idx).or_default().move_cursor(count);
-            //     }
-            // });
-
+            // FIXME: is this why observed runtime does not match O(n) for large hash maps? (doesn't look like it is though)
+            // FIXME: https://github.com/rust-lang/rust/pull/97215
+            // FIXME: sorting benchmark data does not yield linear runtime (even though it massively improves cache miss rate)
+            // FIXME: For rebuild() it's not that important but for rebuild_mut() it is!
             cells.iter_mut().for_each(|(_, slice)| {
                 *slice = cell_lists.reserve_cell(slice.cursor());
             });
+            // FIXME: what happens (below) if I reserve cells sorted by their size (above)?
 
+            // FIXME: this seems to be more likely to be the cache miss culprit
+            // FIXME: can we do something clever here? use an LRU cache?
+            // FIXME: use sth. like itertools::tree_reduce() to somehow deal with
+            // FIXME: the random access pattern of cell_lists' slices?
+            // FIXME: maybe should not store cell indices in Vec but compute them *again* from points
+            // FIXME: computation should be cheap enough and this way we might save some precious cache lines
+            // FIXME: turns out it is in fact cheap enough (but does not improve cache behavior)
+            // FIXME: so we should in fact remove FlatIndex (or make it a BTreeMap?)
             index
                 .index
                 .iter()
                 .zip(points)
                 .enumerate()
-                //TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
+                // TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
                 .for_each(|(i, (cell, point))| {
                     // FIXME: in principle could have multiple &mut slices into CellStorage (for parallel pushing)
                     // FIXME: would just have to make sure that cell is always unique when operating on chunks
@@ -200,8 +184,9 @@ where
             self.cells.clear();
             self.cell_lists.clear();
 
-            // let estimated_cap = (self.index.grid_info.shape().iter().product::<i32>()).min(self.index.index.len() as i32);
-            // self.cells.reserve(0i32.max(estimated_cap - self.cells.capacity() as i32) as usize);
+            // let estimated_cap = self.index.grid_info.shape().iter().product::<i32>().min(self.index.index.len() as i32);
+            // self.cells.reserve(estimated_cap as usize);
+            // self.cells.shrink_to(estimated_cap as usize);
 
             // FIXME: This should be HashMap<i32, Either<usize, CellSliceMeta>> or CellSliceMeta an enum
             self.index.index.iter().for_each(|idx| {
@@ -209,27 +194,14 @@ where
                 self.cells.entry(*idx).or_default().move_cursor(1);
             });
 
-            // let mut sliced = &self.index.index[..];
-            // while let Some((&chunk, tail)) = sliced.split_first_chunk::<4>() {
-            //     self.cells.entry(chunk[0]).or_default().move_cursor(1);
-            //     self.cells.entry(chunk[1]).or_default().move_cursor(1);
-            //     self.cells.entry(chunk[2]).or_default().move_cursor(1);
-            //     self.cells.entry(chunk[3]).or_default().move_cursor(1);
-            //     sliced = tail;
-            // }
-
-            // sliced.iter().for_each(|idx| {
-            //     self.cells.entry(*idx).or_default().move_cursor(1);
-            // });
+            // TODO: Since hashmap iteration is `O(capacity)` not `O(len)` we want to make sure
+            // TODO: that the load factor does not degenerate (resize policy says ~ 0.5-0.85)
+            // TODO: however this means potential re-allocation
+            self.cells.shrink_to_fit();
 
             self.cells.iter_mut().for_each(|(_, slice)| {
                 *slice = self.cell_lists.reserve_cell(slice.cursor());
             });
-
-            //TODO: we'll re-evaluate this once benchmarks with sparse data have been added
-            //TODO: However, even without shrinking, self.cells.len() has an upper bound of  self.index.index.len()
-            //TODO: (if updated point cloud did not shrink in length)
-            self.cells.shrink_to_fit();
 
             // TODO: https://docs.rs/hashbrown/latest/hashbrown/struct.HashMap.html#method.get_many_mut
             // TODO: maybe could use get_many_mut here, but unfortunately we'd have to handle

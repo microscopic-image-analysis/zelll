@@ -39,6 +39,7 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
     let mut group = c.benchmark_group("CellGrid");
     group
         .sampling_mode(SamplingMode::Flat)
+        // .sample_size(10)
         .plot_config(plot_config.clone());
 
     group.bench_with_input(BenchmarkId::new("Gonnet2007", 1000), &1000, |b, size| {
@@ -66,6 +67,9 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
         },
     );
 
+    // TODO: intermediate size steps (to illustrate cache behavior)
+    // TODO: also cachegrind for each size step!
+    // for size in (1..=5).map(|step| 10usize.pow(6) * (2 * step) ) {
     for size in (2..=7).map(|exp| 10usize.pow(exp)) {
         let cutoff: F32or64 = 10.0;
         let conc = 10.0 / cutoff.powi(3); //i.e. 10mol per 10^3 volume units
