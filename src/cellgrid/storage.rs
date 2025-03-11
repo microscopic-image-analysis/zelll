@@ -1,6 +1,6 @@
 // TODO: document motivation for this
 // TODO: in principle we could solve this using slices instead of CellSliceMeta
-// TODO: but then we'd have to distingquish mutability when storing the slices
+// TODO: but then we'd have to distinguish mutability when storing the slices
 // TODO: Also, bumpalo would be a nice approach too but there we'd have
 // TODO: to use allocator-api2 and resetting bumpalo is not nice (again because of mutability)
 // TODO: So instead let's just use a simple wrapper type around Vec with some specialized functionality
@@ -36,6 +36,8 @@ use core::ops::Range;
 // TODO: because they don't do e.g. HMC or just store references/std::cell::* types
 // TODO: (but the whole point of storing P: Particle in CellStorage is to avoid cache misses due to references...)
 // TODO: could also make CellStorage<T> generic over buffer and require Index/IndexMut/SliceIndex traits
+// TODO: https://doc.rust-lang.org/std/boxed/struct.Box.html#method.new_uninit_slice would be quite nice
+// TODO: but then we couldn't add more particles to storage/grid
 #[derive(Debug, Default, Clone)]
 pub(crate) struct CellStorage<T> {
     buffer: Vec<T>,
