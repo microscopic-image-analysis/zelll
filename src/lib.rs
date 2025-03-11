@@ -45,14 +45,14 @@
 //! ```
 //! use zelll::CellGrid;
 //!
-//! let points = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
-//! let mut cg = CellGrid::new(points.iter().copied(), 1.0);
+//! let data = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+//! let mut cg = CellGrid::new(data.iter().copied(), 1.0);
 //!
 //! for ((i, p), (j, q)) in cg.particle_pairs() {
 //!     /* do some work */
 //! }
 //!
-//! cg.rebuild_mut(points.iter().copied(), Some(0.5));
+//! cg.rebuild_mut(data.iter().copied(), Some(0.5));
 //! ```
 //!
 //! [^etymology]: abbrv. from German _Zelllisten_ /ˈʦɛlɪstən/, for cell lists.
@@ -82,7 +82,7 @@ pub use crate::cellgrid::CellGrid;
 ///
 /// A blanket implementation for `Into<T> + Copy` types is provided.\
 /// [`CellGrid`] is slightly more specific and requires implementing `Particle<[{float}; N]>`.
-/// Therefore, fixed-size float arrays, [`nalgebra::SVector`], or types that can be `Deref`-coerced
+/// Therefore, fixed-size float arrays, [`nalgebra::SVector`](https://docs.rs/nalgebra/latest/nalgebra/base/type.SVector.html), or types that can be `Deref`-coerced
 /// into the former or [`mint`](https://docs.rs/mint/latest/mint/) types, can be directly used.
 ///
 /// Having custom types implement this trait allows for patterns like interior mutability,

@@ -26,7 +26,14 @@ pub use util::{Aabb, GridInfo};
 
 /// The central type representing a grid of cells that provides an implementation of the _cell lists_ algorithm.
 ///
-/// # TODO: Algorithm sketch
+/// While iterating over cells, particles and particle pairs is the most important functionality of `CellGrid`,
+/// there is not much that could go wrong using the appropriate methods of this type.
+///
+/// In contrast, there are some intricacies with setting up the necessary data structures internal to `CellGrid,
+/// despite it being mostly straight-forward.
+/// There are many variations of this algorithm, ours is a relatively simple one:
+///
+/// # Algorithm sketch
 /// 1. compute (axis-aligned) bounding box
 /// 2. compute cell index _`i`_ for each particle
 /// 3. pre-allocate storage buffer for _`n`_ particles
@@ -34,9 +41,68 @@ pub use util::{Aabb, GridInfo};
 /// 5. slice storage buffer according to cell sizes
 /// 6. copy particles into cell slices and store cell slice information in hash map
 ///
+/// <div class="warning">
+///
+/// Note that step 1 is not strictly necessary, any bounding box will do,
+/// so we could just use the largest possible one and save some time.
+/// However, we can afford this.\
+/// Also, there are many ways to do step 2.
+/// </div>
+///
+/// Essentially, our `CellGrid` construction is an instance of
+/// [_counting sort_](https://en.wikipedia.org/wiki/Counting_sort)
+/// with the number of buckets _`k`_ (here: _non-empty_ cells) being bounded by _`n`_
+/// due to using sparse storage.
+///
+/// Because we are sorting data, construction of a cell grid is _cache aware_.
+/// Unfortunately, there is not much we can do about this.
+/// However, iterating over particle pairs after the fact benefits from this.
+///
+/// In some settings, input data already has some structure reducing this effect.
+/// Pre-sorting data can be helpful but is not always an option, as is the case for some
+/// types of simulation.
+///
 /// # Examples
-/// TODO: examples with default/explicitly set type parameters (2D, 3D, f32/f64)\
-/// TODO: examples with different types impl'ing `Particle`
+///
+/// The [prototypical example](crate#examples) does not require explicit type annotations:
+///
+/// ```
+/// # use zelll::CellGrid;
+/// let data = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+/// let mut cg = CellGrid::new(data.iter().copied(), 1.0);
+/// ```
+/// Equivalently:
+/// ```
+/// # use zelll::CellGrid;
+/// # let data = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+/// let mut cg: CellGrid<[f64; 3], 3, f64> = CellGrid::new(data.iter().copied(), 1.0);
+/// // usually, type parameters can be elided:
+/// let mut cg: CellGrid<_, 3, f64> = CellGrid::new(data.iter().copied(), 1.0);
+/// ```
+/// Often, `f32` coordinates are sufficient for simulations:
+/// ```
+/// # use zelll::CellGrid;
+/// let data = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+/// let mut cg: CellGrid<_, 3, f32> = CellGrid::new(data.iter().copied(), 1.0);
+/// ```
+/// If you do not need to spell out the specific type of the cell grid, the type checker is happy
+/// with you specifying the input data explicitly:
+/// ```
+/// # use zelll::CellGrid;
+/// let data: Vec<[f32; 3]> = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+/// let mut cg = CellGrid::new(data.iter().copied(), 1.0);
+/// // similarly:
+/// let data: Vec<[f32; 2]> = vec![[0.0, 0.0], [1.0,2.0], [0.0, 0.1]];
+/// let mut cg = CellGrid::new(data.iter().copied(), 1.0);
+/// ```
+/// Any type implementing [`Particle`] can be used:
+/// ```
+/// # use zelll::CellGrid;
+/// use nalgebra::SVector;
+///
+/// let data: Vec<SVector<f32, 2>> = vec![[0.0, 0.0].into(), [1.0,2.0].into(), [0.0, 0.1].into()];
+/// let mut cg = CellGrid::new(data.iter().copied(), 1.0);
+/// ```
 #[derive(Debug, Default, Clone)]
 pub struct CellGrid<P, const N: usize = 3, T: Float = f64>
 where
@@ -72,33 +138,56 @@ where
         + std::fmt::Debug
         + Default,
 {
-    // TODO: document that P: Copy is important here
-    // TODO: intended usage: CellGrid::new(points.iter().copied())
-    // TODO: previously we required <I as IntoIterator>::Item: Borrow<P>
-    // TODO: which provided more flexibility (accepting P and &P)
-    // TODO: but this required lots of type annotations for the user
-    // TODO: since Particle<T>: Copy anyway, we'll sacrifices this flexibility
-    // TODO: in favor of not cluttering user code with type annotations
-    pub fn new<I>(points: I, cutoff: T) -> Self
+    /// Constructs a new `CellGrid` from particle data and a cutoff distance.
+    ///
+    /// # Examples
+    /// ```
+    /// # use zelll::CellGrid;
+    /// let data = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+    /// let cell_grid = CellGrid::new(data.iter().copied(), 1.0);
+    /// ```
+    ///
+    /// <div class="warning">
+    ///
+    /// Note that the intended usage includes `.iter().copied()`
+    /// because we require the items of `particles` to implement `Particle` and we do not
+    /// provide a blanket implementation for references to types implementing `Particle`.
+    ///
+    /// Previously we required `<I as IntoIterator>::Item: Borrow<P>`
+    /// which provided more flexibility by accepting both `P` and `&P`
+    /// but this forces lots of type annotations on the user.\
+    /// Since `Particle<T>: Copy` anyway, we sacrifice this flexibility
+    /// in favor of not cluttering user code with type annotations.
+    ///
+    /// </div>
+    pub fn new<I>(particles: I, cutoff: T) -> Self
     where
         I: IntoIterator<Item = P> + Clone,
         P: Default,
     {
-        CellGrid::default().rebuild(points, Some(cutoff))
+        CellGrid::default().rebuild(particles, Some(cutoff))
     }
 
-    //TODO: Documentation: rebuild does not really update because it does not make a lot of sense:
-    //TODO: If FlatIndex did change, we have to re-allocate (or re-initialize) almost everything anyway;
-    //TODO: If FlatIndex did not change, we don't need to update.
-    //TODO: Therefore we check for that and make CellGrid::new() just a wrapper around CellGrid::rebuild (with an initially empty FlatIndex)
+    /// Consumes `self` and rebuilds the cell grid from the supplied iterator.
+    /// This method can be used to add or remove particles but a full rebuild will happen anyway,
+    /// with the exception of every particle still belonging to the same cell as before.
+    ///
+    /// # Examples
+    /// ```
+    /// # use zelll::CellGrid;
+    /// # let data = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+    /// # let mut cell_grid = CellGrid::new(data.iter().copied(), 1.0);
+    /// // rebuild `cell_grid` with reversed input data and unchanged cutoff distance
+    /// cell_grid = cell_grid.rebuild(data.iter().rev().copied(), None);
+    /// ```
     #[must_use = "rebuild() consumes `self` and returns the rebuilt `CellGrid`"]
-    pub fn rebuild<I>(self, points: I, cutoff: Option<T>) -> Self
+    pub fn rebuild<I>(self, particles: I, cutoff: Option<T>) -> Self
     where
         I: IntoIterator<Item = P> + Clone,
         P: Default,
     {
         let cutoff = cutoff.unwrap_or(self.index.grid_info.cutoff);
-        let index = FlatIndex::from_points(points.clone(), cutoff);
+        let index = FlatIndex::from_points(particles.clone(), cutoff);
 
         if index == self.index {
             self
@@ -135,15 +224,15 @@ where
             index
                 .index
                 .iter()
-                .zip(points)
+                .zip(particles)
                 .enumerate()
                 // TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
-                .for_each(|(i, (cell, point))| {
+                .for_each(|(i, (cell, particle))| {
                     // FIXME: in principle could have multiple &mut slices into CellStorage (for parallel pushing)
                     // FIXME: would just have to make sure that cell is always unique when operating on chunks
                     // FIXME: (pretty much the same issue as with counting cell sizes concurrently)
                     cell_lists.push(
-                        (i, point),
+                        (i, particle),
                         cells
                             .get_mut(cell)
                             .expect("cell grid should contain every cell in the grid index"),
@@ -159,28 +248,34 @@ where
     }
     // TODO: rebuild() could simply do this but rebuild_mut() on
     // TODO: an empty CellGrid does have some overhead due to FlatIndex::rebuild_mut()
-    // pub fn rebuild<I>(self, points: I, cutoff: Option<T>) -> Self
+    // pub fn rebuild<I>(self, particles: I, cutoff: Option<T>) -> Self
     // where
     //     I: IntoIterator<Item = P> + Clone,
     //     P: Default,
     // {
     //     let mut cellgrid = self;
-    //     cellgrid.rebuild_mut(points, cutoff);
+    //     cellgrid.rebuild_mut(particles, cutoff);
     //     cellgrid
     // }
 
-    // TODO: documentation
-    // TODO: currently, rebuild_mut() will usually be more expensive than rebuild() even though it does not
-    // TODO: allocate.
-    // TODO: it makes mostly sense to use this when it's unlikely that the index changed
-    // TODO: when a simulation reaches a stable state or cutoff is larger than the max. interaction distance
-    // TODO: (cutoff-interaction distance >= max. distance particles might travel in one simulation step (similar to verlet lists))
-    pub fn rebuild_mut<I>(&mut self, points: I, cutoff: Option<T>)
+    /// Rebuilds `self` but does so mutably. Internally allocated memory will be re-used but
+    /// re-allocations may happen.
+    /// This method is usually preferred over [`rebuild()`](CellGrid::rebuild()).
+    ///
+    /// # Examples
+    /// ```
+    /// # use zelll::CellGrid;
+    /// # let data = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+    /// # let mut cell_grid = CellGrid::new(data.iter().copied(), 1.0);
+    /// // rebuild `cell_grid` with reversed input data and unchanged cutoff distance
+    /// cell_grid.rebuild_mut(data.iter().rev().copied(), None);
+    /// ```
+    pub fn rebuild_mut<I>(&mut self, particles: I, cutoff: Option<T>)
     where
         I: IntoIterator<Item = P> + Clone,
         P: Default,
     {
-        if self.index.rebuild_mut(points.clone(), cutoff) {
+        if self.index.rebuild_mut(particles.clone(), cutoff) {
             self.cells.clear();
             self.cell_lists.clear();
 
@@ -212,13 +307,13 @@ where
             self.index
                 .index
                 .iter()
-                .zip(points)
+                .zip(particles)
                 .enumerate()
                 //TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
                 //TODO: could use unwrap_unchecked() since this can't/shouldn't fail
-                .for_each(|(i, (cell, point))| {
+                .for_each(|(i, (cell, particle))| {
                     self.cell_lists.push(
-                        (i, point),
+                        (i, particle),
                         self.cells
                             .get_mut(cell)
                             .expect("cell grid should contain every cell in the grid index"),
@@ -227,6 +322,10 @@ where
         }
     }
 
+    /// Returns spatial information about this cell grid, as well as auxiliary functionality
+    /// facilitated by this information.
+    ///
+    /// See [`GridInfo`] for details.
     pub fn info(&self) -> &GridInfo<N, T> {
         &self.index.grid_info
     }
@@ -237,14 +336,25 @@ where
     T: Float + ConstOne + AsPrimitive<i32> + std::fmt::Debug + NumAssignOps + Send + Sync,
     P: Send + Sync,
 {
-    /// Iterate over all relevant (i.e. within cutoff threshold + some extra) unique pairs of points in this `CellGrid`.
+    /// Returns an iterator over all relevant (i.e. within cutoff threshold + some extra) unique
+    /// pairs of particles in this `CellGrid`.
+    ///
+    /// <div class="warning">
+    ///
+    /// The `Item` type is currently `((usize, P), (usize, P))`,
+    /// where each particle is labelled with its position it was inserted into this `CellGrid`.
+    /// A future breaking change might remove this label (think _entity ID_), putting the responsibility to associate `P`
+    /// with additional data (eg. velocities, momenta) onto implementors of [`Particle`].
+    /// This will likely also deprecate [`pair_indices()`](CellGrid::pair_indices()).
+    ///
+    /// </div>
     ///
     /// # Examples
     /// ```
     /// # use zelll::CellGrid;
     /// use nalgebra::distance_squared;
-    /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
-    /// # let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
+    /// # let data = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+    /// # let cell_grid = CellGrid::new(data.iter().copied(), 1.0);
     /// cell_grid.particle_pairs()
     ///     // usually, .filter_map() is preferable (so distance computations can be re-used)
     ///     .filter(|&((_i, p), (_j, q))| {
@@ -259,6 +369,10 @@ where
         self.iter().flat_map(|cell| cell.particle_pairs())
     }
 
+    /// Returns an iterator over all relevant (i.e. within cutoff threshold + some extra) unique
+    /// pairs of particle indices in this `CellGrid`.
+    ///
+    /// A particle index is its position in the iterator that was used for constructing or rebuilding a `CellGrid`.
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn pair_indices(&self) -> impl Iterator<Item = (usize, usize)> + Clone {
         self.iter()
@@ -273,16 +387,21 @@ where
     T: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
     P: Particle<[T; N]> + Send + Sync,
 {
-    /// Iterate in parallel over all relevant (i.e. within cutoff threshold + some extra)
-    /// unique pairs of points in this `CellGrid`.
+    /// Returns a parallel iterator over all relevant (i.e. within cutoff threshold + some extra)
+    /// unique pairs of particles in this `CellGrid`.
+    ///
+    /// <div class="warning">
+    ///
+    /// See also [`particle_pairs()`](CellGrid::particle_pairs()).
+    ///
+    /// </div>
     ///
     /// # Examples
     /// ```
-    /// # // TODO: re-export ParallelIterator
     /// # use zelll::{CellGrid, rayon::ParallelIterator};
     /// use nalgebra::distance_squared;
-    /// # let points = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
-    /// # let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
+    /// # let data = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+    /// # let cell_grid = CellGrid::new(data.iter().copied(), 1.0);
     /// cell_grid.par_particle_pairs()
     //      TODO: fact-check the statement below:
     ///     // Try to avoid filtering this ParallelIterator to avoid significant overhead:
@@ -296,6 +415,10 @@ where
         self.par_iter().flat_map_iter(|cell| cell.particle_pairs())
     }
 
+    /// Returns a parallel iterator over all relevant (i.e. within cutoff threshold + some extra) unique
+    /// pairs of particle indices in this `CellGrid`.
+    ///
+    /// A particle index is its position in the iterator that was used for constructing or rebuilding a `CellGrid`.
     pub fn par_pair_indices(&self) -> impl ParallelIterator<Item = (usize, usize)> {
         self.par_iter()
             .flat_map_iter(|cell| cell.particle_pairs())
