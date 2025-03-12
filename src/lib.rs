@@ -3,7 +3,7 @@
 //! Particle simulations usually require to compute interactions between those particles.
 //! Considering all _pairwise_ interactions of _`n`_ particles would be of time complexity _`O(n²)`_.\
 //! Cell lists facilitate _linear-time_ enumeration of particle pairs closer than a certain
-//! cutoff distance by dividing the enclosing bounding box into cuboid grid cells.
+//! cutoff distance by dividing the enclosing bounding box into (cuboid) grid cells.
 //!
 //! # Caveats
 //!
