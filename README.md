@@ -12,7 +12,7 @@ cutoff distance by dividing the enclosing bounding box into (cuboid) grid cells.
 
 ## Caveats
 
-`zelll` is motivated by _coarse-grained_ (bio-)molecular simulations but is not restricted to that.\
+`zelll`[^etymology] is motivated by _coarse-grained_ (bio-)molecular simulations but is not restricted to that.\
 This is reflected by a few things:
 
 - internally, the simulation box is represented by a (sparse) hash map only storing non-empty grid cells,
@@ -91,3 +91,9 @@ These are improvements we want to make eventually:
     * [x] cache misses (cf. `minimal_new.rs`)
     * [ ] clean up
     * [ ] figures for the above
+
+[^etymology]: abbrv. from German _Zelllisten_ /ˈʦɛlɪstən/, for cell lists.
+[^structureddata]: Usually, (bio-)molecular data files are not completely unordered
+    even though they could be.
+    In practice, it may be a reasonable assumption that sequentially proximate
+    particles often have spatially clustered coordinates as well.
