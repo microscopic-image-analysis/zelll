@@ -70,25 +70,25 @@ where
     //TODO: see https://www.rustsim.org/blog/2020/03/23/simd-aosoa-in-nalgebra/#using-simd-aosoa-for-linear-algebra-in-rust-ultraviolet-and-nalgebra
     //TODO: or can I chunk iterators such that rustc auto-vectorizes?
     //TODO: see https://www.nickwilcox.com/blog/autovec/
-    pub fn from_points<P: Particle<[F; N]>>(
-        points: impl IntoIterator<Item = impl Borrow<P>> + Clone,
+    pub fn from_particles<P: Particle<[F; N]>>(
+        particles: impl IntoIterator<Item = impl Borrow<P>> + Clone,
         cutoff: F,
     ) -> Self {
         // TODO: We could actually use a fixed Aabb (cf. util::GridInfo::new_fixed())
         // TODO: However, computing the bounding box is cheap enough
         // TODO: We might reconsider this after experimenting with hashbrown::HashTable
-        let aabb = Aabb::from_points(points.clone().into_iter());
+        let aabb = Aabb::from_particles(particles.clone().into_iter());
         let grid_info = GridInfo::new(aabb, cutoff);
-        let index = points
+        let index = particles
             .into_iter()
             .take(i32::MAX as usize)
-            .map(|point| grid_info.flat_cell_index(point.borrow().coords()))
+            .map(|p| grid_info.flat_cell_index(p.borrow().coords()))
             .collect();
 
         // TODO: this does seem to have a *small* effect due to autovectorization?
         // TODO: (although often buried by cache effects)
         // TODO: should examine more closely
-        // let mut it = points.into_iter()
+        // let mut it = particles.into_iter()
         //     .map(|p| grid_info.flat_cell_index(p.borrow().coords()));
         // let mut index: Vec<i32> = Vec::with_capacity(it.size_hint().0);
 
@@ -109,23 +109,27 @@ where
     // TODO: benchmark with changing point iterators
     pub fn rebuild_mut<P: Particle<[F; N]>>(
         &mut self,
-        points: impl IntoIterator<Item = impl Borrow<P>> + Clone,
+        particles: impl IntoIterator<Item = impl Borrow<P>> + Clone,
         cutoff: Option<F>,
     ) -> bool {
         let cutoff = cutoff.unwrap_or(self.grid_info.cutoff);
         // TODO: see TODO notes for ::from_points()
-        let aabb = Aabb::from_points(points.clone().into_iter());
+        let aabb = Aabb::from_particles(particles.clone().into_iter());
         let grid_info = GridInfo::new(aabb, cutoff);
 
-        let size = points.clone().into_iter().take(i32::MAX as usize).count();
+        let size = particles
+            .clone()
+            .into_iter()
+            .take(i32::MAX as usize)
+            .count();
         // TODO: should benchmark this
         // let size_changed = size != self.index.len();
         self.index.resize(size, 0);
 
-        let new_index = points
+        let new_index = particles
             .into_iter()
             .take(i32::MAX as usize)
-            .map(|point| grid_info.flat_cell_index(point.borrow().coords()));
+            .map(|p| grid_info.flat_cell_index(p.borrow().coords()));
 
         self.grid_info = grid_info;
 
@@ -153,13 +157,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cellgrid::util::generate_points;
+    use crate::cellgrid::util::generate_pointcloud;
 
     #[test]
     fn test_flatindex() {
         // using 0-origin for simplicity and to avoid floating point errors
-        let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
-        let index = FlatIndex::from_points::<[_; 3]>(points.iter(), 1.0);
+        let points = generate_pointcloud([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
+        let index = FlatIndex::from_particles::<[_; 3]>(points.iter(), 1.0);
         let mut idx = Vec::with_capacity(points.len());
 
         for x in 0..3 {
