@@ -9,6 +9,9 @@ pub type PointCloud<const N: usize> = Vec<[f64; N]>;
 
 /// An axis-aligned bounding box constructed from particle data and used internally.
 ///
+/// An `Aabb` is conveniently expressed by two points, infimum and supremum,
+/// where each particle datum is partially ordered between those points.
+///
 /// See also [`GridInfo::bounding_box()`].
 //TODO: rename fields, infimum/supremum might be confusing outside of a lattice context
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
@@ -24,36 +27,40 @@ impl<const N: usize, F> Aabb<N, F>
 where
     F: Float + std::fmt::Debug + SimdPartialOrd + ConstZero,
 {
-    pub fn from_points<P: Particle<[F; N]>>(
-        mut points: impl Iterator<Item = impl Borrow<P>>,
+    /// Computes the componentwise minimum and maximum from the coordinates
+    /// of the supplied particle data.
+    pub fn from_particles<P: Particle<[F; N]>>(
+        mut particles: impl Iterator<Item = impl Borrow<P>>,
     ) -> Self {
-        let init = points
+        let init = particles
             .next()
             .map(|p| p.borrow().coords())
             .unwrap_or([F::ZERO; N]);
         let init = Point::from(init);
 
-        let (inf, sup) = points
+        let (inf, sup) = particles
             .take(i32::MAX as usize)
-            .fold((init, init), |(i, s), point| {
-                let point = Point::from(point.borrow().coords());
-                (i.inf(&point), s.sup(&point))
+            .fold((init, init), |(i, s), p| {
+                let p = Point::from(p.borrow().coords());
+                (i.inf(&p), s.sup(&p))
             });
 
         Self { inf, sup }
     }
 
     //TODO: could also pass iterators here (single point could be wrapped by std::iter::once or Option::iter())
-    fn update<P: Particle<[F; N]>>(&mut self, point: impl Borrow<P>) {
-        let point = Point::from(point.borrow().coords());
-        self.inf = point.inf(&self.inf);
-        self.sup = point.sup(&self.sup);
+    fn update<P: Particle<[F; N]>>(&mut self, particle: impl Borrow<P>) {
+        let p = Point::from(particle.borrow().coords());
+        self.inf = p.inf(&self.inf);
+        self.sup = p.sup(&self.sup);
     }
 
+    /// Returns a copy of the infimum of this `Aabb`.
     pub fn inf(&self) -> [F; N] {
         self.inf.into()
     }
 
+    /// Returns a copy of the supremum of this `Aabb`.
     pub fn sup(&self) -> [F; N] {
         self.sup.into()
     }
@@ -124,23 +131,42 @@ impl<const N: usize, F> GridInfo<N, F>
 where
     F: Float + std::fmt::Debug,
 {
+    /// Returns the origin corner of this grid.
     pub fn origin(&self) -> [F; N] {
         self.aabb.inf.into()
     }
 
+    /// Returns the shape this grid is partitioned into.
     pub fn shape(&self) -> [i32; N] {
         self.shape.into()
     }
 
+    /// Returns the strides this grid is using to compute flat cell indices.
     pub fn strides(&self) -> [i32; N] {
         self.strides.into()
     }
 
+    /// Returns a reference to the internal axis-aligned bounding box.\
+    /// See [`Aabb`] for details.
     pub fn bounding_box(&self) -> &Aabb<N, F> {
         &self.aabb
     }
 
+    /// Computes a flat index from cell "coordinates".
+    ///
+    /// <div class="warning">
+    ///
+    /// Although negative coordinate values are technically allowed, only values `>= -1i32`
+    /// are actually valid. We need this to compute cell neighborhoods easily.
+    ///
+    /// </div>
+    ///
+    /// # Panics
+    ///
+    /// Panics on **debug** builds if at least one component of `idx` is strictly less than `-1`.
     pub fn flatten_index(&self, idx: impl Borrow<[i32; N]>) -> i32 {
+        debug_assert!(*idx.borrow() >= [-1i32; N]);
+
         let i = SVector::from(*idx.borrow());
         i.dot(&self.strides)
     }
@@ -150,6 +176,8 @@ impl<const N: usize, F> GridInfo<N, F>
 where
     F: Float + NumAssignOps + AsPrimitive<i32> + std::fmt::Debug,
 {
+    /// Constructs a new instance of `GridInfo`.
+    /// Usually, this does not need to be used manually.
     pub fn new(aabb: Aabb<N, F>, cutoff: F) -> Self {
         let shape = ((aabb.sup - aabb.inf) / cutoff).map(|coord| coord.floor().as_() + 1);
 
@@ -176,14 +204,19 @@ where
             strides,
         }
     }
-    //TODO: not sure where it fits better
-    //TODO: GridInfo knows enough to compute the cell index for an arbitrary point
-    //TODO: but might make more sense in FlatIndex?
-    //TODO: sth. like Lattice trait maybe
-    pub fn cell_index(&self, point: impl Borrow<[F; N]>) -> [i32; N] {
-        let point = Point::from(*point.borrow());
 
-        let idx = ((point - self.aabb.inf) / self.cutoff).map(|coord| coord.floor().as_());
+    /// Computes integer "coordinates" of the cell the given coordinates belong to,
+    /// ie. a _cell index_.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the computed cell index does not fit the shape of this grid.
+    // FIXME: document that we're currently only checking `idx < shape`, completely
+    // FIXME: disregarding negative coordinate values here
+    pub fn cell_index(&self, coordinates: impl Borrow<[F; N]>) -> [i32; N] {
+        let p = Point::from(*coordinates.borrow());
+
+        let idx = ((p - self.aabb.inf) / self.cutoff).map(|coord| coord.floor().as_());
 
         // FIXME: cell index ([2, -1, 0]) out of bounds ([1, 1, 1])
         assert!(
@@ -196,16 +229,35 @@ where
         idx.into()
     }
 
-    pub fn flat_cell_index(&self, point: impl Borrow<[F; N]>) -> i32 {
-        let point = Point::from(*point.borrow());
+    /// Computes a flat cell index directly.
+    ///
+    /// <div class="warning">
+    ///
+    /// In contrast to [`flatten_index()`](GridInfo::flatten_index()) and
+    /// [`cell_index()`](GridInfo::cell_index()), this does not panic although
+    /// the same invariants are expected to hold:
+    ///
+    /// ```
+    /// # use zelll::CellGrid;
+    /// # let data = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+    /// # let cell_grid = CellGrid::new(data.iter().copied(), 1.0);
+    /// # let info = cell_grid.info();
+    /// let p = [-1.0, -1.0, -1.0];
+    /// // the LHS is faster than the RHS but doesn't do any bounds checks
+    /// assert_eq!(info.flat_cell_index(p), info.flatten_index(info.cell_index(p)));
+    /// ```
+    ///
+    /// </div>
+    // the reason this does not do any bounds checks is twofold:
+    // 1. particles used for constructing a specific cell grid, always compute to a valid index
+    // 2. if the resulting flat cell index is invalid, its lookup in our internal hash map
+    //    will fail, which is fine
+    pub fn flat_cell_index(&self, coordinates: impl Borrow<[F; N]>) -> i32 {
+        let p = Point::from(*coordinates.borrow());
 
-        ((point - self.aabb.inf) / self.cutoff)
+        ((p - self.aabb.inf) / self.cutoff)
             .map(|coord| coord.floor().as_())
             .dot(&self.strides)
-
-        //TODO: bounds checks are a bit unintuitive now. might defer it to hashmap lookup?
-        // note that the following line is not as efficient:
-        // self.flatten_index(self.cell_index(point))
     }
 }
 
@@ -220,27 +272,25 @@ where
 
 /// Generates a [`Vec`] of 3-dimensional points for testing purposes.
 ///
-/// TODO: rename this like `generate_pointcloud()`/`generate_particles()`
-///
 /// In a grid of `shape` with cells of length `cutoff`, only cells with even linear index contain points (chessboard pattern).
 /// These non-empty cells contain two points each:
 ///
 /// - the first at the origin of the cell (equivalent to the cell's multi-index + the `origin` of the grid)
 /// - the second at the center of the cell
 // We'll stay in 3D for simplicity here
-pub fn generate_points(shape: [usize; 3], cutoff: f64, origin: [f64; 3]) -> PointCloud<3> {
-    let mut points = Vec::with_capacity(((shape.iter().product::<usize>() + 1) / 2) * 2);
+pub fn generate_pointcloud(shape: [usize; 3], cutoff: f64, origin: [f64; 3]) -> PointCloud<3> {
+    let mut pointcloud = Vec::with_capacity(((shape.iter().product::<usize>() + 1) / 2) * 2);
 
     for x in 0..shape[0] {
         for y in 0..shape[1] {
             for z in 0..shape[2] {
                 if (x + y + z) % 2 == 0 {
-                    points.push([
+                    pointcloud.push([
                         cutoff.mul_add(x as f64, origin[0]),
                         cutoff.mul_add(y as f64, origin[1]),
                         cutoff.mul_add(z as f64, origin[2]),
                     ]);
-                    points.push([
+                    pointcloud.push([
                         cutoff.mul_add(x as f64, cutoff.mul_add(0.5, origin[0])),
                         cutoff.mul_add(y as f64, cutoff.mul_add(0.5, origin[1])),
                         cutoff.mul_add(z as f64, cutoff.mul_add(0.5, origin[2])),
@@ -250,7 +300,7 @@ pub fn generate_points(shape: [usize; 3], cutoff: f64, origin: [f64; 3]) -> Poin
         }
     }
 
-    points
+    pointcloud
 }
 
 #[cfg(test)]
@@ -258,7 +308,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_generate_points() {
+    fn test_generate_pointcloud() {
         let points = vec![
             [0.0, 0.0, 0.0],
             [0.5, 0.5, 0.5],
@@ -289,22 +339,22 @@ mod tests {
             [2.0, 2.0, 2.0],
             [2.5, 2.5, 2.5],
         ];
-        assert_eq!(points, generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]));
+        assert_eq!(points, generate_pointcloud([3, 3, 3], 1.0, [0.0, 0.0, 0.0]));
     }
 
     #[test]
     fn test_utils() {
-        let points = generate_points([3, 3, 3], 1.0, [0.2, 0.25, 0.3]);
+        let points = generate_pointcloud([3, 3, 3], 1.0, [0.2, 0.25, 0.3]);
         assert_eq!(points.len(), 28, "testing PointCloud.len()");
 
-        let aabb = Aabb::from_points::<[_; 3]>(points.iter());
+        let aabb = Aabb::from_particles::<[_; 3]>(points.iter());
         assert_eq!(
             aabb,
             Aabb {
                 inf: [0.2, 0.25, 0.3].into(),
                 sup: [2.7, 2.75, 2.8].into()
             },
-            "testing Aabb::from_pointcloud()"
+            "testing Aabb::from_particles()"
         );
 
         let grid_info = GridInfo::new(aabb, 1.0);

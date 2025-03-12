@@ -187,7 +187,7 @@ where
         P: Default,
     {
         let cutoff = cutoff.unwrap_or(self.index.grid_info.cutoff);
-        let index = FlatIndex::from_points(particles.clone(), cutoff);
+        let index = FlatIndex::from_particles(particles.clone(), cutoff);
 
         if index == self.index {
             self

@@ -176,12 +176,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cellgrid::util::generate_points;
+    use crate::cellgrid::util::generate_pointcloud;
 
     #[test]
     fn test_cellgrid_iter() {
         // Using 0-origin to avoid floating point errors
-        let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
+        let points = generate_pointcloud([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
         let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
 
         assert_eq!(cell_grid.iter().count(), 14, "testing iter()");
@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn test_gridcell_iter() {
         // Using 0-origin to avoid floating point errors
-        let points = generate_points([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
+        let points = generate_pointcloud([3, 3, 3], 1.0, [0.0, 0.0, 0.0]);
         let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
 
         assert_eq!(
@@ -218,7 +218,7 @@ mod tests {
     #[test]
     fn test_neighborcell_particle_pairs() {
         // Using 0-origin to avoid floating point errors
-        let points = generate_points([2, 2, 2], 1.0, [0.0, 0.0, 0.0]);
+        let points = generate_pointcloud([2, 2, 2], 1.0, [0.0, 0.0, 0.0]);
         let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
 
         assert_eq!(
