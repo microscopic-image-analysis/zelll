@@ -6,9 +6,9 @@ proof-of-concept bindings for `zelll` with the aim to allow for idiomatic use in
 
 The following steps assume a working Rust toolchain.
 
-1. clone this repository, checkout `python-bindings` and `cd ./zelll/python/`
+1. clone this repository and `cd ./zelll/python/`
 2. install [`maturin`](https://www.maturin.rs/installation)
-3. create and activate a virtual environment: `python3 -m venv .venv && source .venv/bin/activate`
+3. create and activate a virtual environment, eg. `python3 -m venv .venv && source .venv/bin/activate`
 4. (optionally install `numpy` in your environment for testing purposes)
 5. run `maturin develop --release` to build and install an optimized `.whl` into the current virtual environment
 6. open a Python REPL and start playing around (currently w/o any documentation):

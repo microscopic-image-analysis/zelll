@@ -16,5 +16,5 @@ name = "zelll"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.22"
+pyo3 = "0.24"
 zelll = { path  = ".." }
