@@ -1,5 +1,6 @@
-//TODO iterate over all neighboured cells (full/half space), pairs of particles
+//TODO iterate over all neighbored cells (full/half space), pairs of particles
 //TODO: perhaps move parallel iteration into separate submodule
+use crate::cellgrid::storage::CellSliceMeta;
 #[cfg(feature = "rayon")]
 use crate::rayon::ParallelIterator;
 use crate::{CellGrid, Particle};
@@ -8,7 +9,7 @@ use core::slice::Iter;
 use itertools::Itertools;
 use num_traits::{AsPrimitive, ConstOne, Float, NumAssignOps};
 
-/// `GridCell` represents a non-empty (by construction) cell of a [`CellGrid`].
+/// `GridCell` represents a possibly empty (by construction) cell of a [`CellGrid`].
 #[derive(Debug, Clone, Copy)]
 pub struct GridCell<'g, P, const N: usize = 3, F: Float = f64>
 where
@@ -26,7 +27,7 @@ where
     F: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
     P: Particle<[F; N]> + Send + Sync,
 {
-    /// Returns the (flat) cell index of this (non-empty) `GridCell`.
+    /// Returns the (flat) cell index of this (possibly empty) `GridCell`.
     pub(crate) fn index(&self) -> i32 {
         self.index
     }
@@ -43,7 +44,11 @@ where
                 self.grid
                     .cells
                     .get(&self.index)
-                    .expect("This GridCell should be contained in the CellGrid but it is not."),
+                    // FIXME: cf. `CellStorage::cell_slice()` to see why we have to clone here
+                    // CellSliceMeta::default represents an empty slice, so that's exactly what we want
+                    // keep in mind that this only works for unique flat cell indices
+                    // (ie. anything outside of the `CellGrid` might produce garbage/helical boundaries)
+                    .map_or_else(CellSliceMeta::default, |meta| meta.clone()), //.expect("This GridCell should be contained in the CellGrid but it is not."),
             )
             .iter()
     }

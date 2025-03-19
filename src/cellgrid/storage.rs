@@ -51,8 +51,15 @@ impl<T> CellStorage<T> {
     }
 
     // TODO: provide fallible version of this
-    pub(crate) fn cell_slice(&self, metadata: &CellSliceMeta) -> &[T] {
-        &self.buffer[metadata.range.clone()]
+    // FIXME: not taking `&CellSliceMeta` because we'd have to `clone()` the internal range
+    // FIXME: now the caller has to do it themselves, so at least they are aware of it
+    // FIXME: waiting for new copyable range types
+    pub(crate) fn cell_slice(&self, metadata: CellSliceMeta) -> &[T] {
+        &self.buffer[metadata.range]
+    }
+
+    pub(crate) fn try_cell_slice(&self, metadata: CellSliceMeta) -> Option<&[T]> {
+        self.buffer.get(metadata.range)
     }
 
     // TODO: choose appropriate Error type

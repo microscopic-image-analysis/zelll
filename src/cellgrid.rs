@@ -321,14 +321,6 @@ where
                 });
         }
     }
-
-    /// Returns spatial information about this cell grid, as well as auxiliary functionality
-    /// facilitated by this information.
-    ///
-    /// See [`GridInfo`] for details.
-    pub fn info(&self) -> &GridInfo<N, T> {
-        &self.index.grid_info
-    }
 }
 
 impl<P: Particle<[T; N]>, const N: usize, T> CellGrid<P, N, T>
@@ -378,6 +370,67 @@ where
         self.iter()
             .flat_map(|cell| cell.particle_pairs())
             .map(|((i, _p), (j, _q))| (i, j))
+    }
+
+    /// Returns spatial information about this cell grid, as well as auxiliary functionality
+    /// facilitated by this information.
+    ///
+    /// See [`GridInfo`] for details.
+    pub fn info(&self) -> &GridInfo<N, T> {
+        &self.index.grid_info
+    }
+
+    /// Returns an iterator over all relevant (i.e. within cutoff threshold + some extra)
+    /// neighbor particles of the queried particle.
+    ///
+    /// <div class="warning">
+    ///
+    /// Note that the queried particle's cell must be inside this `CellGrid`'s shape.
+    /// If that is not the case, `None` is returned even if some particles inside the grid
+    /// might be within the cutoff distance of the queried particle.
+    /// This restriction might be lifted in the future.
+    // FIXME: a workaround would be to allow constructing `CellGrid` with a given `Aabb`
+    // FIXME: or by padding its shape
+    ///
+    /// This method can be used to query a specific cell
+    /// (by using any `particle` contained in this cell).
+    ///
+    /// </div>
+    ///
+    /// # Examples
+    /// ```
+    /// # use zelll::CellGrid;
+    /// use nalgebra::distance_squared;
+    /// # let data = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+    /// # let cell_grid = CellGrid::new(data.iter().copied(), 1.0);
+    /// let p = [0.5, 1.0, 0.1];
+    /// cell_grid.query(p)
+    ///     .expect("the queried particle should be inside of this grid")
+    ///     // usually, .filter_map() is preferable (so distance computations can be re-used)
+    ///     .filter(|&(_j, q)| {
+    ///         distance_squared(&p.into(), &q.into()) <= 1.0
+    ///     })
+    ///     .for_each(|(_j, q)| {
+    ///         /* do some work */
+    ///     });
+    /// ```
+    #[must_use = "iterators are lazy and do nothing unless consumed"]
+    pub fn query(&self, particle: P) -> Option<impl Iterator<Item = (usize, P)> + Clone> {
+        self.info()
+            .get_cell_index(particle.coords())
+            // FIXME: this still requires careful handling of non-grid-adjacent cells due to flat indices
+            // FIXME: (ie. shape or bounding box should be properly padded for this)
+            // FIXME: maybe should center cells on their origin for this, so we have 0.5*cutoff margin
+            // FIXME: around bounding box for particle queries?
+            // FIXME: might be a sensible compromise
+            .map(|index| self.info().flatten_index(index))
+            .map(|index| GridCell { grid: &self, index })
+            .map(|ghost| {
+                ghost
+                    .iter()
+                    .copied()
+                    .chain(ghost.neighbors().flat_map(|cell| cell.iter().copied()))
+            })
     }
 }
 
