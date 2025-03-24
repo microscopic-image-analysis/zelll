@@ -9,6 +9,60 @@ use core::slice::Iter;
 use itertools::Itertools;
 use num_traits::{AsPrimitive, ConstOne, Float, NumAssignOps};
 
+// cf. https://predr.ag/blog/definitive-guide-to-sealed-traits-in-rust/#sealing-traits-via-method-signatures
+mod private {
+    pub struct Token;
+}
+
+/// "Marker" trait indicating a type being a valid neighborhood configuration.
+pub trait SpaceConfig {
+    #[doc(hidden)]
+    #[inline]
+    fn neighbors_as_slice(neighbors: &[i32], _: private::Token) -> &[i32] {
+        neighbors
+    }
+}
+
+/// _Full-space_ neighborhood.
+pub struct Full;
+/// _Half-space_ neighborhood.
+pub struct Half;
+
+impl SpaceConfig for Full {}
+impl SpaceConfig for Half {
+    #[inline]
+    fn neighbors_as_slice(neighbors: &[i32], _: private::Token) -> &[i32] {
+        &neighbors[..neighbors.len() / 2]
+    }
+}
+
+pub mod neighborhood {
+    //! This module enables advanced querying of [`GridCell`](super::GridCell) neighborhoods.
+    //!
+    //! In `zelll`, cells are represented by _flat_ indices, ie. scalar values.
+    //!
+    //! Similar to the directions in which the **🨀** chess piece can move[^kingdirections],
+    //! relative neighbor cell indices are represented by signed integers:
+    //!
+    //! |    |        |        |    |
+    //! | -: | -----: | -----: | -: |
+    //! |    |  **7** |    8   |  9 |
+    //! |    | **-1** | **🨀** |  1 |
+    //! |    | **-9** | **-8** | -7 |
+    //!
+    //! The _[`Full`]-space_ neighborhood for **🨀** simply consists of cells _`{-9, -1, 7, -8, 8, -7, 1, 9}`_
+    //! (in this order).\
+    //! A _[`Half`]-space_ neighborhood for **🨀** consists of cells _`{-9, -1, 7, -8}`_.
+    //!
+    //! Note that there are multiple valid _half-space_ neighborhoods, this specific sequence
+    //! is merely an implementation artifact.
+    //! Also, the exact index values depend on the cell grid's size and shape.
+    //!
+    //! [^kingdirections]: [https://www.chessprogramming.org/Direction#Ray_Directions](https://www.chessprogramming.org/Direction#Ray_Directions)
+    #[allow(unused_imports)]
+    pub use super::{Full, Half, SpaceConfig};
+}
+
 /// `GridCell` represents a possibly empty (by construction) cell of a [`CellGrid`].
 #[derive(Debug, Clone, Copy)]
 pub struct GridCell<'g, P, const N: usize = 3, F: Float = f64>
@@ -67,28 +121,40 @@ where
         false
     }*/
 
-    /// Returns an iterator over all (currently half-space) non-empty neighboring cells.
+    /// Returns an iterator over non-empty neighboring cells.
     ///
     /// <div class="warning">
     ///
-    /// _half-space_ means that each _pair of cells_ is uniquely enumerated,
-    /// such that a `CellGrid` also produces unique particle pairs.
+    /// Methods such as [`particle_pairs()`](GridCell::particle_pairs()) only access
+    /// **half** of the neighboring cells per grid cell
+    /// (so-called _half-space_) in order to iterate over _unique_ pairs.
+    /// In contrast, [`CellGrid::query_neighbors()`] queries **all** neighboring cells (_full-space_).
+    ///
+    /// See [`neighborhood`] for details.
     ///
     /// </div>
-    //TODO: currently only half-space and aperiodic boundaries
-    //TODO: handle half-/full-space  and (a-)periodic boundary conditions
-    //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
-    pub fn neighbors(self) -> impl FusedIterator<Item = GridCell<'g, P, N, F>> + Clone {
-        self.grid
-            .index
-            .neighbor_indices
+    ///
+    /// # Examples
+    /// ```
+    /// # use zelll::CellGrid;
+    /// use zelll::cellgrid::neighborhood::{Full, Half};
+    /// # let points = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
+    /// # let cg = CellGrid::new(points.iter().copied(), 1.0);
+    /// # let cell = cg.query([0.5, 1.0, 0.1]).unwrap();
+    /// // half-space
+    /// cell.neighbors::<Half>().for_each(|_| {});
+    /// // full-space
+    /// cell.neighbors::<Full>().for_each(|_| {});
+    /// ```
+    // TODO: currently only aperiodic boundaries
+    // TODO: (helical would be simple enough, periodic requires a bit more work)
+    pub fn neighbors<S: SpaceConfig>(
+        self,
+    ) -> impl FusedIterator<Item = GridCell<'g, P, N, F>> + Clone {
+        S::neighbors_as_slice(&self.grid.index.neighbor_indices, private::Token)
             .iter()
             .filter_map(move |rel| {
                 let index = rel + self.index();
-                //TODO: I mean I could also store the slice since I'm already accessing its metadata?
-                //TODO: would save me one lookup into the hashmap self.grid.cells in ::iter()
-                //TODO: tested it, I gain ~2pairs/kcycle from it (32->34) might think about it again
-                //TODO: ::iter() is nicer this way, other parts less so
                 self.grid.cells.get(&index).map(|_| GridCell {
                     grid: self.grid,
                     index,
@@ -111,9 +177,10 @@ where
     /// Returns an iterator over all unique pairs of points in this `GridCell` with points of the neighboring cells.
     #[inline]
     fn inter_cell_pairs(self) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone {
-        self.iter()
-            .copied()
-            .cartesian_product(self.neighbors().flat_map(|cell| cell.iter().copied()))
+        self.iter().copied().cartesian_product(
+            self.neighbors::<Half>()
+                .flat_map(|cell| cell.iter().copied()),
+        )
     }
 
     /// Returns an iterator over all _relevant_ pairs of particles within in the neighborhood of this `GridCell`.

@@ -18,6 +18,7 @@ use flatindex::FlatIndex;
 use hashbrown::HashMap;
 #[doc(inline)]
 pub use iters::GridCell;
+pub use iters::neighborhood;
 use nalgebra::SimdPartialOrd;
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 use storage::{CellSliceMeta, CellStorage};
@@ -406,9 +407,10 @@ where
 
     /// Returns an iterator over all relevant (i.e. within cutoff threshold + some extra)
     /// neighbor particles of the queried particle.
-    /// This may include `particle` itself if its part of this `CellGrid`.
+    /// This may include `particle` itself if it is part of this `CellGrid`.
     ///
     /// This is a convenience wrapper around [`query()`](CellGrid::query()).
+    /// See also [`neighborhood`].
     ///
     /// ```
     /// # use zelll::CellGrid;
@@ -429,9 +431,10 @@ where
     #[must_use = "iterators are lazy and do nothing unless consumed"]
     pub fn query_neighbors(&self, particle: P) -> Option<impl Iterator<Item = (usize, P)> + Clone> {
         self.query(particle).map(|this| {
-            this.iter()
-                .copied()
-                .chain(this.neighbors().flat_map(|cell| cell.iter().copied()))
+            this.iter().copied().chain(
+                this.neighbors::<neighborhood::Full>()
+                    .flat_map(|cell| cell.iter().copied()),
+            )
         })
     }
 }

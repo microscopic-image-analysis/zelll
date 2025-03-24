@@ -45,9 +45,10 @@ where
     // TODO: that many random lookups add up. Also, more non-empty cells makes HashMap construction more expensive
     // TODO: for higher ranks, we'd sth. with more spatial locality
     // TODO:
-    // TODO: this could easily handle full space as well (just have to ignore center of the neighborhood)
-    // TODO: in this case (-rank..rank+1) is not quite ideal. sth. like (0..rank+1).chain(-rank..0)
-    // TODO: and then skip first element of cartesian product
+    // FIXME: handling full space is a bit more expensive (due to filtering out center of the neighborhood)
+    // FIXME: in this case (-rank..rank+1) is not quite ideal. sth. like (0..rank+1).chain(-rank..0)
+    // FIXME: and then skip first element of cartesian product
+    // FIXME: but this is not noticeable for non-trivially sized point clouds
     fn neighbor_indices(grid_info: GridInfo<N, F>) -> Vec<i32> {
         // this is the rank of the neighborhood, 1 -> 3^N, 2 -> 5^N
         const RANK: i32 = 1;
@@ -56,8 +57,7 @@ where
             .map(|_| (-RANK..RANK + 1))
             .multi_cartesian_product()
             .map(|idx| grid_info.flatten_index(TryInto::<[i32; N]>::try_into(idx).unwrap()))
-            //.take_while(|idx| *idx != 0) // not sure which one I like better
-            .take((2 * RANK + 1).pow(N as u32) as usize / 2) // equivalent to .div_euclid()
+            .filter(|idx| *idx != 0)
             .collect()
     }
 }
@@ -157,7 +157,17 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CellGrid;
     use crate::cellgrid::util::generate_pointcloud;
+
+    #[test]
+    fn test_neighbor_indices() {
+        let points = vec![[0.0, 0.0], [6.0, 6.0]];
+        let cg = CellGrid::new(points.iter().copied(), 1.0);
+        let indices = FlatIndex::neighbor_indices(*cg.info());
+
+        assert_eq!(indices, vec![-9, -1, 7, -8, 8, -7, 1, 9]);
+    }
 
     #[test]
     fn test_flatindex() {
