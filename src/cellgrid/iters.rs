@@ -44,15 +44,37 @@ pub mod neighborhood {
     //! Similar to the directions in which the **🨀** chess piece can move[^kingdirections],
     //! relative neighbor cell indices are represented by signed integers:
     //!
-    //! |    |        |        |    |
-    //! | -: | -----: | -----: | -: |
-    //! |    |  **7** |    8   |  9 |
-    //! |    | **-1** | **🨀** |  1 |
-    //! |    | **-9** | **-8** | -7 |
+    // Unfortunately github-flavored markdown tables require a head row, so we include some HTML below
+    // |    |        |        |    |    |
+    // | -: | -----: | -----: | -: | -: |
+    // |    |  **7** |    8   |  9 |    |
+    // |    | **-1** | **🨀** |  1 |    |
+    // |    | **-9** | **-8** | -7 |    |
+    // |    |        |        |    |    |
     //!
-    //! The _[`Full`]-space_ neighborhood for **🨀** simply consists of cells _`{-9, -1, 7, -8, 8, -7, 1, 9}`_
+    //! <table style="margin-left: auto; margin-right: auto;">
+    //!     <tbody style="border: 1px solid;">
+    //!         <tr style="text-align: center">
+    //!             <td style="background-color: var(--main-background-color)"><strong> +7 </strong></td>
+    //!             <td style="background-color: var(--table-alt-row-background-color)"> +8 </td>
+    //!             <td style="background-color: var(--main-background-color)"> +9 </td>
+    //!         </tr>
+    //!         <tr style="text-align: center">
+    //!             <td style="background-color: var(--table-alt-row-background-color)"><strong> -1 </strong></td>
+    //!             <td style="background-color: var(--main-background-color)"><strong> 🨀 </strong></td>
+    //!             <td style="background-color: var(--table-alt-row-background-color)"> +1 </td>
+    //!         </tr>
+    //!         <tr style="text-align: center">
+    //!             <td style="background-color: var(--main-background-color)"><strong> -9 </strong></td>
+    //!             <td style="background-color: var(--table-alt-row-background-color)"><strong> -8 </strong></td>
+    //!             <td style="background-color: var(--main-background-color)"> -7 </td>
+    //!         </tr>
+    //!     </tbody>
+    //! </table>
+    //!
+    //! The _[`Full`]-space_ neighborhood for **🨀** simply consists of cells _`{-9, -1, +7, -8, +8, -7, +1, +9}`_
     //! (in this order).\
-    //! A _[`Half`]-space_ neighborhood for **🨀** consists of cells _`{-9, -1, 7, -8}`_.
+    //! A _[`Half`]-space_ neighborhood for **🨀** consists of cells _`{-9, -1, +7, -8}`_.
     //!
     //! Note that there are multiple valid _half-space_ neighborhoods, this specific sequence
     //! is merely an implementation artifact.
