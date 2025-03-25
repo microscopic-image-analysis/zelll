@@ -52,19 +52,24 @@ pub mod neighborhood {
     // |    | **-9** | **-8** | -7 |    |
     // |    |        |        |    |    |
     //!
+    //! <style type="text/css">
+    //!     tr {text-align: center;}
+    //      // hacky way to approximate squares
+    //!     td {width: 2.5em; height: 2.5em;}
+    //! </style>
     //! <table style="margin-left: auto; margin-right: auto;">
-    //!     <tbody style="border: 1px solid;">
-    //!         <tr style="text-align: center">
+    //!     <tbody>
+    //!         <tr>
     //!             <td style="background-color: var(--main-background-color)"><strong> +7 </strong></td>
     //!             <td style="background-color: var(--table-alt-row-background-color)"> +8 </td>
     //!             <td style="background-color: var(--main-background-color)"> +9 </td>
     //!         </tr>
-    //!         <tr style="text-align: center">
+    //!         <tr>
     //!             <td style="background-color: var(--table-alt-row-background-color)"><strong> -1 </strong></td>
     //!             <td style="background-color: var(--main-background-color)"><strong> 🨀 </strong></td>
     //!             <td style="background-color: var(--table-alt-row-background-color)"> +1 </td>
     //!         </tr>
-    //!         <tr style="text-align: center">
+    //!         <tr>
     //!             <td style="background-color: var(--main-background-color)"><strong> -9 </strong></td>
     //!             <td style="background-color: var(--table-alt-row-background-color)"><strong> -8 </strong></td>
     //!             <td style="background-color: var(--main-background-color)"> -7 </td>
