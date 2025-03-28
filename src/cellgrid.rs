@@ -395,7 +395,7 @@ where
     /// </div>
     pub fn query<Q: Particle<[T; N]>>(&self, particle: Q) -> Option<GridCell<'_, P, N, T>> {
         self.info()
-            .get_cell_index(particle.coords())
+            .try_cell_index(particle.coords())
             // FIXME: this still requires careful handling of non-grid-adjacent cells due to flat indices
             // FIXME: (ie. shape or bounding box should be properly padded for this)
             // FIXME: maybe should center cells on their origin for this, so we have 0.5*cutoff margin

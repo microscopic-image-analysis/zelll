@@ -218,14 +218,14 @@ where
     ///
     /// Panics if the computed cell index does not fit the shape of this grid.
     pub fn cell_index(&self, coordinates: impl Borrow<[F; N]>) -> [i32; N] {
-        self.get_cell_index(coordinates)
+        self.try_cell_index(coordinates)
             .expect("cell index is out of bounds")
     }
 
     /// Computes integer "coordinates" of the cell the given coordinates belong to,
     /// ie. a _cell index_.
     /// Returns `None` if the computed index is outside of this `CellGrid`.
-    pub(crate) fn get_cell_index(&self, coordinates: impl Borrow<[F; N]>) -> Option<[i32; N]> {
+    pub(crate) fn try_cell_index(&self, coordinates: impl Borrow<[F; N]>) -> Option<[i32; N]> {
         let p = Point::from(*coordinates.borrow());
         let idx = ((p - self.aabb.inf) / self.cutoff).map(|coord| coord.floor().as_());
 
