@@ -1,5 +1,5 @@
 [workspace]
-members = ["python"]
+members = ["interzelllar", "python"]
 
 [workspace.package]
 authors = ["Vincent Messow <vincent.messow@uni-jena.de>"]

@@ -1,0 +1,25 @@
+[package]
+name = "interzelllar"
+authors.workspace = true
+repository.workspace = true
+readme = "README.md"
+license.workspace = true
+description = "Sampling protein structure surfaces using HMC and `zelll`."
+#include = ["src/*", "Cargo.toml", "README.md", "COPYING"]
+keywords.workspace = true
+categories.workspace = true
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+nalgebra = "0.33"
+num-dual = "0.11.0"
+pdbtbx = "0.12.0"
+zelll = { path = ".." }
+
+[dev-dependencies]
+clap = { version = "4.5.32", features = ["derive"] }
+
+[[example]]
+name = "interzelllar"
+path = "examples/cli.rs"
