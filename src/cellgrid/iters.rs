@@ -129,24 +129,10 @@ where
                     // CellSliceMeta::default represents an empty slice, so that's exactly what we want
                     // keep in mind that this only works for unique flat cell indices
                     // (ie. anything outside of the `CellGrid` might produce garbage/helical boundaries)
-                    .map_or_else(CellSliceMeta::default, |meta| meta.clone()), //.expect("This GridCell should be contained in the CellGrid but it is not."),
+                    .map_or_else(CellSliceMeta::default, |meta| meta.clone()),
             )
             .iter()
     }
-    /*
-    /// Check whether this `GridCell` is on the boundary of the [`CellGrid`].
-    //TODO: I don't think I need it but let's keep it anyway
-    pub fn on_boundary(&self) -> bool {
-        let idx = self.index();
-        let shape = self.grid.index.grid_info.shape;
-
-        for (i, dim) in shape.iter().enumerate() {
-            if idx[i] == 0 || idx[i] + 1 == *dim {
-                return true;
-            }
-        }
-        false
-    }*/
 
     /// Returns an iterator over non-empty neighboring cells.
     ///

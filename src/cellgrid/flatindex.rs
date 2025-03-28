@@ -162,7 +162,9 @@ mod tests {
 
     #[test]
     fn test_neighbor_indices() {
-        let points = vec![[0.0, 0.0], [6.0, 6.0]];
+        // cf. `util.rs::GridInfo::new()`
+        // to see why this corresponds to a 8x8 chessboard
+        let points = vec![[0.0, 0.0], [3.0, 3.0]];
         let cg = CellGrid::new(points.iter().copied(), 1.0);
         let indices = FlatIndex::neighbor_indices(*cg.info());
 

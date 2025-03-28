@@ -185,20 +185,24 @@ where
     /// Constructs a new instance of `GridInfo`.
     /// Usually, this does not need to be used manually.
     pub fn new(aabb: Aabb<N, F>, cutoff: F) -> Self {
+        // +1 to cover all cells fitting inside the bounding box `aabb`
+        // FIXME: do I really need this? I'll add two-layer padding to the strides and
+        // FIXME: in try_cell_index() make sure to return None if the first layer is exceeded
+        // // +2 to explicitly allow one layer of empty cells around the bounding box
+        // // (so they can be queried but we won't store those in our hash map)
+        // // so in total +3
         let shape = ((aabb.sup - aabb.inf) / cutoff).map(|coord| coord.floor().as_() + 1);
 
         let mut strides = shape;
         strides.iter_mut().fold(1, |prev, curr| {
-            // TODO: simulating larger shape to increase strides;
-            // TODO: this allows for (some) flat relative negative indices,
-            // TODO: could also simply increase the shape, maybe that's less confusing
-            // TODO: and it doesn't affect memory since we're using a hash map anyway
-            // TODO: the better approach would be:
-            // TODO: padded shape (i.e. (2,3,4) -> (4,5,6))
-            // TODO: compute strides from padded shape (i.e. instead of (5,5)->(1,5) or (1,5+1), do (7,7)->(1,7))
-            // TODO: compute cell_index() from 1-based multi-index instead of 0-based, i.e. lower left corner is [1; N] instead of [0; N]
-            // FIXME: "attempt to multiply with overflow"
-            let next = prev * (*curr + 1);
+            // let next = prev * (*curr + 1);
+            // +1 would suffice to allow one layer of negative relative flat indices
+            // +2 allows to query one layer outside all around `shape`
+            // +4 adds two layers of implicit padding around `shape`
+            // such that querying cells in the first padding layer
+            // produces _unique_ neighbor flat indices.
+            // This is important because we would get helical boundaries otherwise
+            let next = prev * (*curr + 4);
             *curr = prev;
             next
         });
@@ -217,6 +221,7 @@ where
     /// # Panics
     ///
     /// Panics if the computed cell index does not fit the shape of this grid.
+    /// See [`try_cell_index()`](GridInfo::try_cell_index()) for details.
     pub fn cell_index(&self, coordinates: impl Borrow<[F; N]>) -> [i32; N] {
         self.try_cell_index(coordinates)
             .expect("cell index is out of bounds")
@@ -224,20 +229,22 @@ where
 
     /// Computes integer "coordinates" of the cell the given coordinates belong to,
     /// ie. a _cell index_.
-    /// Returns `None` if the computed index is outside of this `CellGrid`.
-    pub(crate) fn try_cell_index(&self, coordinates: impl Borrow<[F; N]>) -> Option<[i32; N]> {
+    /// Returns `None` if the computed index is _too far_ outside of this `CellGrid`.
+    ///
+    /// <div class="warning">
+    ///
+    /// Querying locations within a boundary of thickness `cutoff` around the shape of
+    /// the cell grid is allowed because their neighborhoods might reach into the
+    /// grid's bounding box.
+    ///
+    /// </div>
+    pub fn try_cell_index(&self, coordinates: impl Borrow<[F; N]>) -> Option<[i32; N]> {
         let p = Point::from(*coordinates.borrow());
         let idx = ((p - self.aabb.inf) / self.cutoff).map(|coord| coord.floor().as_());
 
-        // FIXME: cell index ([2, -1, 0]) out of bounds ([1, 1, 1])
-        // assert!(
-        //     SVector::zeros() <= idx && idx < self.shape,
-        //     "cell index ({:?}) out of bounds ({:?})",
-        //     idx,
-        //     self.shape
-        // );
-
-        if SVector::zeros() <= idx && idx < self.shape {
+        // cf. GridInfo::new()
+        // we allow querying indices in the first implicit padding layer
+        if SVector::from([-1; N]) <= idx && idx <= self.shape {
             Some(idx.into())
         } else {
             None
@@ -249,7 +256,7 @@ where
     /// <div class="warning">
     ///
     /// In contrast to [`flatten_index()`](GridInfo::flatten_index()) and
-    /// [`cell_index()`](GridInfo::cell_index()), this does not panic although
+    /// [`cell_index()`](GridInfo::cell_index()), this does **not** panic although
     /// the same invariants are expected to hold:
     ///
     /// </div>
@@ -259,22 +266,22 @@ where
     /// # let data = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
     /// let cell_grid = CellGrid::new(data.iter().copied(), 1.0);
     /// # let info = cell_grid.info();
-    /// let p = [-1.0, -1.0, -1.0];
-    /// assert_eq!(info.flat_cell_index(p), info.flatten_index([-1i32; 3]));
+    /// let p = [-1.0; 3];
+    /// assert_eq!(info.flat_cell_index(p), info.flatten_index(info.cell_index(p)));
     /// ```
     /// ```should_panic
     /// # use zelll::CellGrid;
     /// # let data = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
     /// # let cell_grid = CellGrid::new(data.iter().copied(), 1.0);
     /// # let info = cell_grid.info();
-    /// let p = [-1.0, -1.0, -1.0];
+    /// let p = [-2.0; 3];
     /// // this is fine
     /// info.flat_cell_index(p);
     /// // this will panic
     /// info.cell_index(p);
     /// ```
     // the reason this does not do any bounds checks is twofold:
-    // 1. particles used for constructing a specific cell grid, always compute to a valid index
+    // 1. particles used for constructing a specific cell grid always compute to a valid index
     // 2. if the resulting flat cell index is invalid (ie. empty cell), its lookup in our internal hash map
     //    will fail, which is fine
     pub fn flat_cell_index(&self, coordinates: impl Borrow<[F; N]>) -> i32 {
@@ -389,9 +396,8 @@ mod tests {
             "testing GridInfo.origin()"
         );
         assert_eq!(grid_info.shape(), [3, 3, 3], "testing GridInfo.shape");
-        //TODO: note that these are the strides for grid_info.shape + [1, 1, 1]
-        //TODO: this allows us to use negative relative indices representable by BalancedTernary<N>
-        assert_eq!(grid_info.strides(), [1, 4, 16], "testing GridInfo.strides");
+        //TODO: note that these are the strides for grid_info.shape + [4, 4, 4]
+        assert_eq!(grid_info.strides(), [1, 7, 49], "testing GridInfo.strides");
 
         // Intuitively you'd expect [2, 2, 2] for this
         // but we're having floating point imprecision:
@@ -404,7 +410,7 @@ mod tests {
         );
         assert_eq!(
             grid_info.flat_cell_index(&[2.7, 2.75, 2.3]),
-            26,
+            65,
             "testing GridInfo.flat_cell_index()"
         );
         assert_eq!(
@@ -414,7 +420,7 @@ mod tests {
         );
         assert_eq!(
             grid_info.flat_cell_index(&[2.7, 2.75, 2.8]),
-            42,
+            114,
             "testing GridInfo.flat_cell_index()"
         );
     }

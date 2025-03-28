@@ -386,7 +386,7 @@ where
     ///
     /// <div class="warning">
     ///
-    /// Note that the queried particle's cell must be inside this `CellGrid`'s shape.
+    /// Note that the queried particle's cell must be within `cutoff` of this `CellGrid`'s bounding box.
     /// If that is not the case, `None` is returned.
     /// This restriction might be lifted in the future.
     // FIXME: a workaround would be to allow constructing `CellGrid` with a given `Aabb`
@@ -396,11 +396,6 @@ where
     pub fn query<Q: Particle<[T; N]>>(&self, particle: Q) -> Option<GridCell<'_, P, N, T>> {
         self.info()
             .try_cell_index(particle.coords())
-            // FIXME: this still requires careful handling of non-grid-adjacent cells due to flat indices
-            // FIXME: (ie. shape or bounding box should be properly padded for this)
-            // FIXME: maybe should center cells on their origin for this, so we have 0.5*cutoff margin
-            // FIXME: around bounding box for particle queries?
-            // FIXME: might be a sensible compromise
             .map(|index| self.info().flatten_index(index))
             .map(|index| GridCell { grid: self, index })
     }
@@ -419,7 +414,7 @@ where
     /// # let cell_grid = CellGrid::new(data.iter().copied(), 1.0);
     /// let p = [0.5, 1.0, 0.1];
     /// cell_grid.query_neighbors(p)
-    ///     .expect("the queried particle should be inside of this grid")
+    ///     .expect("the queried particle should be within `cutoff` of this grid's shape")
     ///     // usually, .filter_map() is preferable (so distance computations can be re-used)
     ///     .filter(|&(_j, q)| {
     ///         distance_squared(&p.into(), &q.into()) <= 1.0
