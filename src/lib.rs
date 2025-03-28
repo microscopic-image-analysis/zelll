@@ -93,17 +93,17 @@ pub use crate::cellgrid::CellGrid;
 /// ```
 /// # use zelll::Particle;
 /// # #[derive(Clone, Copy)]
-/// # enum AtomKind {
-/// #    Hydrogen, // no associated coordinate data since it's the same for all atom kinds
+/// # enum Element {
+/// #    Hydrogen, // no associated coordinate data since it's the same for all variants
 /// #    Oxygen,
 /// #    // ...
 /// # }
 /// #
-/// // Typically, we would associate data with `AtomKind` variants for concise code
+/// // Typically, we would associate data with `Element` variants for concise code
 /// // but here, every variant would carry the same type of data.
 /// #[derive(Clone, Copy)]
 /// struct Atom {
-///     kind: AtomKind,
+///     kind: Element,
 ///     coords: [f64; 3],
 /// }
 /// impl Particle for Atom {
