@@ -1,12 +1,11 @@
-use hashbrown::{HashMap, HashSet};
-//use nohash_hasher::BuildNoHashHasher;
+// use hashbrown::{HashMap, HashSet};
+// use nohash_hasher::BuildNoHashHasher;
 use nalgebra::{Point, Point3, Vector3, distance_squared};
 use rand::distributions::Standard;
 use rand::prelude::*;
 #[cfg(feature = "rayon")]
 use rayon::prelude::ParallelIterator;
 use std::hint::black_box;
-use std::iter::FromIterator;
 use zelll::CellGrid;
 
 type PointCloud<const N: usize> = Vec<Point<f64, N>>;
@@ -32,7 +31,7 @@ fn main() {
         let b = 3.0 * cutoff;
         let c = (size as f64 / conc) / a / b;
         let _vol_edges = (size as f64 / conc).cbrt();
-        let mut pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0]);
+        let pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0]);
         // This does seem to  improve cache hits in CellGrid::new()?
         // because particles are roughly sorted by their flat index. so lookup into the hashmap is likely to be cached
         // otoh, ::particle_pairs() is unaffected because neighbor cell lookup in hashmap is non-local
@@ -53,9 +52,7 @@ fn main() {
 
         #[cfg(feature = "rayon")]
         cg.par_particle_pairs()
-            .filter(|&((_i, p), (_j, q))| {
-                true //distance_squared(&p.into(), &q.into()) <= _cutoff_squared)
-            })
+            .filter(|&((_i, p), (_j, q))| distance_squared(&p.into(), &q.into()) <= _cutoff_squared)
             .for_each(|_| {
                 //count += 1;
                 black_box(());

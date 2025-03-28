@@ -1,8 +1,8 @@
 use criterion::{
-    AxisScale, BenchmarkId, Criterion, PlotConfiguration, SamplingMode, black_box, criterion_group,
+    AxisScale, BenchmarkId, Criterion, PlotConfiguration, SamplingMode, criterion_group,
     criterion_main,
 };
-use nalgebra::{Norm, Point, Point3, UniformNorm, Vector3, distance_squared};
+use nalgebra::{Point, Point3, Vector3, distance_squared};
 use rand::distributions::Standard;
 use rand::prelude::*;
 use zelll::CellGrid;
@@ -76,7 +76,7 @@ pub fn bench_cellgrid_concentration(c: &mut Criterion) {
         let a = 3.0 * cutoff;
         let b = 3.0 * cutoff;
         let c = (size as F32or64 / conc) / a / b;
-        let vol_edges = (size as F32or64 / conc).cbrt();
+        // let vol_edges = (size as F32or64 / conc).cbrt();
         let pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0], None);
         // FIXME: ::new() from (z-)sorted pointcloud does scale better (but not quite linearly)
         // pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());

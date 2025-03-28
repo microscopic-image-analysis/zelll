@@ -131,6 +131,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,8 +199,8 @@ mod tests {
     fn test_impl_particle() {
         let points = vec![[0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3]];
 
-        let ps = PStorage::<_, SparseGrid>::new(points.iter().copied());
-        let ps: PStorage<_> = PStorage::new(points.clone().into_iter());
+        let _ps = PStorage::<_, SparseGrid>::new(points.iter().copied());
+        let _ps: PStorage<_> = PStorage::new(points.clone().into_iter());
 
         let points: Vec<_> = points.into_iter().map(|p| SVector::from(p)).collect();
         let ps = PStorage::new_sparse(points.iter().copied());

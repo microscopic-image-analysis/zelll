@@ -19,7 +19,7 @@ const CUTOFF: f64 = 5.0;
 // Harmonic potential constants
 const LINK_LENGTH: f64 = 1.0;
 const KSPRING: f64 = 1000.0;
-const BEADMASS: f64 = 1.0;
+// const BEADMASS: f64 = 1.0;
 // Lennard-Jones potential constants
 const EPSILON: f64 = 0.1;
 const SIGMA: f64 = 0.01;
