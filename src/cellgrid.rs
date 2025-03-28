@@ -286,7 +286,7 @@ where
 
             // FIXME: This should be HashMap<i32, Either<usize, CellSliceMeta>> or CellSliceMeta an enum
             self.index.index.iter().for_each(|idx| {
-                // FIXME: this will trigger debug_assert!() in CellSliceMeta::move_cursor()
+                // FIXME: see `storage.rs::CellStorage::move_cursor()` for details
                 self.cells.entry(*idx).or_default().move_cursor(1);
             });
 
