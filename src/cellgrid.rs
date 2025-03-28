@@ -393,7 +393,7 @@ where
     // FIXME: or by padding its shape
     ///
     /// </div>
-    pub fn query(&self, particle: P) -> Option<GridCell<'_, P, N, T>> {
+    pub fn query<Q: Particle<[T; N]>>(&self, particle: Q) -> Option<GridCell<'_, P, N, T>> {
         self.info()
             .get_cell_index(particle.coords())
             // FIXME: this still requires careful handling of non-grid-adjacent cells due to flat indices
@@ -402,7 +402,7 @@ where
             // FIXME: around bounding box for particle queries?
             // FIXME: might be a sensible compromise
             .map(|index| self.info().flatten_index(index))
-            .map(|index| GridCell { grid: &self, index })
+            .map(|index| GridCell { grid: self, index })
     }
 
     /// Returns an iterator over all relevant (i.e. within cutoff threshold + some extra)
@@ -429,7 +429,10 @@ where
     ///     });
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn query_neighbors(&self, particle: P) -> Option<impl Iterator<Item = (usize, P)> + Clone> {
+    pub fn query_neighbors<Q: Particle<[T; N]>>(
+        &self,
+        particle: Q,
+    ) -> Option<impl Iterator<Item = (usize, P)> + Clone> {
         self.query(particle).map(|this| {
             this.iter().copied().chain(
                 this.neighbors::<neighborhood::Full>()

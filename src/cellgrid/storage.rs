@@ -258,7 +258,7 @@ pub(crate) trait GridStorage<V = CellSliceMeta>: Default {
     // TODO: make Entry a generic parameter or hardcode it to CellSliceMeta?
     // default implementation is a no-op
     // but overriding this helps to replicate with_capacity() (since Default is super trait)
-    fn reserve(&mut self, additional: usize) {}
+    fn reserve(&mut self, _additional: usize) {}
 
     fn shrink_to_fit(&mut self) {}
 
