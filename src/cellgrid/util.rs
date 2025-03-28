@@ -170,6 +170,12 @@ where
         let i = SVector::from(*idx.borrow());
         i.dot(&self.strides)
     }
+
+    /// Returns the cutoff radius (ie. the cell edge length) of this grid.
+    #[inline]
+    pub fn cutoff(&self) -> F {
+        self.cutoff
+    }
 }
 
 impl<const N: usize, F> GridInfo<N, F>
