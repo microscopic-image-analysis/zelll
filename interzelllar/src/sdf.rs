@@ -21,39 +21,45 @@ impl SmoothDistanceField {
         x: SVector<D, 3>,
         neighbors: impl Iterator<Item = (F, SVector<D, 3>)>,
     ) -> D {
-        let sum_exp_dists: D = neighbors
-            .filter_map(|(_radius, other)| {
-                // FIXME: need to incorporate element radius into SDF and gradient
-                // FIXME: which might mean we need some more mutable accumulators
-                // let radius = atom.element.radius();
+        let (scaled_exp_dists, atom_radii, total_exp_dists): (D, D, D) = neighbors
+            .filter_map(|(radius, other)| {
+                let cutoff = F::from(self.inner.info().cutoff())?;
 
-                let diff: SVector<D, 3> = x - other;
-                let dist: D = diff.norm();
+                let diff = x - other;
+                let dist = diff.norm();
 
-                if let Some(cutoff) = F::from(self.inner.info().cutoff()) {
-                    if dist.re() <= cutoff {
-                        // this is correct in the sense
-                        // that it approximates lim grad(·) for dist->0
-                        // FIXME: maybe use Float::epsilon() here
-                        if dist.re() != F::zero() {
-                            Some((-dist).exp())
-                        } else {
-                            Some(F::one().into())
-                            // FIXME: actually not sure what's more suitable here
-                            // FIXME: above makes it actually continuous
-                            // FIXME: below fits softmax -> hard max better for single neighbors?
-                            // None
-                        }
+                if dist.re() <= cutoff {
+                    // L2-norm is not continuous at zero
+                    // so at zero, we handle it manually with this conditional
+                    // FIXME: maybe use Float::epsilon() here
+                    if dist.re() != F::zero() {
+                        Some(((-dist / radius).exp(), -dist.exp() * radius, -dist.exp()))
                     } else {
-                        None
+                        let one = F::one().into();
+                        // without this, num-dual would produce NaN gradients
+                        Some((one, radius.into(), one))
                     }
                 } else {
                     None
                 }
             })
-            .sum();
+            .fold(
+                (F::zero().into(), F::zero().into(), F::zero().into()),
+                |acc, curr| {
+                    let (scaled_exp_dists, atom_radii, total_exp_dists) = acc;
+                    let (scaled_exp_dist, atom_radius, exp_dist) = curr;
+                    (
+                        scaled_exp_dists + scaled_exp_dist,
+                        atom_radii + atom_radius,
+                        total_exp_dists + exp_dist,
+                    )
+                },
+            );
 
-        -sum_exp_dists.ln()
+        // average atom radius in neighborhood
+        let sigma = atom_radii / total_exp_dists;
+
+        -sigma * scaled_exp_dists.ln()
     }
 
     // FIXME: might have to change the sign somewhere to make it work with HMC
@@ -122,56 +128,22 @@ mod tests {
         ];
 
         let reference_values = vec![
-            -0.9259472,
-            -0.9259472,
-            -0.9259472,
-            -0.9259472,
-            -0.9259472,
-            -0.9259472,
-            -0.9259472,
-            -1.0800674,
-            -1.473609,
-            -0.35109338,
+            -2.0124574, -2.0124574, -2.0124574, -2.0124574, -2.0124574, -2.0124574, -2.0124574,
+            -2.2994778, -2.990327, -0.7998983,
         ];
 
         let reference_grads = vec![
-            [-0.24194217, -0.24194217, -0.24194217],
-            [-0.24194217, -0.24194217, 0.24194217],
-            [-0.24194217, 0.24194217, -0.24194217],
-            [0.24194217, -0.24194217, -0.24194217],
-            [0.24194217, 0.24194217, -0.24194217],
-            [-0.24194217, 0.24194217, 0.24194217],
-            [0.24194217, -0.24194217, 0.24194217],
-            [0.1249218, 0.1249218, 0.1249218],
-            [6.8276282e-9, -0.0, -0.0],
-            [0.17094302, 0.17094302, 0.17094302],
+            [-0.27617636, -0.27617636, -0.27617636],
+            [-0.27617636, -0.27617636, 0.27617636],
+            [-0.27617636, 0.27617636, -0.27617636],
+            [0.27617636, -0.27617636, -0.27617636],
+            [0.27617636, 0.27617636, -0.27617636],
+            [-0.27617636, 0.27617636, 0.27617636],
+            [0.27617636, -0.27617636, 0.27617636],
+            [0.14357911, 0.14357911, 0.14357911],
+            [1.5707174e-8, -0.0, -0.0],
+            [0.21669577, 0.21669577, 0.21669577],
         ];
-
-        // let reference_values = vec![
-        //     -0.42150798,
-        //     -0.42150798,
-        //     -0.42150798,
-        //     -0.42150798,
-        //     -0.42150798,
-        //     -0.42150798,
-        //     -0.42150798,
-        //     -0.6651994,
-        //     -1.2134161,
-        //     0.8660254,
-        // ];
-
-        // let reference_grads = vec![
-        //     [-0.40066993, -0.40066993, -0.40066993],
-        //     [-0.40066993, -0.40066993, 0.40066993],
-        //     [-0.40066993, 0.40066993, -0.40066993],
-        //     [0.40066993, -0.40066993, -0.40066993],
-        //     [0.40066993, 0.40066993, -0.40066993],
-        //     [-0.40066993, 0.40066993, 0.40066993],
-        //     [0.40066993, -0.40066993, 0.40066993],
-        //     [0.18915294, 0.18915294, 0.18915294],
-        //     [8.856665e-9, -0.0, -0.0],
-        //     [0.5773502, 0.5773502, 0.5773502],
-        // ];
 
         let sdf = SmoothDistanceField {
             inner: CellGrid::new(
