@@ -47,13 +47,13 @@ impl SmoothDistanceField {
         vec![]
     }
 
-    fn sdf<D: DualNum<Angstrom> + ComplexField<RealField = D> + Copy>(
+    fn sdf<F: DualNumFloat, D: DualNum<F> + ComplexField<RealField = D> + Copy>(
         &self,
         x: SVector<D, 3>,
-        neighbors: impl Iterator<Item = SVector<D, 3>>,
+        neighbors: impl Iterator<Item = (F, SVector<D, 3>)>,
     ) -> D {
         let sum_exp_dists: D = neighbors
-            .filter_map(|other| {
+            .filter_map(|(_radius, other)| {
                 // FIXME: need to incorporate element radius into SDF and gradient
                 // FIXME: which might mean we need some more mutable accumulators
                 // let radius = atom.element.radius();
@@ -61,18 +61,22 @@ impl SmoothDistanceField {
                 let diff: SVector<D, 3> = x - other;
                 let dist: D = diff.norm();
 
-                if dist.re() <= self.inner.info().cutoff() {
-                    // this is correct in the sense
-                    // that it approximates lim grad(·) for dist->0
-                    // FIXME: maybe use f32::EPSILON or f32::MIN_POSITIVE or f32::is_normal() here
-                    if dist != 0.0.into() {
-                        Some((-dist).exp())
+                if let Some(cutoff) = F::from(self.inner.info().cutoff()) {
+                    if dist.re() <= cutoff {
+                        // this is correct in the sense
+                        // that it approximates lim grad(·) for dist->0
+                        // FIXME: maybe use Float::epsilon() here
+                        if dist.re() != F::zero() {
+                            Some((-dist).exp())
+                        } else {
+                            Some(F::one().into())
+                            // FIXME: actually not sure what's more suitable here
+                            // FIXME: above makes it actually continuous
+                            // FIXME: below fits softmax -> hard max better for single neighbors?
+                            // None
+                        }
                     } else {
-                        Some(1.0.into())
-                        // FIXME: actually not sure what's the correct one
-                        // FIXME: above makes it actually continuous
-                        // FIXME: below fits softmax -> hard max better for single neighbors?
-                        // None
+                        None
                     }
                 } else {
                     None
@@ -95,9 +99,9 @@ impl SmoothDistanceField {
 
     pub fn gradient(&self, pos: [Angstrom; 3]) -> Option<(Angstrom, [Angstrom; 3])> {
         let neighbors = self.inner.query_neighbors(pos)?.map(|(_, atom)| {
-            let atom: [Angstrom; 3] = atom.coords();
-            let atom = atom.map(DsVec::from_re);
-            SVector::from(atom)
+            let coords: [Angstrom; 3] = atom.coords();
+            let coords = coords.map(DsVec::from_re);
+            (atom.element.radius(), SVector::from(coords))
         });
         let pos = SVector::from(pos);
 
@@ -108,9 +112,9 @@ impl SmoothDistanceField {
 
     pub fn harmonic_gradient(&self, pos: [Angstrom; 3]) -> Option<(Angstrom, [Angstrom; 3])> {
         let neighbors = self.inner.query_neighbors(pos)?.map(|(_, atom)| {
-            let atom: [Angstrom; 3] = atom.coords();
-            let atom = atom.map(DsVec::from_re);
-            SVector::from(atom)
+            let coords: [Angstrom; 3] = atom.coords();
+            let coords = coords.map(DsVec::from_re);
+            (atom.element.radius(), SVector::from(coords))
         });
         let pos = SVector::from(pos);
 
@@ -230,7 +234,7 @@ mod tests {
         };
 
         for pos in positions {
-            let (y, dy) = first_derivative(|x| sdf.harmonic_potential(x, radius.into()), pos);
+            let (_y, _dy) = first_derivative(|x| sdf.harmonic_potential(x, radius.into()), pos);
         }
     }
 }
