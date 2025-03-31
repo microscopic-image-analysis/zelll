@@ -1,5 +1,5 @@
 [workspace]
-members = ["interzelllar", "python"]
+members = ["surface-sampling", "python"]
 
 [workspace.package]
 authors = ["Vincent Messow <vincent.messow@uni-jena.de>"]

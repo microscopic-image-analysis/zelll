@@ -1,10 +1,10 @@
 [package]
-name = "interzelllar"
+name = "psssh"
 authors.workspace = true
 repository.workspace = true
 readme = "README.md"
 license.workspace = true
-description = "Sampling protein structure surfaces using HMC and `zelll`."
+description = "Protein structure surface sampling using HMC and `zelll`."
 #include = ["src/*", "Cargo.toml", "README.md", "COPYING"]
 keywords.workspace = true
 categories.workspace = true
@@ -21,5 +21,5 @@ zelll = { path = ".." }
 clap = { version = "4.5.32", features = ["derive"] }
 
 [[example]]
-name = "interzelllar"
+name = "psssh"
 path = "examples/cli.rs"
