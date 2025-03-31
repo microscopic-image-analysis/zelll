@@ -1,6 +1,6 @@
 use crate::Angstrom;
 use crate::atom::Atom;
-use nalgebra::{ComplexField, Const, Point, SVector};
+use nalgebra::{ComplexField, Const, SVector};
 use num_dual::*;
 use zelll::{CellGrid, Particle};
 
@@ -11,40 +11,9 @@ pub struct SmoothDistanceField {
 }
 
 impl SmoothDistanceField {
-    /// Returns distance and gradient at `pos`.
-    pub fn evaluate(&self, pos: [Angstrom; 3]) -> Option<(Angstrom, [Angstrom; 3])> {
-        // FIXME: when calling log() on this later, we need to handle this still being zero
-        let mut sum_exp_dists = 0.0;
-        let mut grad: SVector<Angstrom, 3> = self
-            .inner
-            .query_neighbors(pos)?
-            .filter_map(|(_, atom)| {
-                // FIXME: need to incorporate element radius into SDF and gradient
-                // FIXME: which might mean we need some more mutable accumulators
-                // let radius = atom.element.radius();
-                let other: [Angstrom; 3] = atom.coords();
-                let mut diff: SVector<Angstrom, 3> = Point::from(pos) - Point::from(other);
-                let dist = diff.normalize_mut();
-
-                if dist <= self.inner.info().cutoff() {
-                    let exp_dist = (-dist).exp();
-                    sum_exp_dists += exp_dist;
-                    diff.scale_mut(exp_dist);
-                    Some(diff)
-                } else {
-                    None
-                }
-            })
-            .sum();
-
-        grad /= sum_exp_dists;
-
-        Some((-sum_exp_dists.ln(), grad.into()))
-    }
-
     /// Computes the gradient and its norm at each "support" point, ie. each inner particle location.
     fn normals(&self) -> Vec<(Angstrom, [Angstrom; 3])> {
-        vec![]
+        todo!()
     }
 
     fn sdf<F: DualNumFloat, D: DualNum<F> + ComplexField<RealField = D> + Copy>(
@@ -97,7 +66,11 @@ impl SmoothDistanceField {
         <Angstrom as Into<D>>::into(0.5 * SPRING) * (x - radius).powi(2)
     }
 
-    pub fn gradient(&self, pos: [Angstrom; 3]) -> Option<(Angstrom, [Angstrom; 3])> {
+    /// Returns the (approximate) smooth distance of `pos` to the internal point cloud and its gradient.
+    ///
+    /// If `pos` is too far away from the point cloud (ie. its neighborhood cannot be queried),
+    /// `None` is returned.
+    pub fn evaluate(&self, pos: [Angstrom; 3]) -> Option<(Angstrom, [Angstrom; 3])> {
         let neighbors = self.inner.query_neighbors(pos)?.map(|(_, atom)| {
             let coords: [Angstrom; 3] = atom.coords();
             let coords = coords.map(DsVec::from_re);
@@ -215,7 +188,7 @@ mod tests {
             .copied()
             // .chain(std::iter::once([1.501; 3]))
             // .chain(std::iter::once([0.001; 3]))
-            .filter_map(|atom| sdf.gradient(atom))
+            .filter_map(|atom| sdf.evaluate(atom))
             .unzip();
 
         assert_eq!(reference_values, sdf_values);
