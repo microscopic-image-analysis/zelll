@@ -1,16 +1,35 @@
 use crate::Angstrom;
 use crate::atom::Atom;
+use crate::io::PointCloud;
 use nalgebra::{ComplexField, Const, SVector};
 use num_dual::*;
 use zelll::{CellGrid, Particle};
 
 type DsVec<T> = DualVec<T, T, Const<3>>;
+type Ds2Vec<T> = Dual2Vec<T, T, Const<3>>;
 
+#[derive(Clone, Debug)]
 pub struct SmoothDistanceField {
     inner: CellGrid<Atom, 3, Angstrom>,
+    pub(crate) surface_radius: Angstrom,
 }
 
 impl SmoothDistanceField {
+    pub fn new(protein: &PointCloud, cutoff: Angstrom) -> Self {
+        Self {
+            inner: CellGrid::new(protein.points.iter().copied(), cutoff),
+            surface_radius: 1.05,
+        }
+    }
+
+    /// Sets a custom radius defining the targeted iso-surface for sampling.
+    pub fn with_surface_radius(self, surface_radius: Angstrom) -> Self {
+        Self {
+            surface_radius,
+            ..self
+        }
+    }
+
     /// Computes the gradient and its norm at each "support" point, ie. each inner particle location.
     fn normals(&self) -> Vec<(Angstrom, [Angstrom; 3])> {
         todo!()
@@ -62,14 +81,13 @@ impl SmoothDistanceField {
         -sigma * scaled_exp_dists.ln()
     }
 
-    // FIXME: might have to change the sign somewhere to make it work with HMC
     fn harmonic_potential<D: DualNum<Angstrom> + ComplexField<RealField = D> + Copy>(
         &self,
         x: D,
         radius: D,
     ) -> D {
         const SPRING: Angstrom = 2.0;
-        <Angstrom as Into<D>>::into(0.5 * SPRING) * (x - radius).powi(2)
+        <Angstrom as Into<D>>::into(-0.5 * SPRING) * (x - radius).powi(2)
     }
 
     /// Returns the (approximate) smooth distance of `pos` to the internal point cloud and its gradient.
@@ -80,16 +98,34 @@ impl SmoothDistanceField {
         let neighbors = self.inner.query_neighbors(pos)?.map(|(_, atom)| {
             let coords: [Angstrom; 3] = atom.coords();
             let coords = coords.map(DsVec::from_re);
+            // let coords = coords.map(Ds2Vec::from_re);
             (atom.element.radius(), SVector::from(coords))
         });
         let pos = SVector::from(pos);
 
         let (val, grad) = gradient(|x| self.sdf(x, neighbors), pos);
+        // let (val, grad, hess) = hessian(|x| self.sdf(x, neighbors), pos);
+        // FIXME: this is only the curvature at critical points
+        // FIXME: to make it always work, I'd have to normalize the gradient and compute its Jacobian?
+        // FIXME: cf. gauss map
+        // let _det: Angstrom = hess.determinant();
+        // FIXME: ie. like this?
+        // FIXME: question is whether `grad` still contains the necessary information
+        // let _det: Angstrom = jacobian(|x| x.normalize(), grad).1.determinant();
+        // FIXME: normalizing makes determinant vanish (which I checked to make sense)
+        // dbg!(_det);
+        // FIXME: probably should impl global function (try_)curvature() based on (try_)gradient()
+        // FIXME: which normalizes gradient, then computes jacobian of it before discarding
+        // FIXME: dual derivative and then finally returns determinant
 
         Some((val.re(), grad.into()))
     }
 
-    pub fn harmonic_gradient(&self, pos: [Angstrom; 3]) -> Option<(Angstrom, [Angstrom; 3])> {
+    pub fn harmonic_gradient(
+        &self,
+        pos: [Angstrom; 3],
+        isoradius: Angstrom,
+    ) -> Option<(Angstrom, [Angstrom; 3])> {
         let neighbors = self.inner.query_neighbors(pos)?.map(|(_, atom)| {
             let coords: [Angstrom; 3] = atom.coords();
             let coords = coords.map(DsVec::from_re);
@@ -98,7 +134,7 @@ impl SmoothDistanceField {
         let pos = SVector::from(pos);
 
         let (val, grad) = gradient(
-            |x| self.harmonic_potential(self.sdf(x, neighbors), 1.05.into()),
+            |x| self.harmonic_potential(self.sdf(x, neighbors), isoradius.into()),
             pos,
         );
 
@@ -111,7 +147,7 @@ mod tests {
     use super::*;
     use crate::atom::Element;
 
-    // TODO: adjust reference values for SDF with atom radii
+    // TODO: should use `approx` for this
     #[test]
     fn test_sdf_autodiff() {
         let points = vec![
@@ -128,21 +164,37 @@ mod tests {
         ];
 
         let reference_values = vec![
-            -2.0124574, -2.0124574, -2.0124574, -2.0124574, -2.0124574, -2.0124574, -2.0124574,
-            -2.2994778, -2.990327, -0.7998983,
+            -2.012457244274712,
+            -2.012457244274712,
+            -2.012457244274712,
+            -2.012457244274712,
+            -2.012457244274712,
+            -2.012457244274712,
+            -2.012457244274712,
+            -2.2994776285300675,
+            -2.990326826730122,
+            -0.7998983683589524,
         ];
 
         let reference_grads = vec![
-            [-0.27617636, -0.27617636, -0.27617636],
-            [-0.27617636, -0.27617636, 0.27617636],
-            [-0.27617636, 0.27617636, -0.27617636],
-            [0.27617636, -0.27617636, -0.27617636],
-            [0.27617636, 0.27617636, -0.27617636],
-            [-0.27617636, 0.27617636, 0.27617636],
-            [0.27617636, -0.27617636, 0.27617636],
-            [0.14357911, 0.14357911, 0.14357911],
-            [1.5707174e-8, -0.0, -0.0],
-            [0.21669577, 0.21669577, 0.21669577],
+            [-0.276176313229217, -0.276176313229217, -0.276176313229217],
+            [-0.276176313229217, -0.276176313229217, 0.276176313229217],
+            [-0.276176313229217, 0.276176313229217, -0.276176313229217],
+            [0.276176313229217, -0.276176313229217, -0.276176313229217],
+            [0.276176313229217, 0.276176313229217, -0.276176313229217],
+            [-0.276176313229217, 0.276176313229217, 0.276176313229217],
+            [0.276176313229217, -0.276176313229217, 0.276176313229217],
+            [
+                0.14357909754235013,
+                0.14357909754235013,
+                0.14357909754235013,
+            ],
+            [-2.9256894966310793e-17, -0.0, -0.0],
+            [
+                0.21669568034989586,
+                0.21669568034989586,
+                0.21669568034989586,
+            ],
         ];
 
         let sdf = SmoothDistanceField {
@@ -163,16 +215,16 @@ mod tests {
             .filter_map(|atom| sdf.evaluate(atom))
             .unzip();
 
-        assert_eq!(reference_values, sdf_values);
-        assert_eq!(reference_grads, sdf_grads);
+        assert_eq!(&reference_values, &sdf_values);
+        assert_eq!(&reference_grads, &sdf_grads);
     }
 
     #[test]
     fn test_harmonic_1d() {
         let positions = vec![
-            -10.0f32, -8.0, -6.0, -4.0, -2.0, -1.0, 0.0, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0,
+            -10.0, -8.0, -6.0, -4.0, -2.0, -1.0, 0.0, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0,
         ];
-        let radius = 0.0f32;
+        let radius = 0.0;
 
         let sdf = SmoothDistanceField {
             inner: CellGrid::new(std::iter::empty(), 1.0),

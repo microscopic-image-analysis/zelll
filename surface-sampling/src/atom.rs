@@ -1,6 +1,6 @@
 use crate::Angstrom;
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub enum Element {
     #[default]
     Carbon,
@@ -27,7 +27,7 @@ impl Element {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Atom {
     pub(crate) element: Element,
     pub(crate) coords: [Angstrom; 3],

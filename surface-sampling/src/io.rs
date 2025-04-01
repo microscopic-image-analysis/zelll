@@ -30,6 +30,7 @@ impl TryFrom<&PdbAtom> for Atom {
 
             Ok(Atom {
                 element,
+                // TODO: `nuts-rs` wants f64 anyway and this would be cleaner
                 // coords: value.pos().into(),
                 coords: [
                     value.x() as Angstrom,
@@ -44,15 +45,13 @@ impl TryFrom<&PdbAtom> for Atom {
 }
 
 pub struct PointCloud {
-    pub(crate) points: Vec<Atom>,
-    pub(crate) normals: Option<Vec<[Angstrom; 3]>>,
+    pub points: Vec<Atom>,
 }
 
 impl PointCloud {
     pub fn from_pdb_atoms<'a>(atoms: impl Iterator<Item = &'a PdbAtom>) -> PointCloud {
         PointCloud {
             points: atoms.filter_map(|a| Atom::try_from(a).ok()).collect(),
-            normals: None,
         }
     }
 }

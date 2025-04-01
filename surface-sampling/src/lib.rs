@@ -7,4 +7,5 @@ pub mod sdf;
 #[allow(dead_code)]
 pub mod surface;
 
-pub type Angstrom = f32;
+// `nuts-rs` wants f64 anyway
+pub type Angstrom = f64;

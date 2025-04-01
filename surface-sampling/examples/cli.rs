@@ -1,4 +1,11 @@
-use clap::{Args, Parser, Subcommand};
+use clap::{Parser, Subcommand};
+use nuts_rs::{Chain, CpuMath, DiagGradNutsSettings, Settings};
+use pdbtbx::{Atom, Model, PDB, StrictnessLevel, open, save};
+use psssh::io::PointCloud;
+use psssh::sdf::SmoothDistanceField;
+use rand::prelude::*;
+use std::path::PathBuf;
+use zelll::Particle;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -10,28 +17,92 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Generate oriented point cloud surfaces from PDB structure files
-    Surface(PdbFiles),
-    /// Detect interaction sites on protein surface point clouds.
-    Sites(SurfaceFiles),
-    /// Visualize point cloud surfaces generated from other subcommands.
-    Visualize { surface: String },
-    /// Export oriented point cloud surfaces.
-    Export(SurfaceFiles),
-}
-
-#[derive(Args, Debug)]
-struct SurfaceFiles {
-    /// Oriented point cloud surface files.
-    surface: Vec<String>,
-}
-
-#[derive(Args, Debug)]
-struct PdbFiles {
-    /// Protein structure PDB files.
-    pdb: Vec<String>,
+    /// Sample points on the surface of a single protein structure.
+    Sample {
+        /// protein structure file to sample on.
+        pdb: PathBuf,
+        /// file path to save sampled surface to. defaults to input path + "_psssh.pdb".
+        out: Option<PathBuf>,
+        /// neighborhood cutoff treshold used for sampling.
+        #[arg(short, long, default_value_t = 10.0)]
+        cutoff: f64,
+        /// number of samples to produces.
+        #[arg(short = 'n', long = "samples", default_value_t = 1000)]
+        n: usize,
+        #[arg(short = 'l', long, default_value_t = 1.05)]
+        surface_level: f64,
+    },
 }
 
 fn main() {
-    let _cli = Cli::parse();
+    let cli = Cli::parse();
+
+    match &cli.command {
+        Commands::Sample {
+            pdb,
+            out,
+            cutoff,
+            n,
+            surface_level,
+        } => {
+            let out = out.clone().unwrap_or(pdb.with_extension("_psssh.pdb"));
+
+            let (data, _) = open(&pdb.to_str().expect("Expected a valid file path"))
+                .expect("Expected a valid PDB file");
+            let data = PointCloud::from_pdb_atoms(data.atoms());
+
+            let sdf =
+                SmoothDistanceField::new(&data, cutoff.abs()).with_surface_radius(*surface_level);
+
+            let mut settings = DiagGradNutsSettings::default();
+            settings.num_tune = 1000;
+            settings.maxdepth = 5;
+
+            let chain = 0;
+            let math = CpuMath::new(sdf);
+            let mut rng = rand::rng();
+            let mut sampler = settings.new_chain(chain, math, &mut rng);
+
+            let init = data
+                .points
+                .choose(&mut rng)
+                .map_or([0.0; 3], |atom| atom.coords());
+
+            sampler
+                .set_position(init.as_slice())
+                .expect("Unrecoverable error during init");
+            let mut trace = vec![];
+
+            // burn-in period
+            for _ in 0..1000 {
+                let (_draw, _info) = sampler.draw().expect("Unrecoverable error during sampling");
+            }
+
+            for _ in 0..*n {
+                let (draw, _info) = sampler.draw().expect("Unrecoverable error during sampling");
+                trace.push(draw);
+            }
+
+            let mut out_pdb = PDB::new();
+            let mut model_out = Model::new(0);
+
+            let atoms = trace.iter().enumerate().filter_map(|(i, coords)| {
+                let [x, y, z]: [f64; 3] = coords[..].try_into().ok()?;
+                Atom::new(false, i, "C", x, y, z, 1.0, 0.0, "C", 0)
+            });
+
+            for (i, atom) in atoms.enumerate() {
+                model_out.add_atom(atom, "X", (i as isize, None), ("PSH", None));
+            }
+
+            out_pdb.add_model(model_out);
+
+            save(
+                &out_pdb,
+                &out.to_str().expect("Expected a valid file path"),
+                StrictnessLevel::Loose,
+            )
+            .expect("Saving sampled structure to PDB file failed");
+        }
+    }
 }
