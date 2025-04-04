@@ -21,7 +21,7 @@ enum Commands {
     Sample {
         /// protein structure file to sample on.
         pdb: PathBuf,
-        /// file path to save sampled surface to. defaults to input path + "_psssh.pdb".
+        /// file path to save sampled surface to. defaults to input path + ".psssh.pdb".
         out: Option<PathBuf>,
         /// neighborhood cutoff treshold used for sampling.
         #[arg(short, long, default_value_t = 10.0)]
@@ -45,7 +45,7 @@ fn main() {
             n,
             surface_level,
         } => {
-            let out = out.clone().unwrap_or(pdb.with_extension("_psssh.pdb"));
+            let out = out.clone().unwrap_or(pdb.with_extension("psssh.pdb"));
 
             let (data, _) = open(&pdb.to_str().expect("Expected a valid file path"))
                 .expect("Expected a valid PDB file");
@@ -88,7 +88,7 @@ fn main() {
 
             let atoms = trace.iter().enumerate().filter_map(|(i, coords)| {
                 let [x, y, z]: [f64; 3] = coords[..].try_into().ok()?;
-                Atom::new(false, i, "C", x, y, z, 1.0, 0.0, "C", 0)
+                Atom::new(false, i, "H", x, y, z, 1.0, 0.0, "H", 0)
             });
 
             for (i, atom) in atoms.enumerate() {
