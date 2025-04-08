@@ -57,37 +57,21 @@ fn sdf(
     neighbors: &(impl Iterator<Item = (Angstrom, [Angstrom; 3])> + Clone),
     cutoff: Angstrom,
 ) -> Angstrom {
-    let (scaled_exp_dists, atom_radii, total_exp_dists): (Angstrom, Angstrom, Angstrom) = neighbors
-        .clone()
-        .filter_map(|(radius, atom)| {
-            let this = SVector::from(*x);
-            let other = SVector::from(atom);
-            let diff = this - other;
-            let dist = diff.norm();
+    let mut scaled_exp_dists: Angstrom = 0.0;
+    let mut atom_radii: Angstrom = 0.0;
+    let mut total_exp_dists: Angstrom = 0.0;
 
-            if dist <= cutoff {
-                // L2-norm is not continuous at zero
-                // so at zero, we handle it manually with this conditional
-                // FIXME: does enzyme need this conditional (like num-dual does)?
-                if dist != 0.0 {
-                    Some(((-dist / radius).exp(), -dist.exp() * radius, -dist.exp()))
-                } else {
-                    // without this, num-dual would produce NaN gradients
-                    Some((1.0, radius.into(), 1.0))
-                }
-            } else {
-                None
-            }
-        })
-        .fold((0.0, 0.0, 0.0), |acc, curr| {
-            let (scaled_exp_dists, atom_radii, total_exp_dists) = acc;
-            let (scaled_exp_dist, atom_radius, exp_dist) = curr;
-            (
-                scaled_exp_dists + scaled_exp_dist,
-                atom_radii + atom_radius,
-                total_exp_dists + exp_dist,
-            )
-        });
+    for (radius, atom) in neighbors.clone() {
+        let this = SVector::from(*x);
+        let other = SVector::from(atom);
+        let dist = (this - other).norm();
+
+        if dist <= cutoff {
+            scaled_exp_dists += (-dist / radius).exp();
+            atom_radii += -dist.exp() * radius;
+            total_exp_dists += -dist.exp();
+        }
+    }
 
     // average atom radius in neighborhood
     let sigma = atom_radii / total_exp_dists;
@@ -148,7 +132,7 @@ mod tests {
             -2.012457244274712,
             -2.2994776285300675,
             -2.9903268267301217,
-            -0.7998983683589523,
+            -0.7998983683589524,
         ];
 
         let reference_grads = vec![

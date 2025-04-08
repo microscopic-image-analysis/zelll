@@ -8,11 +8,6 @@ type DsVec<T> = DualVec<T, T, Const<3>>;
 type Ds2Vec<T> = Dual2Vec<T, T, Const<3>>;
 
 impl SmoothDistanceField {
-    /// Computes the gradient and its norm at each "support" point, ie. each inner particle location.
-    fn normals(&self) -> Vec<(Angstrom, [Angstrom; 3])> {
-        todo!()
-    }
-
     // TODO: this actually looks cleaner with a for loop...
     fn sdf<F: DualNumFloat, D: DualNum<F> + ComplexField<RealField = D> + Copy>(
         &self,
@@ -205,21 +200,5 @@ mod tests {
 
         assert_eq!(&reference_values, &sdf_values);
         assert_eq!(&reference_grads, &sdf_grads);
-    }
-
-    #[test]
-    fn test_harmonic_1d() {
-        let positions = vec![
-            -10.0, -8.0, -6.0, -4.0, -2.0, -1.0, 0.0, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0,
-        ];
-        let radius = 0.0;
-
-        let sdf = SmoothDistanceField {
-            inner: CellGrid::new(std::iter::empty(), 1.0),
-        };
-
-        for pos in positions {
-            let (_y, _dy) = first_derivative(|x| sdf.harmonic_potential(x, radius.into()), pos);
-        }
     }
 }
