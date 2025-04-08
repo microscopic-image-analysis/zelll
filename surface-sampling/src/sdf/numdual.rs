@@ -111,16 +111,26 @@ impl SmoothDistanceField {
         x: D,
         radius: D,
     ) -> D {
-        const FORCE: Angstrom = 10.0;
+        const KFORCE: Angstrom = 10.0;
         let offset_diff = x - radius + D::one();
         // linear term not strictly necessary since we have sdf as a potential as well
-        D::from(FORCE) * (offset_diff + offset_diff.powi(3) - offset_diff.powi(4))
+        D::from(KFORCE) * (offset_diff + offset_diff.powi(3) - offset_diff.powi(4))
         // D::from(FORCE) * (offset_diff - offset_diff.powi(3) - offset_diff.powi(4))
         // FIXME: actually using offset +1.0 with polynomial below works better but is arguably incorrect?
         // TODO: this works similarly well but is arguably not as nice
         // let offset_diff = x - radius + D::from(0.5);
         // D::from(FORCE) * (offset_diff - offset_diff.powi(3) - offset_diff.powi(4))
     }
+
+    // fn harmonic_potential<D: DualNum<Angstrom> + ComplexField<RealField = D> + Copy>(
+    //     &self,
+    //     x: D,
+    //     radius: D,
+    // ) -> D {
+    //     const KFORCE: Angstrom = 10.0;
+    //     const INTERCEPT: Angstrom = 1.0;
+    //     D::from(INTERCEPT) - D::from(KFORCE) * (x - radius).powi(2)
+    // }
 }
 
 #[cfg(test)]

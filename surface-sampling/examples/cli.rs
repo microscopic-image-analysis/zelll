@@ -3,7 +3,7 @@ use nuts_rs::{Chain, CpuMath, DiagGradNutsSettings, Settings};
 use pdbtbx::{Atom, Model, PDB, StrictnessLevel, open, save};
 use psssh::io::PointCloud;
 use psssh::sdf::SmoothDistanceField;
-use rand::prelude::*;
+// use rand::prelude::*;
 use std::path::PathBuf;
 use zelll::Particle;
 
@@ -77,13 +77,14 @@ fn main() {
             let mut rng = rand::rng();
             let mut sampler = settings.new_chain(chain, math, &mut rng);
 
-            let init = data
-                .points
-                .choose(&mut rng)
-                .map_or([0.0; 3], |atom| atom.coords());
+            // let init = data
+            //     .points
+            //     .choose(&mut rng)
+            //     .map_or([0.0; 3], |atom| atom.coords());
             // TODO: alternatively, let's just use the first atom, assuming it's at one of the ends
             // TODO: we're discarding the first `b` samples anyway
-            // let init = data.points.get(0).map_or([0.0; 3], |atom| atom.coords());
+            // FIXME: this seems to help against NUTS ending up with extremely small step sizes
+            let init = data.points.get(0).map_or([0.0; 3], |atom| atom.coords());
 
             sampler
                 .set_position(init.as_slice())
