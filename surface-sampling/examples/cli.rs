@@ -19,18 +19,27 @@ struct Cli {
 enum Commands {
     /// Sample points on the surface of a single protein structure.
     Sample {
-        /// protein structure file to sample on.
+        /// Protein structure file to sample on.
         pdb: PathBuf,
-        /// file path to save sampled surface to. defaults to input path + ".psssh.pdb".
+        /// File path to save sampled surface to. defaults to input path + ".psssh.pdb".
         out: Option<PathBuf>,
-        /// neighborhood cutoff treshold used for sampling.
+        /// Neighborhood cutoff treshold used for sampling.
         #[arg(short, long, default_value_t = 10.0)]
         cutoff: f64,
-        /// number of samples to produces.
-        #[arg(short = 'n', long = "samples", default_value_t = 1000)]
+        /// Number of samples to produces.
+        #[arg(short = 'n', long = "samples", default_value_t = 2000)]
         n: usize,
+        /// Number of samples to discard before sampling 'n' samples
+        #[arg(short = 'b', long = "burn-in", default_value_t = 1000)]
+        b: usize,
+        /// Nistance to the protein structure at which the surface will be sampled.
         #[arg(short = 'l', long, default_value_t = 1.05)]
         surface_level: f64,
+        /// Maximum tree depth for NUTS. The default value is robust enough for this application.
+        /// Lower values are cheaper and may suffice if it's not required to cover the complete
+        /// surface with the sampled points or the sample size is large enough.
+        #[arg(short = 'd', long, default_value_t = 7)]
+        nuts_depth: u64,
     },
 }
 
@@ -43,7 +52,9 @@ fn main() {
             out,
             cutoff,
             n,
+            b,
             surface_level,
+            nuts_depth,
         } => {
             let out = out.clone().unwrap_or(pdb.with_extension("psssh.pdb"));
 
@@ -56,7 +67,10 @@ fn main() {
 
             let mut settings = DiagGradNutsSettings::default();
             settings.num_tune = 1000;
-            settings.maxdepth = 5;
+            settings.maxdepth = *nuts_depth;
+            // sometimes, NUTS gets stuck with very small step sizes
+            // this *occasionally* helps in those cases
+            settings.adapt_options.dual_average_options.initial_step = 0.1;
 
             let chain = 0;
             let math = CpuMath::new(sdf);
@@ -67,6 +81,9 @@ fn main() {
                 .points
                 .choose(&mut rng)
                 .map_or([0.0; 3], |atom| atom.coords());
+            // TODO: alternatively, let's just use the first atom, assuming it's at one of the ends
+            // TODO: we're discarding the first `b` samples anyway
+            // let init = data.points.get(0).map_or([0.0; 3], |atom| atom.coords());
 
             sampler
                 .set_position(init.as_slice())
@@ -74,7 +91,7 @@ fn main() {
             let mut trace = vec![];
 
             // burn-in period
-            for _ in 0..1000 {
+            for _ in 0..*b {
                 let (_draw, _info) = sampler.draw().expect("Unrecoverable error during sampling");
             }
 

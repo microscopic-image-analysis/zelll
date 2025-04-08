@@ -27,3 +27,7 @@ clap = { version = "4.5.32", features = ["derive"] }
 [[example]]
 name = "psssh"
 path = "examples/cli.rs"
+
+[features]
+enzyme = []
+

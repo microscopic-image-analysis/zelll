@@ -13,6 +13,8 @@ impl LogpError for SurfaceSdfError {
     }
 }
 
+// TODO: this would be nice but has noticable overhead
+// impl CpuLogpFunc for &SmoothDistanceField {
 impl CpuLogpFunc for SmoothDistanceField {
     type LogpError = SurfaceSdfError;
     type TransformParams = ();
@@ -25,7 +27,7 @@ impl CpuLogpFunc for SmoothDistanceField {
         let position: [f64; 3] = position.try_into().expect("position should be of length 3");
 
         let (smoothdist, gradient) = self
-            .harmonic_gradient(position, self.surface_radius)
+            .hmc_gradient(position, self.surface_radius)
             .ok_or(SurfaceSdfError)?;
 
         grad.copy_from_slice(&gradient);

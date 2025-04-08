@@ -1,3 +1,4 @@
+#![cfg_attr(feature = "enzyme", feature(autodiff))]
 #[allow(dead_code)]
 pub mod atom;
 #[allow(dead_code)]
