@@ -117,6 +117,11 @@ impl SmoothDistanceField {
         x: D,
         radius: D,
     ) -> D {
+        // TODO: `KFORCE` should be a parameter
+        // TODO: while smaller values make the surface more "fuzzy"
+        // TODO: scaling it (not necessarily linearly) with the cutoff radius
+        // TODO: allows to sample on rougher surfaces (usually smaller isoradii)
+        // TODO: smaller cutoff radius can be counterbalanced with larger isoradius?
         const KFORCE: Angstrom = 10.0;
         let offset_diff = x - radius + D::one();
         // linear term not strictly necessary since we have sdf as a potential as well
