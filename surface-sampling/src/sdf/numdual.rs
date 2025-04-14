@@ -9,6 +9,8 @@ type Ds2Vec<T> = Dual2Vec<T, T, Const<3>>;
 
 impl SmoothDistanceField {
     // TODO: this actually looks cleaner with a for loop...
+    // FIXME: this should probably be done similar to LJTS?
+    // FIXME: because having the hard cutoff affects the actual sdf values
     fn sdf<F: DualNumFloat, D: DualNum<F> + ComplexField<RealField = D> + Copy>(
         &self,
         x: SVector<D, 3>,
@@ -26,7 +28,11 @@ impl SmoothDistanceField {
                     // so at zero, we handle it manually with this conditional
                     // FIXME: maybe use Float::epsilon() here
                     if dist.re() != F::zero() {
-                        Some(((-dist / radius).exp(), -dist.exp() * radius, -dist.exp()))
+                        Some((
+                            (-dist / radius).exp(),
+                            (-dist).exp() * radius,
+                            (-dist).exp(),
+                        ))
                     } else {
                         let one = F::one().into();
                         // without this, num-dual would produce NaN gradients

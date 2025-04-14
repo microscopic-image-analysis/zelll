@@ -68,8 +68,8 @@ fn sdf(
 
         if dist <= cutoff {
             scaled_exp_dists += (-dist / radius).exp();
-            atom_radii += -dist.exp() * radius;
-            total_exp_dists += -dist.exp();
+            atom_radii += (-dist).exp() * radius;
+            total_exp_dists += (-dist).exp();
         }
     }
 
