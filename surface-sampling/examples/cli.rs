@@ -35,9 +35,14 @@ enum Commands {
         /// Number of samples to discard before sampling 'n' samples
         #[arg(short = 'b', long = "burn-in", default_value_t = 1000)]
         b: usize,
-        /// Nistance to the protein structure at which the surface will be sampled.
+        /// Distance to the protein structure at which the surface will be sampled.
         #[arg(short = 'l', long, default_value_t = 1.05)]
         surface_level: f64,
+        /// Force constant used for sampling on the protein surface.
+        /// Smaller values might work better with smaller cutoff radii
+        /// but might also require adjusting the surface level.
+        #[arg(short = 'f', long, default_value_t = 10.0)]
+        force_constant: f64,
         /// Maximum tree depth for NUTS. The default value is robust enough for this application.
         /// Lower values are cheaper and may suffice if it's not required to cover the complete
         /// surface with the sampled points or the sample size is large enough.
@@ -72,6 +77,7 @@ fn main() {
             n,
             b,
             surface_level,
+            force_constant,
             nuts_depth,
         } => {
             let out = out.clone().unwrap_or(pdb.with_extension("psssh.pdb"));
@@ -80,8 +86,9 @@ fn main() {
                 .expect("Expected a valid PDB file");
             let data = PointCloud::from_pdb_atoms(data.atoms());
 
-            let sdf =
-                SmoothDistanceField::new(&data, cutoff.abs()).with_surface_radius(*surface_level);
+            let sdf = SmoothDistanceField::new(&data, cutoff.abs())
+                .with_surface_radius(*surface_level)
+                .with_k_force(*force_constant);
 
             let mut settings = DiagGradNutsSettings::default();
             settings.num_tune = 1000;
@@ -101,7 +108,6 @@ fn main() {
             //     .map_or([0.0; 3], |atom| atom.coords());
             // TODO: alternatively, let's just use the first atom, assuming it's at one of the ends
             // TODO: we're discarding the first `b` samples anyway
-            // FIXME: this seems to help against NUTS ending up with extremely small step sizes
             let init = data.points.get(0).map_or([0.0; 3], |atom| atom.coords());
 
             sampler

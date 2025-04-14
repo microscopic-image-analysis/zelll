@@ -91,9 +91,9 @@ fn hmc_potential(
 }
 
 fn poly_potential(x: Angstrom, radius: Angstrom) -> Angstrom {
-    const KFORCE: Angstrom = 10.0;
+    // const KFORCE: Angstrom = 10.0;
     let offset_diff = x - radius + 1.0;
-    KFORCE * (offset_diff + offset_diff.powi(3) - offset_diff.powi(4))
+    self.k_force * (offset_diff + offset_diff.powi(3) - offset_diff.powi(4))
     // let offset_diff = x - radius + 0.5;
     // KFORCE * (offset_diff - offset_diff.powi(3) - offset_diff.powi(4))
     // FIXME: cf. numdual.rs

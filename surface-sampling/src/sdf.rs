@@ -20,6 +20,7 @@ use zelll::CellGrid;
 pub struct SmoothDistanceField {
     inner: CellGrid<Atom, 3, Angstrom>,
     pub(crate) surface_radius: Angstrom,
+    pub(crate) k_force: Angstrom, // this wouldn't survive dimensional analysis though
 }
 
 impl SmoothDistanceField {
@@ -27,6 +28,7 @@ impl SmoothDistanceField {
         Self {
             inner: CellGrid::new(protein.points.iter().copied(), cutoff),
             surface_radius: 1.05,
+            k_force: 10.0,
         }
     }
 
@@ -36,5 +38,11 @@ impl SmoothDistanceField {
             surface_radius,
             ..self
         }
+    }
+
+    /// Sets a custom force constant for the iso-surface potential.
+    /// Note that the actual physical dimension is not length.
+    pub fn with_k_force(self, k_force: Angstrom) -> Self {
+        Self { k_force, ..self }
     }
 }

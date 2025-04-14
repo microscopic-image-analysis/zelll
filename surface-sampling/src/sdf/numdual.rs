@@ -122,15 +122,15 @@ impl SmoothDistanceField {
         // TODO: scaling it (not necessarily linearly) with the cutoff radius
         // TODO: allows to sample on rougher surfaces (usually smaller isoradii)
         // TODO: smaller cutoff radius can be counterbalanced with larger isoradius?
-        const KFORCE: Angstrom = 10.0;
+        // const KFORCE: Angstrom = 10.0;
         let offset_diff = x - radius + D::one();
         // linear term not strictly necessary since we have sdf as a potential as well
-        D::from(KFORCE) * (offset_diff + offset_diff.powi(3) - offset_diff.powi(4))
-        // D::from(FORCE) * (offset_diff - offset_diff.powi(3) - offset_diff.powi(4))
+        D::from(self.k_force) * (offset_diff + offset_diff.powi(3) - offset_diff.powi(4))
+        // D::from(KFORCE) * (offset_diff - offset_diff.powi(3) - offset_diff.powi(4))
         // FIXME: actually using offset +1.0 with polynomial below works better but is arguably incorrect?
         // TODO: this works similarly well but is arguably not as nice
         // let offset_diff = x - radius + D::from(0.5);
-        // D::from(FORCE) * (offset_diff - offset_diff.powi(3) - offset_diff.powi(4))
+        // D::from(KFORCE) * (offset_diff - offset_diff.powi(3) - offset_diff.powi(4))
     }
 
     // fn harmonic_potential<D: DualNum<Angstrom> + ComplexField<RealField = D> + Copy>(
