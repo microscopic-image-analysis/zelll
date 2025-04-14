@@ -1,11 +1,14 @@
 use clap::{Parser, Subcommand};
 use nuts_rs::{Chain, CpuMath, DiagGradNutsSettings, Settings};
 use pdbtbx::{Atom, Model, PDB, StrictnessLevel, open, save};
+use psssh::Angstrom;
 use psssh::io::PointCloud;
 use psssh::sdf::SmoothDistanceField;
+use psssh::utils::approx_geodesic_dist;
 // use rand::prelude::*;
+use csv::Writer;
 use std::path::PathBuf;
-use zelll::Particle;
+use zelll::{CellGrid, Particle};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -40,6 +43,21 @@ enum Commands {
         /// surface with the sampled points or the sample size is large enough.
         #[arg(short = 'd', long, default_value_t = 7)]
         nuts_depth: u64,
+    },
+    /// Analyze a sampled surface via the smooth distance function of a protein structure.
+    /// The SDF is used to generate normal vectors for each surface sample in order
+    /// to approximate the geodesic distance on the surface.
+    Stats {
+        /// The protein structure from which the surface was sampled.
+        structure: PathBuf,
+        /// Surface sample file.
+        surface: PathBuf,
+        /// CSV file path to write stats to. defaults to structure path + ".csv".
+        csv: Option<PathBuf>,
+        /// Cutoff radius determining the local neighborhood in which approximate geodesic distances
+        /// should be measured.
+        #[arg(short, long, default_value_t = 5.0)]
+        cutoff: f64,
     },
 }
 
@@ -121,6 +139,49 @@ fn main() {
                 StrictnessLevel::Loose,
             )
             .expect("Saving sampled structure to PDB file failed");
+        }
+        Commands::Stats {
+            structure,
+            surface,
+            csv,
+            cutoff,
+        } => {
+            let csv_path = csv.clone().unwrap_or(surface.with_extension("csv"));
+            let (structure, _) = open(&structure.to_str().expect("Expected a valid file path"))
+                .expect("Expected a valid PDB file");
+            let (surface, _) = open(&surface.to_str().expect("Expected a valid file path"))
+                .expect("Expected a valid PDB file");
+
+            let structure = PointCloud::from_pdb_atoms(structure.atoms());
+            let surface = PointCloud::from_pdb_atoms(surface.atoms());
+            let sdf = SmoothDistanceField::new(&structure, cutoff.abs());
+
+            let surface_grid = CellGrid::new(surface.points.iter().copied(), *cutoff);
+
+            let mut wtr = Writer::from_path(csv_path).expect("Could not create Writer from path");
+            wtr.write_record(&["i", "j", "sd_i", "sd_i", "approx. geodesic distance"])
+                .expect("Could not write CSV header");
+
+            surface_grid
+                .particle_pairs()
+                .filter_map(|((i, p), (j, q))| {
+                    let pc: [Angstrom; 3] = p.coords();
+                    let qc: [Angstrom; 3] = q.coords();
+
+                    let (p_sd, p_normal) = sdf.evaluate(pc)?;
+                    let (q_sd, q_normal) = sdf.evaluate(qc)?;
+
+                    let agd = approx_geodesic_dist(p, q, p_normal, q_normal);
+
+                    if agd <= *cutoff {
+                        Some((i, j, p_sd, q_sd, agd))
+                    } else {
+                        None
+                    }
+                })
+                .for_each(|rec| {
+                    wtr.serialize(rec).expect("Could not write CSV record");
+                });
         }
     }
 }
