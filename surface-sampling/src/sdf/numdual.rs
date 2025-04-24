@@ -209,6 +209,7 @@ mod tests {
                 1.0,
             ),
             surface_radius: 1.05,
+            k_force: 10.0,
         };
 
         let (sdf_values, sdf_grads): (Vec<Angstrom>, Vec<[Angstrom; 3]>) = points

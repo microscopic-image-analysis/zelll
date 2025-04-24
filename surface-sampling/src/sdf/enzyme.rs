@@ -1,5 +1,6 @@
 // RUSTFLAGS="-C target-cpu=native -C target-feature=+avx2 -Zautodiff=Enable" cargo +enzyme run --example psssh --release --package psssh --features enzyme
 // RUSTFLAGS="-Zautodiff=Enable" cargo +enzyme test --package psssh --features enzyme -- --show-output
+// FIXME: see https://github.com/rust-lang/rust/issues/137520
 use crate::Angstrom;
 use crate::sdf::SmoothDistanceField;
 use nalgebra::SVector;
@@ -91,9 +92,9 @@ fn hmc_potential(
 }
 
 fn poly_potential(x: Angstrom, radius: Angstrom) -> Angstrom {
-    // const KFORCE: Angstrom = 10.0;
+    const KFORCE: Angstrom = 10.0;
     let offset_diff = x - radius + 1.0;
-    self.k_force * (offset_diff + offset_diff.powi(3) - offset_diff.powi(4))
+    KFORCE * (offset_diff + offset_diff.powi(3) - offset_diff.powi(4))
     // let offset_diff = x - radius + 0.5;
     // KFORCE * (offset_diff - offset_diff.powi(3) - offset_diff.powi(4))
     // FIXME: cf. numdual.rs
@@ -165,6 +166,7 @@ mod tests {
                 1.0,
             ),
             surface_radius: 1.05,
+            k_force: 10.0,
         };
 
         let (sdf_values, sdf_grads): (Vec<Angstrom>, Vec<[Angstrom; 3]>) = points
