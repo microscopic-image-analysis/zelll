@@ -10,11 +10,11 @@ use rand::distributions::Standard;
 use rand::prelude::*;
 use zelll::CellGrid;
 
-type PointCloud<const N: usize> = Vec<Point<f32, N>>;
+type PointCloud<const N: usize> = Vec<Point<f64, N>>;
 /// Generate a uniformly random 3D point cloud of size `n` in a cuboid of edge lengths `vol` centered around `origin`.
-fn generate_points_random(n: usize, vol: [f32; 3], origin: [f32; 3]) -> PointCloud<3> {
+fn generate_points_random(n: usize, vol: [f64; 3], origin: [f64; 3]) -> PointCloud<3> {
     std::iter::repeat_with(|| {
-        Point3::<f32>::from(
+        Point3::<f64>::from(
             (Vector3::from_iterator(thread_rng().sample_iter(Standard))
                 - Vector3::new(0.5, 0.5, 0.5)
                 + Vector3::from(origin))
@@ -37,20 +37,41 @@ fn main() {
         .next()
         .and_then(|arg| arg.parse::<usize>().ok())
         .unwrap_or(1);
+    let sort = args
+        .next()
+        .and_then(|arg| arg.parse::<bool>().ok())
+        .unwrap_or(false);
+    let single_precision = args
+        .next()
+        .and_then(|arg| arg.parse::<bool>().ok())
+        .unwrap_or(false);
 
-    let cutoff: f32 = 10.0;
+    let cutoff: f64 = 10.0;
     let conc = 10.0 / cutoff.powi(3); //i.e. 100mol per 10^3 volume units
     let a = 3.0 * cutoff;
     let b = 3.0 * cutoff;
-    let c = (size as f32 / conc) / a / b;
-    let _vol_edges = (size as f32 / conc).cbrt();
-    let pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0]);
-    // TODO: plot unsorted vs sorted cache misses
-    // pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
+    let c = (size as f64 / conc) / a / b;
+    let _vol_edges = (size as f64 / conc).cbrt();
+    let mut pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0]);
 
-    valgrind::start_instrumentation();
-    for _ in 0..repeat {
-        let _cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
+    if sort {
+        pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
     }
-    valgrind::stop_instrumentation();
+
+    if single_precision {
+        let cutoff = cutoff as f32;
+        let pointcloud: Vec<_> = pointcloud.iter().map(|p| p.cast::<f32>()).collect();
+
+        valgrind::start_instrumentation();
+        for _ in 0..repeat {
+            let _cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
+        }
+        valgrind::stop_instrumentation();
+    } else {
+        valgrind::start_instrumentation();
+        for _ in 0..repeat {
+            let _cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
+        }
+        valgrind::stop_instrumentation();
+    }
 }
