@@ -32,6 +32,9 @@ pub mod utils {
         x_normal.normalize_mut();
         y_normal.normalize_mut();
 
+        // distance(&x, &y)
         distance(&x, &y) * (2.0 - x_normal.dot(&y_normal))
+        // distance(&x, &y) * (2.0 - x_normal.dot(&y_normal)).sqrt()
+        // distance(&x, &y) * (2.0 - distance(&x_normal.into(), &y_normal.into()))
     }
 }

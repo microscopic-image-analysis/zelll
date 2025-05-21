@@ -1,12 +1,12 @@
 use clap::{Parser, Subcommand};
+use csv::Writer;
 use nuts_rs::{Chain, CpuMath, DiagGradNutsSettings, Settings};
 use pdbtbx::{Atom, Model, PDB, StrictnessLevel, open, save};
 use psssh::Angstrom;
 use psssh::io::PointCloud;
 use psssh::sdf::SmoothDistanceField;
 use psssh::utils::approx_geodesic_dist;
-// use rand::prelude::*;
-use csv::Writer;
+use rand::prelude::*;
 use std::path::PathBuf;
 use zelll::{CellGrid, Particle};
 
@@ -29,10 +29,10 @@ enum Commands {
         /// Neighborhood cutoff treshold used for sampling.
         #[arg(short, long, default_value_t = 10.0)]
         cutoff: f64,
-        /// Number of samples to produces.
+        /// Number of samples to produce.
         #[arg(short = 'n', long = "samples", default_value_t = 2000)]
         n: usize,
-        /// Number of samples to discard before sampling 'n' samples
+        /// Number of samples to discard before sampling 'n' samples.
         #[arg(short = 'b', long = "burn-in", default_value_t = 1000)]
         b: usize,
         /// Distance to the protein structure at which the surface will be sampled.
@@ -63,6 +63,12 @@ enum Commands {
         /// should be measured.
         #[arg(short, long, default_value_t = 5.0)]
         cutoff: f64,
+        /// Number of bins for the histogram covering the interval [0, cutoff].
+        #[arg(short, long, default_value_t = 100)]
+        bins: usize,
+        /// Amount of point neighborhood samples on the surface for the histogram.
+        #[arg(short = 'n', long = "samples", default_value_t = 1000)]
+        n: usize,
     },
 }
 
@@ -151,6 +157,8 @@ fn main() {
             surface,
             csv,
             cutoff,
+            bins,
+            n,
         } => {
             let csv_path = csv.clone().unwrap_or(surface.with_extension("csv"));
             let (structure, _) = open(&structure.to_str().expect("Expected a valid file path"))
@@ -168,6 +176,27 @@ fn main() {
             wtr.write_record(&["i", "j", "sd_i", "sd_i", "approx. geodesic distance"])
                 .expect("Could not write CSV header");
 
+            let mut rng = rand::rng();
+            let sample_points = surface.points.choose_multiple(&mut rng, *n);
+
+            // We're not using CellGrid::particle_pairs() here
+            // although it provides similar information in a histogram.
+            // However, using specific particle neighborhoods allows us to quantify variation
+            // in the local pairwise distance distributions
+            // which is preferred since we're operating on a submanifold embedded in 3D.
+            // Also, `::particle_pairs()` enumerates (globally) unique pairs
+            // whereas we want _all_ distances in a local neighborhood of a particle.
+            // The latter point doesn't change the analysis but suits the intuition better.
+            for center in sample_points {
+                if let Some(neighbors) = surface_grid.query_neighbors(*center) {
+                    // TODO: compute *ordinary* euclidean distance for each neighbor
+                    // TODO: compute the corresponding bin
+                    // TODO: increase bin count
+                    // TODO: write bin counts as line into CSV file
+                    todo!();
+                }
+            }
+
             surface_grid
                 .particle_pairs()
                 .filter_map(|((i, p), (j, q))| {
@@ -177,6 +206,8 @@ fn main() {
                     let (p_sd, p_normal) = sdf.evaluate(pc)?;
                     let (q_sd, q_normal) = sdf.evaluate(qc)?;
 
+                    // FIXME: in our case this approximation is not well-justified
+                    // FIXME: for small neighborhoods ordinary euclidean distance is more appropriate
                     let agd = approx_geodesic_dist(p, q, p_normal, q_normal);
 
                     if agd <= *cutoff {
@@ -188,6 +219,14 @@ fn main() {
                 .for_each(|rec| {
                     wtr.serialize(rec).expect("Could not write CSV record");
                 });
+
+            // let n_pairs = surface_grid.particle_pairs().count();
+            // this assumes homogenous density and is a very rough guess,
+            // also assuming the surface is locally very flat
+            // let surface_area =
+            //     (surface.points.len().pow(2)) as f64 * std::f64::consts::PI * cutoff.powi(2)
+            //         / count as f64;
+            // dbg!(surface_area);
         }
     }
 }
