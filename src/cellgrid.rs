@@ -56,8 +56,8 @@ pub use util::{Aabb, GridInfo};
 /// due to using sparse storage.
 ///
 /// Because we are sorting data, construction of a cell grid is _cache aware_.
-/// Unfortunately, there is not much we can do about this.
 /// However, iterating over particle pairs after the fact benefits from this.
+/// Unfortunately, there is not much we can do about this.
 ///
 /// In some settings, input data already has some structure reducing this effect.
 /// Pre-sorting data can be helpful but is not always an option, as is the case for some
@@ -205,29 +205,23 @@ where
 
             // cells.shrink_to_fit();
 
-            // FIXME: is this why observed runtime does not match O(n) for large hash maps? (doesn't look like it is though)
-            // FIXME: https://github.com/rust-lang/rust/pull/97215
-            // FIXME: sorting benchmark data does not yield linear runtime (even though it massively improves cache miss rate)
-            // FIXME: For rebuild() it's not that important but for rebuild_mut() it is!
+            // technically, this is O(capacity) not O(n)
+            // cf. https://github.com/rust-lang/rust/pull/97215
             cells.iter_mut().for_each(|(_, slice)| {
                 *slice = cell_lists.reserve_cell(slice.cursor());
             });
             // FIXME: what happens (below) if I reserve cells sorted by their size (above)?
-
             // FIXME: this seems to be more likely to be the cache miss culprit
             // FIXME: can we do something clever here? use an LRU cache?
             // FIXME: use sth. like itertools::tree_reduce() to somehow deal with
             // FIXME: the random access pattern of cell_lists' slices?
-            // FIXME: maybe should not store cell indices in Vec but compute them *again* from points
-            // FIXME: computation should be cheap enough and this way we might save some precious cache lines
-            // FIXME: turns out it is in fact cheap enough (but does not improve cache behavior)
-            // FIXME: so we should in fact remove FlatIndex (or make it a BTreeMap?)
             index
                 .index
                 .iter()
                 .zip(particles)
                 .enumerate()
-                // TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
+                // TODO: we know cells.get_mut() won't fail by construction
+                // TODO: but maybe use try_for_each() instead
                 .for_each(|(i, (cell, particle))| {
                     // FIXME: in principle could have multiple &mut slices into CellStorage (for parallel pushing)
                     // FIXME: would just have to make sure that cell is always unique when operating on chunks
@@ -310,8 +304,7 @@ where
                 .iter()
                 .zip(particles)
                 .enumerate()
-                //TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
-                //TODO: could use unwrap_unchecked() since this can't/shouldn't fail
+                //TODO: see `::rebuild()`
                 .for_each(|(i, (cell, particle))| {
                     self.cell_lists.push(
                         (i, particle),
