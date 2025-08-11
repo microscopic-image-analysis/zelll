@@ -32,6 +32,15 @@ impl SmoothDistanceField {
                             (-dist / radius).exp(),
                             (-dist).exp() * radius,
                             (-dist).exp(),
+                            // TODO: this is essentially the usual mean (sum of atom_radii / #neighbors)
+                            // TODO: and seemingly works just as well
+                            // TODO: might be interesting to see if this is sound
+                            // TODO: at least in sigma(x) there are no incontinuities then.
+                            // TODO: (also highlights the fact that we don't have a single SDF but
+                            // TODO: rather an ensemble with an SDF for each query point)
+                            // (-dist / radius).exp(),
+                            // radius,
+                            // F::one().into(),
                         ))
                     } else {
                         let one = F::one().into();
@@ -57,7 +66,6 @@ impl SmoothDistanceField {
 
         // average atom radius in neighborhood
         let sigma = atom_radii / total_exp_dists;
-
         -sigma * scaled_exp_dists.ln()
     }
 
@@ -105,7 +113,8 @@ impl SmoothDistanceField {
         let pos = SVector::from(pos);
 
         let (val, grad) = gradient(
-            |x| self.poly_potential(self.sdf(x, neighbors), isoradius.into()),
+            // |x| self.poly_potential(self.sdf(x, neighbors), isoradius.into()),
+            |x| self.harmonic_potential(self.sdf(x, neighbors), isoradius.into()),
             pos,
         );
 
@@ -133,15 +142,13 @@ impl SmoothDistanceField {
         // D::from(KFORCE) * (offset_diff - offset_diff.powi(3) - offset_diff.powi(4))
     }
 
-    // fn harmonic_potential<D: DualNum<Angstrom> + ComplexField<RealField = D> + Copy>(
-    //     &self,
-    //     x: D,
-    //     radius: D,
-    // ) -> D {
-    //     const KFORCE: Angstrom = 10.0;
-    //     const INTERCEPT: Angstrom = 1.0;
-    //     D::from(INTERCEPT) - D::from(KFORCE) * (x - radius).powi(2)
-    // }
+    fn harmonic_potential<D: DualNum<Angstrom> + ComplexField<RealField = D> + Copy>(
+        &self,
+        x: D,
+        radius: D,
+    ) -> D {
+        -D::from(self.k_force) * (x - radius).powi(2)
+    }
 }
 
 #[cfg(test)]

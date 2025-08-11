@@ -45,4 +45,8 @@ impl SmoothDistanceField {
     pub fn with_k_force(self, k_force: Angstrom) -> Self {
         Self { k_force, ..self }
     }
+
+    pub fn grid(&self) -> &CellGrid<Atom, 3, Angstrom> {
+        &self.inner
+    }
 }

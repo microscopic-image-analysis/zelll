@@ -1,4 +1,4 @@
-# `psssh` 🤫: Protein Structure Surface Sampling using HMC and `zelll`
+# `psssh` 🤫: Protein Structure Surface Sampling using HMC
 
 Example application of `zelll`.
 
