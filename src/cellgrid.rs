@@ -255,7 +255,8 @@ where
 
     /// Rebuilds `self` but does so mutably. Internally allocated memory will be re-used but
     /// re-allocations may happen.
-    /// This method is usually preferred over [`rebuild()`](CellGrid::rebuild()).
+    /// In some settings, this method is preferred over [`rebuild()`](CellGrid::rebuild()),
+    /// e.g. in simulations that are expected to converge towards a stable configuration.
     ///
     /// # Examples
     /// ```
@@ -382,8 +383,6 @@ where
     /// Note that the queried particle's cell must be within `cutoff` of this `CellGrid`'s bounding box.
     /// If that is not the case, `None` is returned.
     /// This restriction might be lifted in the future.
-    // FIXME: a workaround would be to allow constructing `CellGrid` with a given `Aabb`
-    // FIXME: or by padding its shape
     ///
     /// </div>
     pub fn query<Q: Particle<[T; N]>>(&self, particle: Q) -> Option<GridCell<'_, P, N, T>> {
@@ -461,6 +460,8 @@ where
     ///     });
     /// ```
     pub fn par_particle_pairs(&self) -> impl ParallelIterator<Item = ((usize, P), (usize, P))> {
+        // TODO: ideally, we would schedule 2 threads for cell.particle_pairs() with the same CPU affinity
+        // TODO: so they can share their resources
         self.par_iter().flat_map_iter(|cell| cell.particle_pairs())
     }
 
