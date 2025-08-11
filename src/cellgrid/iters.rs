@@ -168,6 +168,11 @@ where
             .iter()
             .filter_map(move |rel| {
                 let index = rel + self.index();
+                // TODO: a bit wasteful to throw away the `CellSliceMeta` after the hash map lookup
+                // TODO: either make `GridCell` contain this as well or `CellSliceMeta` the cell index too
+                // TODO: yet another reason for `cells` to store an enum?
+                // TODO: now that iter() supports "empty" cells, filter_map is not even needed anymore
+                // TODO: at least internally, have to be careful about this
                 self.grid.cells.get(&index).map(|_| GridCell {
                     grid: self.grid,
                     index,
@@ -227,7 +232,7 @@ where
     /// assert_eq!(points.len(), cg.iter().flat_map(|cell| cell.iter()).count());
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn iter(&self) -> impl FusedIterator<Item = GridCell<P, N, F>> + Clone {
+    pub fn iter(&self) -> impl FusedIterator<Item = GridCell<'_, P, N, F>> + Clone {
         // note that ::keys() does not keep a stable iteration order!
         self.cells
             .keys()
@@ -248,7 +253,7 @@ where
     /// assert_eq!(cg.iter().count(), cg.par_iter().count());
     /// ```
     #[cfg(feature = "rayon")]
-    pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<P, N, F>>
+    pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<'_, P, N, F>>
     where
         P: Send + Sync,
     {
@@ -286,8 +291,6 @@ mod tests {
             points.len(),
             "testing iter()"
         );
-
-        //TODO: test GridCell.index() and GridCell.on_boundary()
 
         #[cfg(feature = "rayon")]
         assert_eq!(
