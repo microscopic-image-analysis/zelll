@@ -18,7 +18,7 @@
 //! - periodic boundary conditions are currently not supported
 //! - parts of this implementation are more cache-aware than others, which becomes noticeable with
 //!   larger data sets\
-//!   (at `10⁶` -- `10⁷` particles, mostly depending on L3 cache size)
+//!   (at `10⁶` -- `10⁷` particles, mostly depending on last-level cache size)
 //!   but is less pronounced with structured data[^structureddata]
 //!
 //! # Usage
