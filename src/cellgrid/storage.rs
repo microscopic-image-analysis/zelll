@@ -38,6 +38,8 @@ use core::ops::Range;
 // TODO: could also make CellStorage<T> generic over buffer and require Index/IndexMut/SliceIndex traits
 // TODO: https://doc.rust-lang.org/std/boxed/struct.Box.html#method.new_uninit_slice would be quite nice
 // TODO: but then we couldn't add more particles to storage/grid
+// FIXME: in the future we might change this to one Vec<> per GridCell to address
+// FIXME: performance issues in CellGrid::new()/::rebuild_mut()
 #[derive(Debug, Default, Clone)]
 pub(crate) struct CellStorage<T> {
     buffer: Vec<T>,
@@ -138,6 +140,14 @@ impl CellSliceMeta {
         // FIXME: but CellStorage::push() does perform bounds checks on the actual slice anyway
         // debug_assert!(self.cursor + steps < self.range.len());
         self.cursor += steps;
+    }
+    // panics if moving back causes OOB (i.e. if cursor is currently 0)
+    pub(crate) fn move_cursor_back(&mut self, steps: usize) {
+        // FIXME: this will be triggered on CellGrid::rebuild(_mut)()
+        // FIXME: removing this debug_assert! for now since CellStorage is not part of the public API
+        // FIXME: but CellStorage::push() does perform bounds checks on the actual slice anyway
+        // debug_assert!(self.cursor + steps < self.range.len());
+        self.cursor -= steps;
     }
 
     //FIXME: technically a len() but might be misleading because cursor might exceed range.end...
