@@ -5,5 +5,9 @@
 *.png
 *.out
 *.rnote
+*.pdb
+*.csv
+*.mp4
+*.pse
 perf.data*
 
