@@ -1,3 +1,4 @@
+//! RUSTFLAGS="-C target-cpu=native" cargo bench --features quick_bench,rayon -- Iteration
 use criterion::{
     AxisScale, BenchmarkId, Criterion, PlotConfiguration, SamplingMode, criterion_group,
     criterion_main,
@@ -5,6 +6,8 @@ use criterion::{
 use nalgebra::{Point, Point3, Vector3, distance_squared};
 use rand::distributions::Standard;
 use rand::prelude::*;
+#[cfg(feature = "rayon")]
+use rayon::ThreadPoolBuilder;
 use zelll::CellGrid;
 #[cfg(feature = "rayon")]
 use zelll::rayon::ParallelIterator;
@@ -34,9 +37,9 @@ fn generate_points_random(
     .collect()
 }
 
-pub fn bench_cellgrid(c: &mut Criterion) {
+pub fn bench_iters(c: &mut Criterion) {
     let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
-    let mut group = c.benchmark_group("CellGrid");
+    let mut group = c.benchmark_group("Iteration");
     group
         .sampling_mode(SamplingMode::Flat)
         .plot_config(plot_config.clone());
@@ -44,7 +47,7 @@ pub fn bench_cellgrid(c: &mut Criterion) {
     #[cfg(feature = "quick_bench")]
     group.sample_size(10);
 
-    for size in (2..=8).map(|exp| 10usize.pow(exp)) {
+    for size in (1..=8).map(|exp| 10usize.pow(exp)) {
         let cutoff: F32or64 = 10.0;
         let conc = 10.0 / cutoff.powi(3); //i.e. 10mol per cutoff^3 volume units
         let a = 3.0 * cutoff;
@@ -55,46 +58,46 @@ pub fn bench_cellgrid(c: &mut Criterion) {
         // pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
         let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
 
-        group.bench_with_input(
-            BenchmarkId::new("::new()", size),
-            &pointcloud,
-            |b, pointcloud| b.iter(|| CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff)),
-        );
-
-        group.bench_with_input(
-            BenchmarkId::new("::particle_pairs()", size),
-            &cg,
-            |b, cg| {
-                let cutoff_squared = cutoff.powi(2);
-                b.iter(|| {
-                    cg.particle_pairs()
-                        .filter(|&((_i, p), (_j, q))| {
-                            distance_squared(&p.into(), &q.into()) <= cutoff_squared
-                        })
-                        .for_each(|_| {});
-                })
-            },
-        );
+        #[cfg(not(feature = "rayon"))]
+        group.bench_with_input(BenchmarkId::new("sequential", size), &cg, |b, cg| {
+            let cutoff_squared = cutoff.powi(2);
+            b.iter(|| {
+                cg.particle_pairs()
+                    .filter(|&((_i, p), (_j, q))| {
+                        distance_squared(&p.into(), &q.into()) <= cutoff_squared
+                    })
+                    .for_each(|_| {});
+            })
+        });
 
         #[cfg(feature = "rayon")]
-        group.bench_with_input(
-            BenchmarkId::new("::par_particle_pairs()", size),
-            &cg,
-            |b, cg| {
-                let cutoff_squared = cutoff.powi(2);
-                b.iter(|| {
-                    cg.par_particle_pairs().for_each(|((_i, p), (_j, q))| {
-                        if distance_squared(&p.into(), &q.into()) <= cutoff_squared {
-                        } else {
-                        }
-                    });
-                })
-            },
-        );
+        for nthreads in 1..=16 {
+            let pool = ThreadPoolBuilder::new()
+                .num_threads(nthreads)
+                .build()
+                .unwrap();
+
+            group.bench_with_input(
+                BenchmarkId::new(format!("{} threads", pool.current_num_threads()), size),
+                &cg,
+                |b, cg| {
+                    let cutoff_squared = cutoff.powi(2);
+                    b.iter(|| {
+                        pool.install(|| {
+                            cg.par_particle_pairs().for_each(|((_i, p), (_j, q))| {
+                                if distance_squared(&p.into(), &q.into()) <= cutoff_squared {
+                                } else {
+                                }
+                            })
+                        });
+                    })
+                },
+            );
+        }
     }
 
     group.finish();
 }
 
-criterion_group!(benches, bench_cellgrid);
+criterion_group!(benches, bench_iters);
 criterion_main!(benches);
