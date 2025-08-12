@@ -1,5 +1,4 @@
 use clap::{Parser, Subcommand};
-use csv::Writer;
 use nuts_rs::{Chain, CpuMath, DiagGradNutsSettings, Settings};
 use pdbtbx::{Atom, Model, PDB, StrictnessLevel, open, save};
 use psssh::Angstrom;
