@@ -1,13 +1,10 @@
 use clap::{Parser, Subcommand};
 use nuts_rs::{Chain, CpuMath, DiagGradNutsSettings, Settings};
 use pdbtbx::{Atom, Model, PDB, StrictnessLevel, open, save};
-use psssh::Angstrom;
 use psssh::io::PointCloud;
 use psssh::sdf::SmoothDistanceField;
-use psssh::utils::approx_geodesic_dist;
-use rand::prelude::*;
 use std::path::PathBuf;
-use zelll::{CellGrid, Particle};
+use zelll::Particle;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
