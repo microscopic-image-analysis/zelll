@@ -311,7 +311,7 @@ where
 /// - the second at the center of the cell
 // We'll stay in 3D for simplicity here
 pub fn generate_pointcloud(shape: [usize; 3], cutoff: f64, origin: [f64; 3]) -> PointCloud<3> {
-    let mut pointcloud = Vec::with_capacity(((shape.iter().product::<usize>() + 1) / 2) * 2);
+    let mut pointcloud = Vec::with_capacity(shape.iter().product::<usize>().div_ceil(2));
 
     for x in 0..shape[0] {
         for y in 0..shape[1] {

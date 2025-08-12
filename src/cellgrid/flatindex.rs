@@ -136,21 +136,19 @@ where
         // FIXME: there seems to be a bug in shape/stride computation, causing redundant indices for small shapes e.g. (2,2,2)?
         self.neighbor_indices = FlatIndex::neighbor_indices(grid_info);
 
-        let index_changed =
-            self.index
-                .iter_mut()
-                .zip(new_index)
-                .fold(false, |has_changed, (old, new)| {
-                    if
-                    /* size_changed || */
-                    *old != new {
-                        *old = new;
-                        true
-                    } else {
-                        has_changed
-                    }
-                });
-        index_changed
+        self.index
+            .iter_mut()
+            .zip(new_index)
+            .fold(false, |has_changed, (old, new)| {
+                if
+                /* size_changed || */
+                *old != new {
+                    *old = new;
+                    true
+                } else {
+                    has_changed
+                }
+            })
     }
 }
 
