@@ -63,7 +63,7 @@ fn main() {
         } => {
             let out = out.clone().unwrap_or(pdb.with_extension("psssh.pdb"));
 
-            let (data, _) = open(&pdb.to_str().expect("Expected a valid file path"))
+            let (data, _) = open(pdb.to_str().expect("Expected a valid file path"))
                 .expect("Expected a valid PDB file");
             let data = PointCloud::from_pdb_atoms(data.atoms());
 
@@ -71,9 +71,11 @@ fn main() {
                 .with_surface_radius(*surface_level)
                 .with_k_force(*force_constant);
 
-            let mut settings = DiagGradNutsSettings::default();
-            settings.num_tune = 1000;
-            settings.maxdepth = *nuts_depth;
+            let mut settings = DiagGradNutsSettings {
+                num_tune: 1000,
+                maxdepth: *nuts_depth,
+                ..Default::default()
+            };
             // sometimes, NUTS gets stuck with very small step sizes
             // this *occasionally* helps in those cases
             settings.adapt_options.dual_average_options.initial_step = 0.1;
@@ -89,7 +91,7 @@ fn main() {
             //     .map_or([0.0; 3], |atom| atom.coords());
             // TODO: alternatively, let's just use the first atom, assuming it's at one of the ends
             // TODO: we're discarding the first `b` samples anyway
-            let init = data.points.get(0).map_or([0.0; 3], |atom| atom.coords());
+            let init = data.points.first().map_or([0.0; 3], |atom| atom.coords());
 
             sampler
                 .set_position(init.as_slice())
@@ -122,7 +124,7 @@ fn main() {
 
             save(
                 &out_pdb,
-                &out.to_str().expect("Expected a valid file path"),
+                out.to_str().expect("Expected a valid file path"),
                 StrictnessLevel::Loose,
             )
             .expect("Saving sampled structure to PDB file failed");
