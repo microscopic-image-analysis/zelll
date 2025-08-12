@@ -49,27 +49,6 @@ enum Commands {
         #[arg(short = 'd', long, default_value_t = 7)]
         nuts_depth: u64,
     },
-    /// Analyze a sampled surface via the smooth distance function of a protein structure.
-    /// The SDF is used to generate normal vectors for each surface sample in order
-    /// to approximate the geodesic distance on the surface.
-    Stats {
-        /// The protein structure from which the surface was sampled.
-        structure: PathBuf,
-        /// Surface sample file.
-        surface: PathBuf,
-        /// CSV file path to write stats to. defaults to structure path + ".csv".
-        csv: Option<PathBuf>,
-        /// Cutoff radius determining the local neighborhood in which approximate geodesic distances
-        /// should be measured.
-        #[arg(short, long, default_value_t = 5.0)]
-        cutoff: f64,
-        /// Number of bins for the histogram covering the interval [0, cutoff].
-        #[arg(short, long, default_value_t = 100)]
-        bins: usize,
-        /// Amount of point neighborhood samples on the surface for the histogram.
-        #[arg(short = 'n', long = "samples", default_value_t = 1000)]
-        n: usize,
-    },
 }
 
 fn main() {
@@ -151,82 +130,6 @@ fn main() {
                 StrictnessLevel::Loose,
             )
             .expect("Saving sampled structure to PDB file failed");
-        }
-        Commands::Stats {
-            structure,
-            surface,
-            csv,
-            cutoff,
-            bins,
-            n,
-        } => {
-            let csv_path = csv.clone().unwrap_or(surface.with_extension("csv"));
-            let (structure, _) = open(&structure.to_str().expect("Expected a valid file path"))
-                .expect("Expected a valid PDB file");
-            let (surface, _) = open(&surface.to_str().expect("Expected a valid file path"))
-                .expect("Expected a valid PDB file");
-
-            let structure = PointCloud::from_pdb_atoms(structure.atoms());
-            let surface = PointCloud::from_pdb_atoms(surface.atoms());
-            let sdf = SmoothDistanceField::new(&structure, cutoff.abs());
-
-            let surface_grid = CellGrid::new(surface.points.iter().copied(), *cutoff);
-
-            let mut wtr = Writer::from_path(csv_path).expect("Could not create Writer from path");
-            wtr.write_record(&["i", "j", "sd_i", "sd_i", "approx. geodesic distance"])
-                .expect("Could not write CSV header");
-
-            let mut rng = rand::rng();
-            let sample_points = surface.points.choose_multiple(&mut rng, *n);
-
-            // We're not using CellGrid::particle_pairs() here
-            // although it provides similar information in a histogram.
-            // However, using specific particle neighborhoods allows us to quantify variation
-            // in the local pairwise distance distributions
-            // which is preferred since we're operating on a submanifold embedded in 3D.
-            // Also, `::particle_pairs()` enumerates (globally) unique pairs
-            // whereas we want _all_ distances in a local neighborhood of a particle.
-            // The latter point doesn't change the analysis but suits the intuition better.
-            for center in sample_points {
-                if let Some(neighbors) = surface_grid.query_neighbors(*center) {
-                    // TODO: compute *ordinary* euclidean distance for each neighbor
-                    // TODO: compute the corresponding bin
-                    // TODO: increase bin count
-                    // TODO: write bin counts as line into CSV file
-                    todo!();
-                }
-            }
-
-            surface_grid
-                .particle_pairs()
-                .filter_map(|((i, p), (j, q))| {
-                    let pc: [Angstrom; 3] = p.coords();
-                    let qc: [Angstrom; 3] = q.coords();
-
-                    let (p_sd, p_normal) = sdf.evaluate(pc)?;
-                    let (q_sd, q_normal) = sdf.evaluate(qc)?;
-
-                    // FIXME: in our case this approximation is not well-justified
-                    // FIXME: for small neighborhoods ordinary euclidean distance is more appropriate
-                    let agd = approx_geodesic_dist(p, q, p_normal, q_normal);
-
-                    if agd <= *cutoff {
-                        Some((i, j, p_sd, q_sd, agd))
-                    } else {
-                        None
-                    }
-                })
-                .for_each(|rec| {
-                    wtr.serialize(rec).expect("Could not write CSV record");
-                });
-
-            // let n_pairs = surface_grid.particle_pairs().count();
-            // this assumes homogenous density and is a very rough guess,
-            // also assuming the surface is locally very flat
-            // let surface_area =
-            //     (surface.points.len().pow(2)) as f64 * std::f64::consts::PI * cutoff.powi(2)
-            //         / count as f64;
-            // dbg!(surface_area);
         }
     }
 }
