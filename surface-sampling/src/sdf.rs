@@ -1,13 +1,6 @@
 #[allow(dead_code)]
-#[cfg(feature = "enzyme")]
-mod enzyme;
-#[cfg(not(feature = "enzyme"))]
 mod numdual;
 
-#[cfg(feature = "enzyme")]
-#[allow(unused_imports)]
-pub use enzyme::*;
-#[cfg(not(feature = "enzyme"))]
 #[allow(unused_imports)]
 pub use numdual::*;
 

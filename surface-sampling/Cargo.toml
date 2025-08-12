@@ -27,14 +27,3 @@ clap = { version = "4.5.32", features = ["derive"] }
 [[example]]
 name = "psssh"
 path = "examples/cli.rs"
-
-[features]
-# FIXME: don't yet expect this to work
-enzyme = []
-
-# FIXME: these will be ignored by cargo because this is a subcrate
-[profile.dev]
-lto = "fat"
-
-[profile.release]
-lto = "fat"
