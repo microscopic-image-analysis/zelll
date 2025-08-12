@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 use csv::Writer;
+use nalgebra::{Matrix4, Point3, Vector3};
 use nuts_rs::{Chain, CpuMath, DiagGradNutsSettings, Settings};
 use pdbtbx::{Atom, Model, PDB, StrictnessLevel, open, save};
 use psssh::Angstrom;
@@ -7,6 +8,8 @@ use psssh::io::PointCloud;
 use psssh::sdf::SmoothDistanceField;
 use psssh::utils::approx_geodesic_dist;
 use rand::prelude::*;
+use sobol::Sobol;
+use sobol::params::JoeKuoD6;
 use std::path::PathBuf;
 use zelll::{CellGrid, Particle};
 
@@ -48,6 +51,26 @@ enum Commands {
         /// surface with the sampled points or the sample size is large enough.
         #[arg(short = 'd', long, default_value_t = 7)]
         nuts_depth: u64,
+    },
+    /// Sample points on the surface of a single protein structure using Sobol sequences.
+    Sobol {
+        /// Protein structure file to sample on.
+        pdb: PathBuf,
+        /// File path to save sampled surface to. defaults to input path + ".psssh.pdb".
+        out: Option<PathBuf>,
+        /// Neighborhood cutoff treshold used for sampling.
+        #[arg(short, long, default_value_t = 10.0)]
+        cutoff: f64,
+        /// Sobol sequence length. Should be a power of 2.
+        #[arg(short = 's', long = "samples", default_value_t = 524288)]
+        s: usize,
+        /// Distance to the protein structure at which the surface will be sampled.
+        #[arg(short = 'l', long, default_value_t = 1.05)]
+        surface_level: f64,
+        /// Error term added to smooth distance.
+        /// Larger values produce more samples but are less accurate.
+        #[arg(short = 'e', long, default_value_t = 0.05)]
+        epsilon: f64,
     },
     /// Analyze a sampled surface via the smooth distance function of a protein structure.
     /// The SDF is used to generate normal vectors for each surface sample in order
@@ -138,6 +161,62 @@ fn main() {
                 let [x, y, z]: [f64; 3] = coords[..].try_into().ok()?;
                 Atom::new(false, i, "H", x, y, z, 1.0, 0.0, "H", 0)
             });
+
+            for (i, atom) in atoms.enumerate() {
+                model_out.add_atom(atom, "X", (i as isize, None), ("PSH", None));
+            }
+
+            out_pdb.add_model(model_out);
+
+            save(
+                &out_pdb,
+                &out.to_str().expect("Expected a valid file path"),
+                StrictnessLevel::Loose,
+            )
+            .expect("Saving sampled structure to PDB file failed");
+        }
+        Commands::Sobol {
+            pdb,
+            out,
+            cutoff,
+            s,
+            surface_level,
+            epsilon,
+        } => {
+            let out = out.clone().unwrap_or(pdb.with_extension("sobol.pdb"));
+
+            let (data, _) = open(&pdb.to_str().expect("Expected a valid file path"))
+                .expect("Expected a valid PDB file");
+            let data = PointCloud::from_pdb_atoms(data.atoms());
+
+            let sdf =
+                SmoothDistanceField::new(&data, cutoff.abs()).with_surface_radius(*surface_level);
+
+            let inf = Vector3::from(sdf.grid().info().bounding_box().inf());
+            let sup = Vector3::from(sdf.grid().info().bounding_box().sup());
+            let extra = Vector3::from([*cutoff; 3]);
+            let transform = Matrix4::new_nonuniform_scaling(&(sup - inf + extra))
+                .append_translation(&(inf - extra * 0.5));
+
+            let sobol = Sobol::<f64>::new(3, &JoeKuoD6::minimal())
+                .take(*s)
+                .map(|sob| Point3::from_slice(&sob))
+                .map(|sob| transform.transform_point(&sob))
+                .filter(|sob| {
+                    if let Some((dist, _)) = sdf.evaluate((*sob).into()) {
+                        (dist - surface_level).abs() <= *epsilon
+                    } else {
+                        false
+                    }
+                });
+            let sampled: Vec<_> = sobol.collect();
+            let atoms = sampled.into_iter().enumerate().filter_map(|(i, coords)| {
+                let [x, y, z]: [f64; 3] = coords.into();
+                Atom::new(false, i, "H", x, y, z, 1.0, 0.0, "H", 0)
+            });
+
+            let mut out_pdb = PDB::new();
+            let mut model_out = Model::new(0);
 
             for (i, atom) in atoms.enumerate() {
                 model_out.add_atom(atom, "X", (i as isize, None), ("PSH", None));
