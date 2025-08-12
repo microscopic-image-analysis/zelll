@@ -72,21 +72,7 @@ impl SmoothDistanceField {
             (atom.element.radius(), SVector::from(coords))
         });
         let pos = SVector::from(pos);
-
         let (val, grad) = gradient(|x| self.sdf(x, neighbors), pos);
-        // let (val, grad, hess) = hessian(|x| self.sdf(x, neighbors), pos);
-        // FIXME: this is only the curvature at critical points
-        // FIXME: to make it always work, I'd have to normalize the gradient and compute its Jacobian?
-        // FIXME: cf. gauss map
-        // let _det: Angstrom = hess.determinant();
-        // FIXME: ie. like this?
-        // FIXME: question is whether `grad` still contains the necessary information
-        // let _det: Angstrom = jacobian(|x| x.normalize(), grad).1.determinant();
-        // FIXME: normalizing makes determinant vanish (which I checked to make sense)
-        // dbg!(_det);
-        // FIXME: probably should impl global function (try_)curvature() based on (try_)gradient()
-        // FIXME: which normalizes gradient, then computes jacobian of it before discarding
-        // FIXME: dual derivative and then finally returns determinant
 
         Some((val.re(), grad.into()))
     }
@@ -104,7 +90,6 @@ impl SmoothDistanceField {
         let pos = SVector::from(pos);
 
         let (val, grad) = gradient(
-            // |x| self.poly_potential(self.sdf(x, neighbors), isoradius.into()),
             |x| self.harmonic_potential(self.sdf(x, neighbors), isoradius.into()),
             pos,
         );
