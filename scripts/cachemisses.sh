@@ -1,7 +1,7 @@
 #!/bin/bash
 cargo build --release --example cachemisses
 
-PROJECT_DIR=$(dirname "$(cargo locate-project --message-format plain)")
+PROJECT_DIR=$(dirname "$(cargo locate-project --workspace --message-format plain)")
 TARGET_DIR="$PROJECT_DIR/target/release/examples"
 cd $TARGET_DIR
 
