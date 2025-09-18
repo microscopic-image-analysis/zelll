@@ -5,9 +5,12 @@ use crate::Particle;
 use itertools::Itertools;
 use nalgebra::SimdPartialOrd;
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 
 #[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub(crate) struct FlatIndex<const N: usize = 3, F: Float = f64>
 where
     F: std::fmt::Debug + 'static,

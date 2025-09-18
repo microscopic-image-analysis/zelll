@@ -2,6 +2,8 @@
 use crate::Particle;
 use nalgebra::{Point, SVector, SimdPartialOrd};
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 
 /// A `Vec<[f64; N]>`, aliased for convenience and testing purposes.
@@ -15,6 +17,7 @@ pub type PointCloud<const N: usize> = Vec<[f64; N]>;
 /// See also [`GridInfo::bounding_box()`].
 //TODO: rename fields, infimum/supremum might be confusing outside of a lattice context
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Aabb<const N: usize = 3, F: Float = f64>
 where
     F: std::fmt::Debug + 'static,
@@ -75,6 +78,7 @@ where
 ///
 /// </div>
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GridInfo<const N: usize = 3, F: Float = f64>
 where
     F: std::fmt::Debug + 'static,

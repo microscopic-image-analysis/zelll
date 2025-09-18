@@ -21,6 +21,8 @@ pub use iters::GridCell;
 pub use iters::neighborhood;
 use nalgebra::SimdPartialOrd;
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use storage::{CellSliceMeta, CellStorage};
 #[doc(inline)]
 pub use util::{Aabb, GridInfo};
@@ -105,6 +107,7 @@ pub use util::{Aabb, GridInfo};
 /// let mut cg = CellGrid::new(data.iter().copied(), 1.0);
 /// ```
 #[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CellGrid<P, const N: usize = 3, T: Float = f64>
 where
     T: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,

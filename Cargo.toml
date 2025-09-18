@@ -29,6 +29,7 @@ nalgebra = "0.33"
 hashbrown = "0.15"
 num-traits = "0.2"
 rayon = { version = "1.10", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
 
 [dev-dependencies]
 # see https://bheisler.github.io/criterion.rs/book/user_guide/csv_output.html
@@ -42,6 +43,7 @@ crabgrind = "0.1.12"
 
 [features]
 default = []
+serde = ["dep:serde", "hashbrown/serde", "nalgebra/serde-serialize"]
 rayon = ["dep:rayon", "hashbrown/rayon"]
 # cargo feature to toggle less/more samples for benchmarks
 quick_bench = []

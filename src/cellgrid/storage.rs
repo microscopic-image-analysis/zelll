@@ -22,6 +22,8 @@
 // TODO: but I need to check if this is still possible with values of type Vec<_, &Bump>
 // TODO: and see how this works without without this scoping
 use core::ops::Range;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 // TODO: impl<T> Deref<Target = Vec<T>> for CellStorage<T>
 // TODO: impl<T> DerefMut<Target = Vec<T>> for CellStorage<T>
@@ -41,6 +43,7 @@ use core::ops::Range;
 // FIXME: in the future we might change this to one Vec<> per GridCell to address
 // FIXME: performance issues in CellGrid::new()/::rebuild_mut()
 #[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub(crate) struct CellStorage<T> {
     buffer: Vec<T>,
 }
@@ -109,6 +112,7 @@ impl<T: Default> CellStorage<T> {
 
 // TODO: this type does not check bounds, this is responsibility of CellStorage
 #[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub(crate) struct CellSliceMeta {
     cursor: usize,
     // TODO: Range is not Copy
