@@ -46,10 +46,10 @@ class SdfOp(Op):
         sigma = atom_radii / total_exp_dists
         return -sigma * np.log(scaled_exp_dists)
         
-    def eval_sdf(self, coordinates):
+    def eval_sdf(self, pos):
         # NOTE: in practice, this is not well suited to tensor libraries for reasons described e.g. here: 
         # NOTE: https://pytensor.readthedocs.io/en/latest/extending/creating_a_c_op.html#methods-the-c-op-needs-to-define
-        neighbors = self.inner.neighbors(coordinates);
+        neighbors = self.inner.neighbors(pos);
         if not neighbors:
             return -np.inf, [-np.inf, -np.inf, -np.inf]
         
@@ -58,7 +58,7 @@ class SdfOp(Op):
         else:
             neighbors = [(1.0, coords) for i, coords in neighbors]
         
-        return gradient(lambda x: self._sdf(x, neighbors), coordinates)
+        return gradient(lambda x: self._sdf(x, neighbors), pos)
         
     def make_node(self, x):
         x = pt.as_tensor(x)
