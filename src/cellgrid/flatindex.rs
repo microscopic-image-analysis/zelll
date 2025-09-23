@@ -135,8 +135,6 @@ where
             .map(|p| grid_info.flat_cell_index(p.borrow().coords()));
 
         self.grid_info = grid_info;
-
-        // FIXME: there seems to be a bug in shape/stride computation, causing redundant indices for small shapes e.g. (2,2,2)?
         self.neighbor_indices = FlatIndex::neighbor_indices(grid_info);
 
         self.index
