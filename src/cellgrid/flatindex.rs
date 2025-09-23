@@ -57,7 +57,7 @@ where
         const RANK: i32 = 1;
 
         (0..N)
-            .map(|_| (-RANK..RANK + 1))
+            .map(|_| -RANK..RANK + 1)
             .multi_cartesian_product()
             .map(|idx| grid_info.flatten_index(TryInto::<[i32; N]>::try_into(idx).unwrap()))
             .filter(|idx| *idx != 0)

@@ -29,8 +29,8 @@ impl Element {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Atom {
-    pub(crate) element: Element,
-    pub(crate) coords: [Angstrom; 3],
+    pub element: Element,
+    pub coords: [Angstrom; 3],
 }
 
 // The blanket implementation for Particle can use this

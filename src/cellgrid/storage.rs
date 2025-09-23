@@ -24,6 +24,7 @@
 use core::ops::Range;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+// TODO: learn from https://davidlattimore.github.io/posts/2025/09/02/rustforge-wild-performance-tricks.html
 
 // TODO: impl<T> Deref<Target = Vec<T>> for CellStorage<T>
 // TODO: impl<T> DerefMut<Target = Vec<T>> for CellStorage<T>
