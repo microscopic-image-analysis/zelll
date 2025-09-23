@@ -35,10 +35,7 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 # see https://bheisler.github.io/criterion.rs/book/user_guide/csv_output.html
 # csv output is deprecated but it's very convenient for our plotting purposes
 criterion = { version = "0.5", features = ["csv_output"] }
-kiss3d = "0.35"
 rand = "0.8"
-soa_derive = "0.13"
-dashmap = "5.5"
 crabgrind = "0.1.12"
 
 [features]
