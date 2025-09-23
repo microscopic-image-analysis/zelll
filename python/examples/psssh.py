@@ -47,7 +47,7 @@ class SdfOp(Op):
         return -sigma * np.log(scaled_exp_dists)
         
     def eval_sdf(self, coordinates):
-        # NOTE: in practice, this is not very suited to tensor libraries for reasons described e.g. here: 
+        # NOTE: in practice, this is not well suited to tensor libraries for reasons described e.g. here: 
         # NOTE: https://pytensor.readthedocs.io/en/latest/extending/creating_a_c_op.html#methods-the-c-op-needs-to-define
         neighbors = self.inner.neighbors(coordinates);
         if not neighbors:
