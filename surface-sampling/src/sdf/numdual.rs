@@ -1,0 +1,198 @@
+use crate::Angstrom;
+use crate::sdf::SmoothDistanceField;
+use nalgebra::{ComplexField, Const, SVector};
+use num_dual::*;
+use zelll::Particle;
+
+type DsVec<T> = DualVec<T, T, Const<3>>;
+type Ds2Vec<T> = Dual2Vec<T, T, Const<3>>;
+
+impl SmoothDistanceField {
+    // TODO: this actually looks cleaner with a for loop...
+    // FIXME: this should probably be done similar to LJTS?
+    // FIXME: because having the hard cutoff affects the actual sdf values
+    fn sdf<F: DualNumFloat, D: DualNum<F> + ComplexField<RealField = D> + Copy>(
+        &self,
+        x: SVector<D, 3>,
+        neighbors: impl Iterator<Item = (F, SVector<D, 3>)>,
+    ) -> D {
+        let (scaled_exp_dists, atom_radii, total_exp_dists): (D, D, D) = neighbors
+            .filter_map(|(radius, other)| {
+                let cutoff = F::from(self.inner.info().cutoff())?;
+
+                let diff = x - other;
+                let dist = diff.norm();
+
+                if dist.re() <= cutoff {
+                    // L2-norm is not continuous at zero
+                    // so at zero, we handle it manually with this conditional
+                    // FIXME: maybe use Float::epsilon() here
+                    if dist.re() != F::zero() {
+                        Some((
+                            (-dist / radius).exp(),
+                            (-dist).exp() * radius,
+                            (-dist).exp(),
+                        ))
+                    } else {
+                        let one = F::one().into();
+                        // without this, num-dual would produce NaN gradients
+                        Some((one, radius.into(), one))
+                    }
+                } else {
+                    None
+                }
+            })
+            .fold(
+                (F::zero().into(), F::zero().into(), F::zero().into()),
+                |acc, curr| {
+                    let (scaled_exp_dists, atom_radii, total_exp_dists) = acc;
+                    let (scaled_exp_dist, atom_radius, exp_dist) = curr;
+                    (
+                        scaled_exp_dists + scaled_exp_dist,
+                        atom_radii + atom_radius,
+                        total_exp_dists + exp_dist,
+                    )
+                },
+            );
+
+        // average atom radius in neighborhood
+        let sigma = atom_radii / total_exp_dists;
+        -sigma * scaled_exp_dists.ln()
+    }
+
+    /// Returns the (approximate) smooth distance of `pos` to the internal point cloud and its gradient.
+    ///
+    /// If `pos` is too far away from the point cloud (ie. its neighborhood cannot be queried),
+    /// `None` is returned.
+    pub fn evaluate(&self, pos: [Angstrom; 3]) -> Option<(Angstrom, [Angstrom; 3])> {
+        let neighbors = self.inner.query_neighbors(pos)?.map(|(_, atom)| {
+            let coords: [Angstrom; 3] = atom.coords();
+            let coords = coords.map(DsVec::from_re);
+            // let coords = coords.map(Ds2Vec::from_re);
+            (atom.element.radius(), SVector::from(coords))
+        });
+        let pos = SVector::from(pos);
+        let (val, grad) = gradient(|x| self.sdf(x, neighbors), pos);
+
+        Some((val.re(), grad.into()))
+    }
+
+    pub fn hmc_gradient(
+        &self,
+        pos: [Angstrom; 3],
+        isoradius: Angstrom,
+    ) -> Option<(Angstrom, [Angstrom; 3])> {
+        let neighbors = self.inner.query_neighbors(pos)?.map(|(_, atom)| {
+            let coords: [Angstrom; 3] = atom.coords();
+            let coords = coords.map(DsVec::from_re);
+            (atom.element.radius(), SVector::from(coords))
+        });
+        let pos = SVector::from(pos);
+
+        let (val, grad) = gradient(
+            |x| self.harmonic_potential(self.sdf(x, neighbors), isoradius.into()),
+            pos,
+        );
+
+        Some((val.re(), grad.into()))
+    }
+
+    fn poly_potential<D: DualNum<Angstrom> + ComplexField<RealField = D> + Copy>(
+        &self,
+        x: D,
+        radius: D,
+    ) -> D {
+        let offset_diff = x - radius + D::one();
+        // linear term not strictly necessary since we have sdf as a potential as well
+        D::from(self.k_force) * (offset_diff + offset_diff.powi(3) - offset_diff.powi(4))
+    }
+
+    fn harmonic_potential<D: DualNum<Angstrom> + ComplexField<RealField = D> + Copy>(
+        &self,
+        x: D,
+        radius: D,
+    ) -> D {
+        -D::from(self.k_force) * (x - radius).powi(2)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::atom::{Atom, Element};
+    use zelll::CellGrid;
+
+    // TODO: should use `approx` for this
+    #[test]
+    fn test_sdf_autodiff() {
+        let points = vec![
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [0.0, 1.0, 1.0],
+            [1.0, 0.0, 1.0],
+            [1.0, 1.0, 1.0],
+            [0.5, 0.5, 0.5],
+            [1.5, 1.5, 1.5],
+        ];
+
+        let reference_values = vec![
+            -2.012457244274712,
+            -2.012457244274712,
+            -2.012457244274712,
+            -2.012457244274712,
+            -2.012457244274712,
+            -2.012457244274712,
+            -2.012457244274712,
+            -2.2994776285300675,
+            -2.990326826730122,
+            -0.7998983683589524,
+        ];
+
+        let reference_grads = vec![
+            [-0.276176313229217, -0.276176313229217, -0.276176313229217],
+            [-0.276176313229217, -0.276176313229217, 0.276176313229217],
+            [-0.276176313229217, 0.276176313229217, -0.276176313229217],
+            [0.276176313229217, -0.276176313229217, -0.276176313229217],
+            [0.276176313229217, 0.276176313229217, -0.276176313229217],
+            [-0.276176313229217, 0.276176313229217, 0.276176313229217],
+            [0.276176313229217, -0.276176313229217, 0.276176313229217],
+            [
+                0.14357909754235013,
+                0.14357909754235013,
+                0.14357909754235013,
+            ],
+            [-2.9256894966310793e-17, -0.0, -0.0],
+            [
+                0.21669568034989586,
+                0.21669568034989586,
+                0.21669568034989586,
+            ],
+        ];
+
+        let sdf = SmoothDistanceField {
+            inner: CellGrid::new(
+                points.iter().map(|&coords| Atom {
+                    element: Element::default(),
+                    coords,
+                }),
+                1.0,
+            ),
+            surface_radius: 1.05,
+            k_force: 10.0,
+        };
+
+        let (sdf_values, sdf_grads): (Vec<Angstrom>, Vec<[Angstrom; 3]>) = points
+            .iter()
+            .copied()
+            // .chain(std::iter::once([1.501; 3]))
+            // .chain(std::iter::once([0.001; 3]))
+            .filter_map(|atom| sdf.evaluate(atom))
+            .unzip();
+
+        assert_eq!(&reference_values, &sdf_values);
+        assert_eq!(&reference_grads, &sdf_grads);
+    }
+}

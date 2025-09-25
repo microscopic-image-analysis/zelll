@@ -5,9 +5,12 @@ use crate::Particle;
 use itertools::Itertools;
 use nalgebra::SimdPartialOrd;
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 
 #[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub(crate) struct FlatIndex<const N: usize = 3, F: Float = f64>
 where
     F: std::fmt::Debug + 'static,
@@ -54,7 +57,7 @@ where
         const RANK: i32 = 1;
 
         (0..N)
-            .map(|_| (-RANK..RANK + 1))
+            .map(|_| -RANK..RANK + 1)
             .multi_cartesian_product()
             .map(|idx| grid_info.flatten_index(TryInto::<[i32; N]>::try_into(idx).unwrap()))
             .filter(|idx| *idx != 0)
@@ -132,25 +135,21 @@ where
             .map(|p| grid_info.flat_cell_index(p.borrow().coords()));
 
         self.grid_info = grid_info;
-
-        // FIXME: there seems to be a bug in shape/stride computation, causing redundant indices for small shapes e.g. (2,2,2)?
         self.neighbor_indices = FlatIndex::neighbor_indices(grid_info);
 
-        let index_changed =
-            self.index
-                .iter_mut()
-                .zip(new_index)
-                .fold(false, |has_changed, (old, new)| {
-                    if
-                    /* size_changed || */
-                    *old != new {
-                        *old = new;
-                        true
-                    } else {
-                        has_changed
-                    }
-                });
-        index_changed
+        self.index
+            .iter_mut()
+            .zip(new_index)
+            .fold(false, |has_changed, (old, new)| {
+                if
+                /* size_changed || */
+                *old != new {
+                    *old = new;
+                    true
+                } else {
+                    has_changed
+                }
+            })
     }
 }
 

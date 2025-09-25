@@ -1,5 +1,5 @@
 [workspace]
-members = ["python"]
+members = ["surface-sampling", "python"]
 
 [workspace.package]
 authors = ["Vincent Messow <vincent.messow@uni-jena.de>"]
@@ -29,30 +29,29 @@ nalgebra = "0.33"
 hashbrown = "0.15"
 num-traits = "0.2"
 rayon = { version = "1.10", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
 
 [dev-dependencies]
-criterion = "0.5"
-kiss3d = "0.35"
+# see https://bheisler.github.io/criterion.rs/book/user_guide/csv_output.html
+# csv output is deprecated but it's very convenient for our plotting purposes
+criterion = { version = "0.5", features = ["csv_output"] }
 rand = "0.8"
-soa_derive = "0.13"
-dashmap = "5.5"
 crabgrind = "0.1.12"
 
 [features]
 default = []
+serde = ["dep:serde", "hashbrown/serde", "nalgebra/serde-serialize"]
 rayon = ["dep:rayon", "hashbrown/rayon"]
+# cargo feature to toggle less/more samples for benchmarks
+quick_bench = []
 
 [[bench]]
 name = "cellgrid"
 harness = false
 
-# [[bench]]
-# name = "hashmap"
-# harness = false
-
-# [[bench]]
-# name = "simd"
-# harness = false
+[[bench]]
+name = "iters"
+harness = false
 
 [profile.bench]
 opt-level = 3

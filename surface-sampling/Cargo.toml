@@ -1,0 +1,29 @@
+[package]
+name = "psssh"
+authors.workspace = true
+repository.workspace = true
+readme = "README.md"
+license.workspace = true
+description = "Protein structure surface sampling using HMC and `zelll`."
+#include = ["src/*", "Cargo.toml", "README.md", "COPYING"]
+keywords.workspace = true
+categories.workspace = true
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+nalgebra = "0.33"
+num-dual = "0.11.0"
+nuts-rs = "0.15"
+pdbtbx = "0.12.0"
+rand = "0.9.0"
+thiserror = "2.0.12"
+zelll = { path = ".." }
+
+[dev-dependencies]
+# approx = "0.5.1"
+clap = { version = "4.5.32", features = ["derive"] }
+
+[[example]]
+name = "psssh"
+path = "examples/cli.rs"

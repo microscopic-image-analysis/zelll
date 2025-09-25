@@ -1,6 +1,7 @@
 # `python-zelll`
 
-proof-of-concept bindings for `zelll` with the aim to allow for idiomatic use in Python.
+Proof-of-concept bindings for `zelll` with the aim to allow for idiomatic use in Python.
+Features are currently not documented.
 
 ## Try it Yourself
 
@@ -27,10 +28,10 @@ cg.rebuild(points, 1.0)
 
 # CellGrid objects are iterable, so you can use them like any other Iterable in Python:
 pairs = list(cg)
-pairs = [(i, j) for i, j in cg]
+pairs = [(p, q) for p, q in cg]
 pairs = []
-for i, j in cg:
-    pairs.append((i, j))
+for p, q in cg:
+    pairs.append((p, q))
 
 # Note that while CellGrid produces unique ordered index pairs, it visits its cells in arbitrary order.
 # So if you want to check whether the index pairs after `rebuild()` changed,
@@ -47,19 +48,32 @@ it = iter(cg)
 
 # The index pairs produced by CellGridIterator also contain pairs
 # with distance > cutoff.
-# Here's an example dropping the index pairs with distance > cutoff.
+# Here's an example dropping pairs with distance > cutoff.
 # Note that there are faster ways to compute the (squared) euclidean distance.
-pairs = [(i,j) for i, j in cg if np.linalg.norm(points[i] - points[j]) <= 0.5]
+pairs = [((i, p), (j, q)) for (i, p), (j, q) in cg 
+    if np.linalg.norm(np.array(p) - np.array(q)) <= 0.5]
+```
+
+### Case Study
+
+`examples/psssh.py` illustrates how the bindings can be used for prototyping purposes
+by replicating the core design implemented in 
+[`../surface-sampling/`](https://github.com/microscopic-image-analysis/zelll/tree/main/surface-sampling):
+
+```sh
+maturin develop --release
+uv venv examples/.venv
+source examples/.venv/bin/activate
+uv pip install -r examples/requirements.txt
+# download some protein structures to test
+# e.g. from here:
+# https://dockground.compbio.ku.edu/unbound/unbound-docking-benchmarks.php
+python psssh.py <PDB> -o psssh.pdb
+# you can visualize the output file using e.g. PyMol
 ```
 
 ## TODO
 
-- [ ] measure bindings performance overhead
-- [ ] fully convince myself that usage of std::mem::transmute() is sound
+- [ ] fix likely unsound `unsafe` code 
 - [ ] complete API
 - [ ] documentation
-    * [ ] integrate with readthedocs.io
-- [ ] distribution
-    * [ ] build `*.whl`s on CI
-    * [ ] publish to PyPI on release
-

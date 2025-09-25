@@ -1,7 +1,7 @@
 //! # Usage
 //!
 //! ```sh
-//! valgrind --tool=callgrind --cache-sim=yes --instr-atstart=no ./minimal_new 100000 10
+//! valgrind --tool=callgrind --cache-sim=yes --instr-atstart=no target/release/examples/cachemisses 100000 1
 //! ```
 
 use crabgrind::callgrind as valgrind;
@@ -37,6 +37,14 @@ fn main() {
         .next()
         .and_then(|arg| arg.parse::<usize>().ok())
         .unwrap_or(1);
+    let sort = args
+        .next()
+        .and_then(|arg| arg.parse::<bool>().ok())
+        .unwrap_or(false);
+    let single_precision = args
+        .next()
+        .and_then(|arg| arg.parse::<bool>().ok())
+        .unwrap_or(false);
 
     let cutoff: f64 = 10.0;
     let conc = 10.0 / cutoff.powi(3); //i.e. 100mol per 10^3 volume units
@@ -44,12 +52,26 @@ fn main() {
     let b = 3.0 * cutoff;
     let c = (size as f64 / conc) / a / b;
     let _vol_edges = (size as f64 / conc).cbrt();
-    let pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0]);
-    // pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
+    let mut pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0]);
 
-    valgrind::start_instrumentation();
-    for _ in 0..repeat {
-        let _cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
+    if sort {
+        pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
     }
-    valgrind::stop_instrumentation();
+
+    if single_precision {
+        let cutoff = cutoff as f32;
+        let pointcloud: Vec<_> = pointcloud.iter().map(|p| p.cast::<f32>()).collect();
+
+        valgrind::start_instrumentation();
+        for _ in 0..repeat {
+            let _cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
+        }
+        valgrind::stop_instrumentation();
+    } else {
+        valgrind::start_instrumentation();
+        for _ in 0..repeat {
+            let _cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
+        }
+        valgrind::stop_instrumentation();
+    }
 }

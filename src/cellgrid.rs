@@ -21,6 +21,8 @@ pub use iters::GridCell;
 pub use iters::neighborhood;
 use nalgebra::SimdPartialOrd;
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use storage::{CellSliceMeta, CellStorage};
 #[doc(inline)]
 pub use util::{Aabb, GridInfo};
@@ -56,8 +58,8 @@ pub use util::{Aabb, GridInfo};
 /// due to using sparse storage.
 ///
 /// Because we are sorting data, construction of a cell grid is _cache aware_.
-/// Unfortunately, there is not much we can do about this.
 /// However, iterating over particle pairs after the fact benefits from this.
+/// Unfortunately, there is not much we can do about this.
 ///
 /// In some settings, input data already has some structure reducing this effect.
 /// Pre-sorting data can be helpful but is not always an option, as is the case for some
@@ -105,6 +107,7 @@ pub use util::{Aabb, GridInfo};
 /// let mut cg = CellGrid::new(data.iter().copied(), 1.0);
 /// ```
 #[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CellGrid<P, const N: usize = 3, T: Float = f64>
 where
     T: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
@@ -205,29 +208,23 @@ where
 
             // cells.shrink_to_fit();
 
-            // FIXME: is this why observed runtime does not match O(n) for large hash maps? (doesn't look like it is though)
-            // FIXME: https://github.com/rust-lang/rust/pull/97215
-            // FIXME: sorting benchmark data does not yield linear runtime (even though it massively improves cache miss rate)
-            // FIXME: For rebuild() it's not that important but for rebuild_mut() it is!
+            // technically, this is O(capacity) not O(n)
+            // cf. https://github.com/rust-lang/rust/pull/97215
             cells.iter_mut().for_each(|(_, slice)| {
                 *slice = cell_lists.reserve_cell(slice.cursor());
             });
             // FIXME: what happens (below) if I reserve cells sorted by their size (above)?
-
             // FIXME: this seems to be more likely to be the cache miss culprit
             // FIXME: can we do something clever here? use an LRU cache?
             // FIXME: use sth. like itertools::tree_reduce() to somehow deal with
             // FIXME: the random access pattern of cell_lists' slices?
-            // FIXME: maybe should not store cell indices in Vec but compute them *again* from points
-            // FIXME: computation should be cheap enough and this way we might save some precious cache lines
-            // FIXME: turns out it is in fact cheap enough (but does not improve cache behavior)
-            // FIXME: so we should in fact remove FlatIndex (or make it a BTreeMap?)
             index
                 .index
                 .iter()
                 .zip(particles)
                 .enumerate()
-                // TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
+                // TODO: we know cells.get_mut() won't fail by construction
+                // TODO: but maybe use try_for_each() instead
                 .for_each(|(i, (cell, particle))| {
                     // FIXME: in principle could have multiple &mut slices into CellStorage (for parallel pushing)
                     // FIXME: would just have to make sure that cell is always unique when operating on chunks
@@ -261,7 +258,8 @@ where
 
     /// Rebuilds `self` but does so mutably. Internally allocated memory will be re-used but
     /// re-allocations may happen.
-    /// This method is usually preferred over [`rebuild()`](CellGrid::rebuild()).
+    /// In some settings, this method is preferred over [`rebuild()`](CellGrid::rebuild()),
+    /// e.g. in simulations that are expected to converge towards a stable configuration.
     ///
     /// # Examples
     /// ```
@@ -310,8 +308,7 @@ where
                 .iter()
                 .zip(particles)
                 .enumerate()
-                //TODO: clean this up, this could be nicer since we know cells.get_mut() won't fail?
-                //TODO: could use unwrap_unchecked() since this can't/shouldn't fail
+                //TODO: see `::rebuild()`
                 .for_each(|(i, (cell, particle))| {
                     self.cell_lists.push(
                         (i, particle),
@@ -389,8 +386,6 @@ where
     /// Note that the queried particle's cell must be within `cutoff` of this `CellGrid`'s bounding box.
     /// If that is not the case, `None` is returned.
     /// This restriction might be lifted in the future.
-    // FIXME: a workaround would be to allow constructing `CellGrid` with a given `Aabb`
-    // FIXME: or by padding its shape
     ///
     /// </div>
     pub fn query<Q: Particle<[T; N]>>(&self, particle: Q) -> Option<GridCell<'_, P, N, T>> {
@@ -468,6 +463,8 @@ where
     ///     });
     /// ```
     pub fn par_particle_pairs(&self) -> impl ParallelIterator<Item = ((usize, P), (usize, P))> {
+        // TODO: ideally, we would schedule 2 threads for cell.particle_pairs() with the same CPU affinity
+        // TODO: so they can share their resources
         self.par_iter().flat_map_iter(|cell| cell.particle_pairs())
     }
 

@@ -16,5 +16,7 @@ name = "zelll"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.24"
-zelll = { path  = ".." }
+bincode = { version = "2.0", features = ["serde"] }
+pyo3 = "0.26"
+zelll = { path  = "..", features = ["serde"] }
+serde = { version = "1.0" }

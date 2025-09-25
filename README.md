@@ -1,9 +1,7 @@
 # `zelll`: a Rust implementation of the cell lists algorithm.
 
-<!--
 [![Crates.io](https://img.shields.io/crates/v/zelll.svg)](https://crates.io/crates/zelll)
 [![Documentation](https://docs.rs/zelll/badge.svg)](https://docs.rs/zelll)
--->
 
 Particle simulations usually require to compute interactions between those particles.
 Considering all _pairwise_ interactions of _`n`_ particles would be of time complexity _`O(n²)`_.\
@@ -23,7 +21,7 @@ This is reflected by a few things:
 - periodic boundary conditions are currently not supported
 - parts of this implementation are more cache-aware than others, which becomes noticeable with
   larger data sets\
-  (at `10⁶` -- `10⁷` particles, mostly depending on L2 cache size)
+  (at `10⁶` -- `10⁷` particles, mostly depending on last-level cache size)
   but is less pronounced with structured data[^structureddata]
 
 ## Usage
@@ -39,6 +37,7 @@ This crate only provides iteration over particle pairs.
 It is left to the user to filter (eg. by distance) and compute interaction potentials.
 The `rayon` feature enables parallel iteration. Performance gains depend on data size and
 computational cost per pair though. Benchmarks are encouraged.
+The `serde` feature flag enables serialization.
 
 This crate is intended for simulations where performance is often paramount.
 The rust compiler offers [codegen options](https://doc.rust-lang.org/rustc/codegen-options/index.html#target-cpu) 
@@ -48,7 +47,15 @@ that can be useful in these settings, eg. like this:
 RUSTFLAGS="-C target-cpu=native" cargo bench --features rayon
 ```
 
-## Examples
+Experimental Python bindings can be found in the
+[`python/`](https://github.com/microscopic-image-analysis/zelll/tree/main/python)
+directory.
+These bindings are not intended for productive use because they are
+incomplete, likely contain unsound code and carry significant overhead.
+They are, however, suitable for exploratory purposes.
+
+### Examples
+
 ```rust
 use zelll::CellGrid;
 
@@ -62,6 +69,31 @@ for ((i, p), (j, q)) in cg.particle_pairs() {
 cg.rebuild_mut(data.iter().copied(), Some(0.5));
 ```
 
+
+### Benchmarks
+
+In addition to the `rayon` feature flag, benchmarks also read `quick_bench`
+for reduced sample sizes as full benchmarks may take quite some time.
+
+```sh
+# only runs the "Iteration" benchmark (the other valid choice is "CellGrid") 
+RUSTFLAGS="-C target-cpu=native" cargo bench --features quick_bench,rayon -- Iteration
+```
+
+Cache misses are measured via `scripts/cachemisses.sh`:
+
+```sh
+# this requires a Valgrind installation
+# presorted data: false, f32: false
+./scripts/cachemisses.sh false false > cachemisses.csv
+```
+
+## Case Study
+
+Information for a self-contained example can be found in the 
+[`surface-sampling/`](https://github.com/microscopic-image-analysis/zelll/tree/main/surface-sampling)
+directory.
+
 ## Roadmap
 
 These are improvements we want to make eventually:
@@ -74,23 +106,26 @@ These are improvements we want to make eventually:
 - [ ] periodic boundaries
 - [ ] revisit flat cell indices 
     * maximum bounding box 
-    * completely different "hashing" method
-    * hashing/flat indices are cheap, we don't really need to allocate memory for that
+    * other hashing approaches
 - [ ] redo `CellStorage`, this is rather hacky at the moment
 
 
 ## ToDo (temporary)
 
-- [ ] finish python bindings + docs
-    * only expose subset of API
-- [ ] clean up examples
-    * [ ] remove rendering dependencies
-- [ ] showcase application: docking decoy sets
-    * put into subcrate
-- [ ] benchmarks
-    * [x] cache misses (cf. `minimal_new.rs`)
-    * [ ] clean up
-    * [ ] figures for the above
+- [ ] double-check docs
+- [x] mention `psssh` here and add more details to its readme
+- [x] mention *experimental python bindings in README
+- [x] clean up examples
+    * [x] remove rendering dependencies
+- [ ] Draft
+    - [ ] proof reading
+    * [x] mention exp. py bindings in summary
+    * [x] update Fig. 3: less structures but show interior (by slicing, transparency or side-by-side samples/surface)
+    * [x] motivate case study (beginning of section), highlight zelll's utility
+        * [x] emphasize that it's about probabilistic sampling, could be misunderstood as graphics-related
+        * [x] close with more details about probabilistic aim -> "more intriguing use cases": (docking,) ISD
+    * [x] seque to Fig. 2 in introduction
+    * [x] add listing for `_sdf()` from `psssh.py` to supplementals
 
 [^etymology]: abbrv. from German _Zelllisten_ /ˈʦɛlɪstən/, for cell lists.
 [^structureddata]: Usually, (bio-)molecular data files are not completely unordered
