@@ -7,7 +7,7 @@ repository = "https://github.com/microscopic-image-analysis/zelll"
 license = "MIT"
 keywords = ["coarse-grained", "molecular-dynamics", "simulation", "cell-lists"]
 categories = ["science", "simulation"]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 
 [package]
