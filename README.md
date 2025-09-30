@@ -109,24 +109,6 @@ These are improvements we want to make eventually:
     * other hashing approaches
 - [ ] redo `CellStorage`, this is rather hacky at the moment
 
-
-## ToDo (temporary)
-
-- [ ] double-check docs
-- [x] mention `psssh` here and add more details to its readme
-- [x] mention *experimental python bindings in README
-- [x] clean up examples
-    * [x] remove rendering dependencies
-- [ ] Draft
-    - [ ] proof reading
-    * [x] mention exp. py bindings in summary
-    * [x] update Fig. 3: less structures but show interior (by slicing, transparency or side-by-side samples/surface)
-    * [x] motivate case study (beginning of section), highlight zelll's utility
-        * [x] emphasize that it's about probabilistic sampling, could be misunderstood as graphics-related
-        * [x] close with more details about probabilistic aim -> "more intriguing use cases": (docking,) ISD
-    * [x] seque to Fig. 2 in introduction
-    * [x] add listing for `_sdf()` from `psssh.py` to supplementals
-
 [^etymology]: abbrv. from German _Zelllisten_ /ˈʦɛlɪstən/, for cell lists.
 [^structureddata]: Usually, (bio-)molecular data files are not completely unordered
     even though they could be.
