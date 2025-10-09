@@ -1,3 +1,6 @@
+// FIXME: derived serde traits do not yet show up as feature-gated
+// FIXME: cf. https://github.com/rust-lang/rust/issues/103300
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 //! `zelll`[^etymology] provides a Rust implementation of the __cell lists__ algorithm.
 //!
 //! Particle simulations usually require to compute interactions between those particles.

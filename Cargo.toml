@@ -63,3 +63,7 @@ opt-level = 3
 #makes profiling difficult
 #overflow-checks = true
 lto = true
+
+[package.metadata.docs.rs]
+features = ["rayon", "serde"]
+rustdoc-args = ["--cfg", "docsrs"]
