@@ -11,10 +11,10 @@
 //! # Caveats
 //!
 //! `zelll` is motivated by _coarse-grained_ (bio-)molecular simulations but is not restricted to that.\
-//! This is reflected by a few things:
+//! This is reflected by a few points:
 //!
 //! - internally, the simulation box is represented by a (sparse) hash map only storing non-empty grid cells,
-//!   which gives an upper bound for memory usage given by _`n`_
+//!   which gives an upper bound for memory usage of _`n`_
 //! - bounding boxes are assumed to change and are computed from particle data\
 //!   (future APIs may be added to set a fixed bounding box)
 //! - instead of cell _lists_, slices into a contiguous storage buffer are used
@@ -34,7 +34,7 @@
 //! 4. rebuild `CellGrid` from updated particle positions
 //!
 //! This crate only provides iteration over particle pairs.
-//! It is left to the user to filter (eg. by distance) and compute interaction potentials.
+//! It is left to the user to filter (e.g. by distance) and compute interaction potentials.
 //! The `rayon` feature enables parallel iteration. Performance gains depend on data size and
 //! computational cost per pair though. Benchmarks are encouraged.
 //!
@@ -89,7 +89,7 @@ pub use crate::cellgrid::CellGrid;
 /// into the former or [`mint`](https://docs.rs/mint/latest/mint/) types, can be directly used.
 ///
 /// Having custom types implement this trait allows for patterns like interior mutability,
-/// referencing separate storage (eg. with ECS, or concurrent storage types),
+/// referencing separate storage (e.g. with ECS, or concurrent storage types),
 /// or particle data being of different kinds.
 ///
 /// # Examples

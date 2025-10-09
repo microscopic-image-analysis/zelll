@@ -11,10 +11,10 @@ cutoff distance by dividing the enclosing bounding box into (cuboid) grid cells.
 ## Caveats
 
 `zelll`[^etymology] is motivated by _coarse-grained_ (bio-)molecular simulations but is not restricted to that.\
-This is reflected by a few things:
+This is reflected by a few points:
 
 - internally, the simulation box is represented by a (sparse) hash map only storing non-empty grid cells,
-  which gives an upper bound for memory usage given by _`n`_
+  which gives an upper bound for memory usage of _`n`_
 - bounding boxes are assumed to change and are computed from particle data\
   (future APIs may be added to set a fixed bounding box)
 - instead of cell _lists_, slices into a contiguous storage buffer are used
@@ -34,14 +34,14 @@ The general pattern in which this crate is intended to be used is roughly:
 4. rebuild `CellGrid` from updated particle positions
 
 This crate only provides iteration over particle pairs.
-It is left to the user to filter (eg. by distance) and compute interaction potentials.
+It is left to the user to filter (e.g. by distance) and compute interaction potentials.
 The `rayon` feature enables parallel iteration. Performance gains depend on data size and
 computational cost per pair though. Benchmarks are encouraged.
 The `serde` feature flag enables serialization.
 
 This crate is intended for simulations where performance is often paramount.
 The rust compiler offers [codegen options](https://doc.rust-lang.org/rustc/codegen-options/index.html#target-cpu) 
-that can be useful in these settings, eg. like this:
+that can be useful in these settings, e.g. like this:
 
 ```sh
 RUSTFLAGS="-C target-cpu=native" cargo bench --features rayon
