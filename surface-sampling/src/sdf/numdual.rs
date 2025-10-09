@@ -1,63 +1,63 @@
 use crate::Angstrom;
 use crate::sdf::SmoothDistanceField;
-use nalgebra::{ComplexField, Const, SVector};
+use nalgebra::{ComplexField, SVector};
 use num_dual::*;
 use zelll::Particle;
-
-type DsVec<T> = DualVec<T, T, Const<3>>;
-type Ds2Vec<T> = Dual2Vec<T, T, Const<3>>;
 
 impl SmoothDistanceField {
     // TODO: this actually looks cleaner with a for loop...
     // FIXME: this should probably be done similar to LJTS?
     // FIXME: because having the hard cutoff affects the actual sdf values
-    fn sdf<F: DualNumFloat, D: DualNum<F> + ComplexField<RealField = D> + Copy>(
+    fn sdf<D: DualNum<Angstrom> + ComplexField<RealField = D> + Copy>(
         &self,
         x: SVector<D, 3>,
-        neighbors: impl Iterator<Item = (F, SVector<D, 3>)>,
-    ) -> D {
+    ) -> Option<D> {
+        let at: [D; 3] = x.into();
+        let at = at.map(|coord| coord.re());
+        let neighbors = self.inner.query_neighbors(at)?.map(|(_, atom)| {
+            let coords: [Angstrom; 3] = atom.coords();
+            let coords = coords.map(|c| c.into());
+            (atom.element.radius(), SVector::from(coords))
+        });
+
         let (scaled_exp_dists, atom_radii, total_exp_dists): (D, D, D) = neighbors
             .filter_map(|(radius, other)| {
-                let cutoff = F::from(self.inner.info().cutoff())?;
+                let cutoff = self.inner.info().cutoff();
 
                 let diff = x - other;
                 let dist = diff.norm();
 
-                if dist.re() <= cutoff {
+                if dist.re() <= cutoff.into() {
                     // L2-norm is not continuous at zero
                     // so at zero, we handle it manually with this conditional
                     // FIXME: maybe use Float::epsilon() here
-                    if dist.re() != F::zero() {
+                    if dist.re() != 0.0 {
                         Some((
                             (-dist / radius).exp(),
                             (-dist).exp() * radius,
                             (-dist).exp(),
                         ))
                     } else {
-                        let one = F::one().into();
                         // without this, num-dual would produce NaN gradients
-                        Some((one, radius.into(), one))
+                        Some((D::one(), radius.into(), D::one()))
                     }
                 } else {
                     None
                 }
             })
-            .fold(
-                (F::zero().into(), F::zero().into(), F::zero().into()),
-                |acc, curr| {
-                    let (scaled_exp_dists, atom_radii, total_exp_dists) = acc;
-                    let (scaled_exp_dist, atom_radius, exp_dist) = curr;
-                    (
-                        scaled_exp_dists + scaled_exp_dist,
-                        atom_radii + atom_radius,
-                        total_exp_dists + exp_dist,
-                    )
-                },
-            );
+            .fold((D::zero(), D::zero(), D::zero()), |acc, curr| {
+                let (scaled_exp_dists, atom_radii, total_exp_dists) = acc;
+                let (scaled_exp_dist, atom_radius, exp_dist) = curr;
+                (
+                    scaled_exp_dists + scaled_exp_dist,
+                    atom_radii + atom_radius,
+                    total_exp_dists + exp_dist,
+                )
+            });
 
         // average atom radius in neighborhood
         let sigma = atom_radii / total_exp_dists;
-        -sigma * scaled_exp_dists.ln()
+        Some(-sigma * scaled_exp_dists.ln())
     }
 
     /// Returns the (approximate) smooth distance of `pos` to the internal point cloud and its gradient.
@@ -65,15 +65,7 @@ impl SmoothDistanceField {
     /// If `pos` is too far away from the point cloud (ie. its neighborhood cannot be queried),
     /// `None` is returned.
     pub fn evaluate(&self, pos: [Angstrom; 3]) -> Option<(Angstrom, [Angstrom; 3])> {
-        let neighbors = self.inner.query_neighbors(pos)?.map(|(_, atom)| {
-            let coords: [Angstrom; 3] = atom.coords();
-            let coords = coords.map(DsVec::from_re);
-            // let coords = coords.map(Ds2Vec::from_re);
-            (atom.element.radius(), SVector::from(coords))
-        });
-        let pos = SVector::from(pos);
-        let (val, grad) = gradient(|x| self.sdf(x, neighbors), pos);
-
+        let (val, grad) = gradient(|x| self.sdf(x), &pos.into())?;
         Some((val.re(), grad.into()))
     }
 
@@ -82,17 +74,13 @@ impl SmoothDistanceField {
         pos: [Angstrom; 3],
         isoradius: Angstrom,
     ) -> Option<(Angstrom, [Angstrom; 3])> {
-        let neighbors = self.inner.query_neighbors(pos)?.map(|(_, atom)| {
-            let coords: [Angstrom; 3] = atom.coords();
-            let coords = coords.map(DsVec::from_re);
-            (atom.element.radius(), SVector::from(coords))
-        });
-        let pos = SVector::from(pos);
-
         let (val, grad) = gradient(
-            |x| self.harmonic_potential(self.sdf(x, neighbors), isoradius.into()),
-            pos,
-        );
+            |x| {
+                self.sdf(x)
+                    .map(|val| self.harmonic_potential(val, isoradius.into()))
+            },
+            &pos.into(),
+        )?;
 
         Some((val.re(), grad.into()))
     }
@@ -148,27 +136,31 @@ mod tests {
             -2.012457244274712,
             -2.2994776285300675,
             -2.990326826730122,
-            -0.7998983683589524,
+            -0.7998983683589523,
         ];
 
         let reference_grads = vec![
-            [-0.276176313229217, -0.276176313229217, -0.276176313229217],
-            [-0.276176313229217, -0.276176313229217, 0.276176313229217],
-            [-0.276176313229217, 0.276176313229217, -0.276176313229217],
-            [0.276176313229217, -0.276176313229217, -0.276176313229217],
-            [0.276176313229217, 0.276176313229217, -0.276176313229217],
-            [-0.276176313229217, 0.276176313229217, 0.276176313229217],
-            [0.276176313229217, -0.276176313229217, 0.276176313229217],
             [
-                0.14357909754235013,
-                0.14357909754235013,
-                0.14357909754235013,
+                -0.2761763132292168,
+                -0.2761763132292168,
+                -0.2761763132292168,
             ],
-            [-2.9256894966310793e-17, -0.0, -0.0],
+            [-0.2761763132292168, -0.2761763132292168, 0.2761763132292168],
+            [-0.2761763132292168, 0.2761763132292168, -0.2761763132292168],
+            [0.2761763132292168, -0.2761763132292168, -0.2761763132292168],
+            [0.2761763132292168, 0.2761763132292168, -0.2761763132292168],
+            [-0.2761763132292168, 0.2761763132292168, 0.2761763132292168],
+            [0.2761763132292168, -0.2761763132292168, 0.2761763132292168],
             [
-                0.21669568034989586,
-                0.21669568034989586,
-                0.21669568034989586,
+                0.14357909754235015,
+                0.14357909754235015,
+                0.14357909754235015,
+            ],
+            [6.651802279961878e-17, -0.0, -0.0],
+            [
+                0.21669568034989597,
+                0.21669568034989597,
+                0.21669568034989597,
             ],
         ];
 
