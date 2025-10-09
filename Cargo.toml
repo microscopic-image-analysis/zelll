@@ -25,7 +25,7 @@ edition.workspace = true
 
 [dependencies]
 itertools = "0.14"
-nalgebra = "0.33"
+nalgebra = "0.34"
 hashbrown = "0.16"
 num-traits = "0.2"
 rayon = { version = "1.10", optional = true }
