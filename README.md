@@ -88,6 +88,45 @@ Cache misses are measured via `scripts/cachemisses.sh`:
 ./scripts/cachemisses.sh false false > cachemisses.csv
 ```
 
+#### Dimensionless Lennard-Jones
+
+This benchmark measures the (sequential) runtime needed for `CellGrid construction` and particle-pair iteration
+in order to compute the total potential energy of random systems of varying sizes.
+The input data is generated identically to the other benchmarks.
+
+```sh
+# only runs the "Lennard-Jones" benchmark
+RUSTFLAGS="-C target-cpu=native" cargo bench --features quick_bench -- Lennard-Jones
+# memory can be measured using Valgrind:
+# valgrind --tool=massif --threshold=0.01 ./lj-4abe96560267fd7f -- --bench
+# note that the smallest allocation might not appear at all; run with smaller benchmark data to measure them
+```
+
+[`more_benches/in.zelllbench.txt`](https://github.com/microscopic-image-analysis/zelll/tree/main/more_benches/in.zelllbench.txt)
+provides a carefully constructed setup for [LAMMPS](https://www.lammps.org/)
+that should closely resemble this benchmark.
+
+Before starting LAMMPS, generate the same input data as used in the `zelll` benchmark:
+```sh
+# `<n>`: number of particles, `<seed>`: optional random seed
+cargo run --release --example lmp-data -- <n> <seed> > atomsinabox.txt
+# now run this benchmark in LAMMPS:
+lmp -in more_benches/in.zelllbench.txt -var data atomsinabox.txt
+```
+
+For convenience, use `scripts/more_benches.sh`:
+
+```sh
+# this requires a LAMMPS installation and may use >20GB of RAM (modify the file if necessary)
+./scripts/more_benches.sh > lammps_bench.csv
+```
+
+Note that this setup runs LAMMPS on a single CPU core without additional acceleration
+for the sake of comparability.
+This setup does not simulate any actual particle motion (that's not what we're trying to measure here).
+It only covers repeated neighbor list construction and computation of the system's
+potential energy by accumulating dimensionless Lennard-Jones interactions.
+
 ## Case Study
 
 Information for a self-contained example can be found in the 
