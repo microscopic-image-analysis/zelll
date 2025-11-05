@@ -38,6 +38,10 @@ criterion = { version = "0.5", features = ["csv_output"] }
 rand = "0.8"
 crabgrind = "0.1.12"
 
+[[example]]
+name = "lmp-data"
+path = "examples/lammps_data.rs"
+
 [features]
 default = []
 serde = ["dep:serde", "hashbrown/serde", "nalgebra/serde-serialize"]
@@ -51,6 +55,10 @@ harness = false
 
 [[bench]]
 name = "iters"
+harness = false
+
+[[bench]]
+name = "lj"
 harness = false
 
 [profile.bench]
