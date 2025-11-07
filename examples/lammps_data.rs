@@ -69,17 +69,13 @@ fn main() {
     println!("-{} {} zlo zhi", 0.5 * c, 0.5 * c);
     println!("");
     println!("Atoms # atomic");
+    println!(
+        "# lammps read_data needs an empty line here: https://docs.lammps.org/Errors_details.html#err0016"
+    );
 
     for (i, atom) in pointcloud.iter().enumerate() {
         println!("{} 1 {} {} {}", i + 1, atom.x, atom.y, atom.z);
     }
 
-    println!(
-        "{} 1 {} {} {} # additional atom to make lammps read_data happy: https://docs.lammps.org/Errors_details.html#err0016",
-        size + 1,
-        origin[0],
-        origin[1],
-        origin[2],
-    );
     println!("");
 }
