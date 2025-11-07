@@ -40,7 +40,7 @@ function compute(data)
         box,
         cl,
         parallel=false,
-    )
+    ) / n # total energy per atom (as done by LAMMPS)
 end
 
 b = @benchmarkable compute(x) setup = (x = copy(particles))
