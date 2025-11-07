@@ -69,7 +69,6 @@ for ((i, p), (j, q)) in cg.particle_pairs() {
 cg.rebuild_mut(data.iter().copied(), Some(0.5));
 ```
 
-
 ### Benchmarks
 
 In addition to the `rayon` feature flag, benchmarks also read `quick_bench`
@@ -117,8 +116,12 @@ lmp -in more_benches/in.zelllbench.txt -var data atomsinabox.txt
 For convenience, use `scripts/more_benches.sh`:
 
 ```sh
-# this requires a LAMMPS installation and may use >20GB of RAM (modify the file if necessary)
+# this requires a LAMMPS installation and may use >20GB of RAM (modify the script if necessary)
 ./scripts/more_benches.sh > lammps_bench.csv
+
+# this benchmarks `CellListMap.jl` instead
+# and requires a Julia installation and uses ~60GB of RAM (modify the script if necessary)
+./scripts/more_benches.sh false > celllistmapjl_bench.csv
 ```
 
 Note that this setup runs LAMMPS on a single CPU core without additional acceleration
@@ -126,6 +129,10 @@ for the sake of comparability.
 This setup does not simulate any actual particle motion (that's not what we're trying to measure here).
 It only covers repeated neighbor list construction and computation of the system's
 potential energy by accumulating dimensionless Lennard-Jones interactions.
+
+`more_benches.sh` can also be used to benchmark [CellListMap.jl](https://m3g.github.io/CellListMap.jl/stable/)
+However, note that fair benchmarking is difficult; 
+treat the results of `zelll`, LAMMPS and CellListMap.jl with care.
 
 ## Case Study
 
