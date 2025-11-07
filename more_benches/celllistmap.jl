@@ -49,7 +49,7 @@ results = run(b)
 
 total_energy = compute(particles)
 @printf(
-    "%d 1 %f %f %f \"CellListMap.jl\"\n",
+    "%d 1 %.14f %f %f \"CellListMap.jl\"\n",
     n,
     total_energy,
     mean(results.times) * 1e-9, # seconds
