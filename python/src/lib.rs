@@ -112,7 +112,7 @@ impl PyCellGrid {
     fn cutoff(slf: PyRef<'_, Self>) -> f64 {
         slf.inner.info().cutoff()
     }
-
+    #[pyo3(signature = (coordinates: "typing.Sequence[float]") -> "typing.Iterator[typing.Sequence[float]] | None")]
     fn query_neighbors(
         slf: PyRef<'_, Self>,
         coordinates: &Bound<'_, PyAny>,
@@ -263,11 +263,9 @@ impl PyCellQueryIter {
     }
 }
 
-/// `python-zelll`
+#[doc = include_str!("../README.md")]
 #[pymodule]
-fn zelll(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<PyCellGrid>()?;
-    m.add_class::<PyCellGridIter>()?;
-    m.add_class::<PyCellQueryIter>()?;
-    Ok(())
+pub mod zelll {
+    #[pymodule_export]
+    pub use super::{PyCellGrid, PyCellGridIter, PyCellQueryIter};
 }
