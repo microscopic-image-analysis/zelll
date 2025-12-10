@@ -56,7 +56,24 @@ impl<'py> Iterator for ParticlesIterator<'py> {
     }
 }
 
-/// 3D cell grid
+/// The central type representing a grid of cells that provides an implementation of the _cell lists_ algorithm.
+///
+/// # Examples
+///
+/// ```python
+/// from zelll import CellGrid
+/// import numpy as np
+///
+/// points = np.random.random_sample((10, 3))
+/// cg = CellGrid(points, 0.5)
+/// ```
+///
+/// `CellGrid` can also be populated after empty initialization:
+///
+/// ```python
+/// cg = CellGrid()
+/// cg.rebuild(points, 0.5)
+/// ```
 #[derive(Clone)]
 #[pyclass(name = "CellGrid", module = "zelll")]
 pub struct PyCellGrid {
@@ -264,6 +281,13 @@ impl PyCellQueryIter {
 }
 
 #[doc = include_str!("../README.md")]
+/// # How to read this documentation
+///
+/// This page only aims to document the API of the Python bindings accompanied by simple examples.
+/// We encourage the reader to consult the [documentation of the Rust library](https://docs.rs/zelll/)
+/// for further technical details and background information.
+/// If in doubt, the Rust API docs should be considered the authoritative source for the exact behavior
+/// of the library.
 #[pymodule]
 pub mod zelll {
     #[pymodule_export]
