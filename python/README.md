@@ -8,16 +8,6 @@ Bindings for [`zelll`](https://github.com/microscopic-image-analysis/zelll) with
 The latest release is documented [here](https://microscopic-image-analysis.github.io/zelll).
 Pre-built wheels can be found on [PyPI](https://pypi.python.org/pypi/zelll).
 
-## Building
-
-The following steps assume a working Rust toolchain.
-
-1. clone this repository and `cd ./zelll/python/`
-2. install [`maturin`](https://www.maturin.rs/installation)
-3. create and activate a virtual environment, eg. `python3 -m venv .venv && source .venv/bin/activate`
-4. (optionally install `numpy` in your environment for testing purposes)
-5. run `maturin develop --release` to build and install an optimized `.whl` into the current virtual environment
-
 ## Usage
 
 ```python
@@ -78,4 +68,14 @@ uv pip install -r examples/requirements.txt
 python psssh.py <PDB> -o psssh.pdb
 # you can visualize the output file using e.g. PyMol
 ```
+
+## Building
+
+The following steps assume a working Rust toolchain.
+
+1. clone this repository and `cd ./zelll/python/`
+2. install [`maturin`](https://www.maturin.rs/installation)
+3. create and activate a virtual environment, eg. `python3 -m venv .venv && source .venv/bin/activate`
+4. (optionally install `numpy` in your environment for testing purposes)
+5. run `maturin develop --release` to build and install an optimized `.whl` into the current virtual environment
 
