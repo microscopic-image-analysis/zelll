@@ -4,10 +4,11 @@
 
 # Python bindings for zelll
 
-Proof-of-concept bindings for [`zelll`](https://github.com/microscopic-image-analysis/zelll) with the aim to allow for idiomatic use in Python.
-Features are currently not documented.
+Bindings for [`zelll`](https://github.com/microscopic-image-analysis/zelll) with the aim to allow for idiomatic use in Python.
+The latest release is documented [here](https://microscopic-image-analysis.github.io/zelll).
+Pre-built wheels can be found on [PyPI](https://pypi.python.org/pypi/zelll).
 
-## Try it Yourself
+## Building
 
 The following steps assume a working Rust toolchain.
 
@@ -16,7 +17,9 @@ The following steps assume a working Rust toolchain.
 3. create and activate a virtual environment, eg. `python3 -m venv .venv && source .venv/bin/activate`
 4. (optionally install `numpy` in your environment for testing purposes)
 5. run `maturin develop --release` to build and install an optimized `.whl` into the current virtual environment
-6. open a Python REPL and start playing around (currently w/o any documentation):
+
+## Usage
+
 ```python
 from zelll import CellGrid
 import numpy as np
@@ -62,7 +65,7 @@ pairs = [((i, p), (j, q)) for (i, p), (j, q) in cg
 
 `examples/psssh.py` illustrates how the bindings can be used for prototyping purposes
 by replicating the core design implemented in 
-[`../surface-sampling/`](https://github.com/microscopic-image-analysis/zelll/tree/main/surface-sampling):
+[`surface-sampling/`](https://github.com/microscopic-image-analysis/zelll/tree/main/surface-sampling):
 
 ```sh
 maturin develop --release
@@ -76,8 +79,3 @@ python psssh.py <PDB> -o psssh.pdb
 # you can visualize the output file using e.g. PyMol
 ```
 
-## TODO
-
-- [ ] fix likely unsound `unsafe` code 
-- [ ] complete API
-- [ ] documentation

@@ -49,12 +49,8 @@ that can be useful in these settings, e.g. like this:
 RUSTFLAGS="-C target-cpu=native" cargo bench --features rayon
 ```
 
-Experimental Python bindings can be found in the
-[`python/`](https://github.com/microscopic-image-analysis/zelll/tree/main/python)
-directory.
-These bindings are not intended for productive use because they are
-incomplete, likely contain unsound code and carry significant overhead.
-They are, however, suitable for exploratory purposes.
+Limited Python bindings suitable for exploratory purposes are available on [PyPI](https://pypi.python.org/pypi/zelll).
+The latest Python API is documented [here](https://microscopic-image-analysis.github.io/zelll).
 
 ### Examples
 
