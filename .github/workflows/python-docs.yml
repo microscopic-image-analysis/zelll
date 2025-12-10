@@ -27,7 +27,7 @@ jobs:
 
       - run: pip install -e python/
       - run: pip install pdoc
-      - run: pdoc -t python/pdoc/templates -o python/docs/ zelll
+      - run: pdoc --no-show-source -t python/pdoc/templates -o python/docs/ zelll
 
       - uses: actions/upload-pages-artifact@v4
         with:
