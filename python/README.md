@@ -1,6 +1,10 @@
-# `python-zelll`
+[![Crates.io](https://img.shields.io/crates/v/zelll.svg)](https://crates.io/crates/zelll)
+[![PyPI](https://img.shields.io/pypi/v/zelll.svg)](https://pypi.python.org/pypi/zelll)
+[![Documentation](https://img.shields.io/badge/docs-Python_API-green)](https://microscopic-image-analysis.github.io/zelll)
 
-Proof-of-concept bindings for `zelll` with the aim to allow for idiomatic use in Python.
+# Python bindings for zelll
+
+Proof-of-concept bindings for [`zelll`](https://github.com/microscopic-image-analysis/zelll) with the aim to allow for idiomatic use in Python.
 Features are currently not documented.
 
 ## Try it Yourself
