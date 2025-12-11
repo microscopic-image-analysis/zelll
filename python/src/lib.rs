@@ -56,7 +56,42 @@ impl<'py> Iterator for ParticlesIterator<'py> {
     }
 }
 
-/// 3D cell grid
+/// The central type representing a grid of cells that provides an implementation of the _cell lists_ algorithm.
+///
+/// # Thread Safety
+///
+/// Instances of this type can be sent between threads and immutable access is safe.
+/// While immutable references are held, mutable access is not allowed.
+/// Note that multithreading only yields performance gains with
+/// [free-threaded](https://docs.python.org/3/library/threading.html#gil-and-performance-considerations)
+/// Python versions.
+///
+/// See also `CellGrid.rebuild`, `CellGridIter`, `CellQueryIter`.
+///
+/// # Examples
+///
+/// ```python
+/// from zelll import CellGrid
+/// import numpy as np
+///
+/// points = np.random.random_sample((10, 3))
+/// cg = CellGrid(points, 0.5)
+/// ```
+///
+/// `CellGrid` can also be populated after empty initialization:
+///
+/// ```python
+/// cg = CellGrid()
+/// cg.rebuild(points, 0.5)
+/// ```
+///
+/// `CellGrid` is an `Iterable[...]`
+/// (see also `CellGridIter`):
+///
+/// ```python
+/// for (i, p), (j, q) in cg:
+///     dist = np.linalg.norm(np.array(p) - np.array(q))
+/// ```
 #[derive(Clone)]
 #[pyclass(name = "CellGrid", module = "zelll")]
 pub struct PyCellGrid {
@@ -65,8 +100,15 @@ pub struct PyCellGrid {
 
 #[pymethods]
 impl PyCellGrid {
+    /// Constructs an instance of `CellGrid`.
+    ///
+    /// Note that `particles` can be an arbitrary `Iterable` but the items it produces
+    /// have to be 3D coordinates, i.e. only `Sequence[float]` of length `3`.
+    ///
+    /// # Examples
+    /// see `CellGrid`.
     #[new]
-    #[pyo3(signature = (particles=None, /, cutoff=1.0))]
+    #[pyo3(signature = (particles: "typing.Iterable[typing.Sequence[float]] | None" = None, /, cutoff=1.0) -> "zelll.CellGrid")]
     fn new<'py>(py: Python<'py>, particles: Option<&Bound<'py, PyAny>>, cutoff: f64) -> Self {
         let inner = match particles {
             Some(p) => {
@@ -85,7 +127,29 @@ impl PyCellGrid {
         Self { inner }
     }
 
-    #[pyo3(signature = (particles, /, cutoff=None))]
+    /// Rebuilds a `CellGrid` instance from new data.
+    ///
+    /// Note that `particles` can be an arbitrary `Iterable` but the items it produces
+    /// have to be 3D coordinates, i.e. only `Sequence[float]` of length `3`.
+    ///
+    /// # Thread Safety
+    ///
+    /// Rebuilding is not thread-safe and will throw a `RuntimeError` if other threads
+    /// are holding references.
+    /// In particular, this is the case if threads are currently iterating
+    /// by means of `CellGridIter` or `CellQueryIter`.
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// try:
+    ///     cg.rebuild(points, 1.5)
+    /// except RuntimeError as e:
+    ///     print(e)
+    ///     # consider attempting a rebuild when no other thread is accessing the `cg` anymore
+    /// ```
+    /// also see `CellGrid`.
+    #[pyo3(signature = (particles: "typing.Iterable[typing.Sequence[float]]", /, cutoff=None))]
     fn rebuild<'py>(
         mut slf: PyRefMut<'_, Self>,
         particles: &Bound<'py, PyAny>,
@@ -102,6 +166,9 @@ impl PyCellGrid {
         PyCellGridIter::new(slf)
     }
 
+    /// Returns the axis-aligned bounding box of this cell grid represented
+    /// by two 3D points.
+    #[pyo3(signature = () -> "tuple[list[float], list[float]]")]
     fn aabb(slf: PyRef<'_, Self>) -> ([f64; 3], [f64; 3]) {
         (
             slf.inner.info().bounding_box().inf(),
@@ -109,10 +176,29 @@ impl PyCellGrid {
         )
     }
 
+    /// Returns the cutoff radius used to partition the particle data into the cell grid.
     fn cutoff(slf: PyRef<'_, Self>) -> f64 {
         slf.inner.info().cutoff()
     }
 
+    /// Given 3D `coordinates`, this returns an iterator over all particles in the neighborhood
+    /// of the query location.
+    ///
+    /// Returns `None` if `coordinates` is "too far away" from the cell grid, which
+    /// depends on the specific `cutoff` radius.
+    ///
+    /// The items of the resulting iterator may have a (euclidean) distance larger than `cutoff`
+    /// with respect to the query location.
+    ///
+    /// # Examples
+    ///
+    /// Filter particles in neighborhood by euclidean distance to query location:
+    /// ```python
+    /// x = np.array([0.1, 0.1, 0.1])
+    /// neighbors =  [(i, p) for (i, p) in cg.query_neighbors(x)
+    ///     if np.linalg.norm(x - np.array(p)) <= 0.5]
+    /// ```
+    #[pyo3(signature = (coordinates: "typing.Sequence[float]") -> "zelll.CellQueryIter | None")]
     fn query_neighbors(
         slf: PyRef<'_, Self>,
         coordinates: &Bound<'_, PyAny>,
@@ -120,7 +206,23 @@ impl PyCellGrid {
         PyCellQueryIter::new(slf, coordinates)
     }
 
-    // TODO: document that this filters by inner cutoff and returns Vec<> instead
+    /// Given 3D `coordinates`, this returns a list over all particles in the neighborhood
+    /// of the query location.
+    ///
+    /// Returns `None` if `coordinates` is "too far away" from the cell grid, which
+    /// depends on the specific `cutoff` radius.
+    ///
+    /// The items of the returned list are already filtered by euclidean distance
+    /// with respect to the query location.
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// x = np.array([0.1, 0.1, 0.1])
+    /// neighbors = cg.neighbors(x)
+    /// ```
+    /// See also `CellGrid.query_neighbors`.
+    #[pyo3(signature = (coordinates: "typing.Sequence[float]") -> "list[tuple[int, list[float]]] | None")]
     fn neighbors(slf: PyRef<'_, Self>, coordinates: [f64; 3]) -> Option<Vec<(usize, [f64; 3])>> {
         let cutoff_squared = slf.inner.info().cutoff().powi(2);
         let iter = slf.inner.query_neighbors(coordinates)?;
@@ -154,6 +256,15 @@ impl PyCellGrid {
     }
 }
 
+/// `CellGridIter` is `Iterator[tuple[tuple[int, list[float]], tuple[int, list[float]]]]`
+///
+/// # Thread Safety
+///
+/// Cannot be sent between threads but a thread that has shared access to a `CellGrid`
+/// can construct a thread-local iterator.
+///
+/// # Examples
+/// see `CellGrid`.
 // PyCellGridIter is unsendable because we need to store a PyRef directly.
 // cf. https://docs.rs/pyo3/latest/pyo3/attr.pyclass.html
 #[pyclass(name = "CellGridIter", module = "zelll", unsendable)]
@@ -173,11 +284,10 @@ impl PyCellGridIter {
         // let py = py_cellgrid.py();
         // let _owner = (&py_cellgrid).into_py(py);
         let iter = Box::new((&py_cellgrid).inner.particle_pairs());
-        // SAFETY: unclear
-        // SAFETY: (but the idea is that `_keep_borrow` makes sure that `iter`s lifetime can be extended)
-        // replicating some ideas from
-        // https://github.com/PyO3/pyo3/issues/1085 and
-        // https://github.com/PyO3/pyo3/issues/1089
+        // SAFETY: but the idea is that `_keep_borrow` makes sure that `iter`s lifetime can be extended
+        // SAFETY: replicating some ideas from
+        // SAFETY: https://github.com/PyO3/pyo3/issues/1085 and
+        // SAFETY: https://github.com/PyO3/pyo3/issues/1089
         let iter = unsafe {
             std::mem::transmute::<
                 Box<dyn Iterator<Item = ((usize, [f64; 3]), (usize, [f64; 3]))> + '_>,
@@ -185,12 +295,11 @@ impl PyCellGridIter {
             >(iter)
         };
 
-        // SAFETY: unclear
-        // SAFETY: (the idea was that `_owner` ensures our static reference is valid as long as we hold `_owner`
+        // SAFETY: the idea is that `_owner` ensures our static reference is valid as long as we hold `_owner`
         // SAFETY: but experiments show that it does not seem to be necessary.
         // SAFETY: Even if the owning `PyCellGrid` is dropped, ie. goes out of scope or using `del`, the GC
         // SAFETY: seems to keep it until the last `PyCellGridIter` is dropped but
-        // SAFETY: I guess this should be profiled somehow)
+        // SAFETY: I guess this should be profiled systematically
         // SAFETY: (this might depend on `PyRef` being a wrapper around `Bound`, which might change to `Borrowed`,
         // SAFETY: could this cause problems?)
         let _keep_borrow: PyRef<'static, PyCellGrid> = unsafe { std::mem::transmute(py_cellgrid) };
@@ -226,6 +335,15 @@ impl PyCellGridIter {
     }
 }
 
+/// `CellQueryIter` is `Iterator[tuple[int, list[float]]]`
+///
+/// # Thread Safety
+///
+/// Cannot be sent between threads but a thread that has shared access to a `CellGrid`
+/// can construct a thread-local iterator.
+///
+/// # Examples
+/// see `CellGrid.query_neighbors`.
 // PyCellQueryIter is unsendable because we need to store a PyRef directly.
 #[pyclass(name = "CellQueryIter", module = "zelll", unsendable)]
 pub struct PyCellQueryIter {
@@ -263,11 +381,16 @@ impl PyCellQueryIter {
     }
 }
 
-/// `python-zelll`
-#[pymodule]
-fn zelll(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<PyCellGrid>()?;
-    m.add_class::<PyCellGridIter>()?;
-    m.add_class::<PyCellQueryIter>()?;
-    Ok(())
+#[doc = include_str!("../README.md")]
+/// # How to read this documentation
+///
+/// This page only aims to document the API of the Python bindings accompanied by simple examples.
+/// We encourage the reader to consult the [documentation of the Rust library](https://docs.rs/zelll/)
+/// for further technical details and background information.
+/// If in doubt, the Rust API docs should be considered the authoritative source for the exact behavior
+/// of the library.
+#[pymodule(gil_used = false)]
+pub mod zelll {
+    #[pymodule_export]
+    pub use super::{PyCellGrid, PyCellGridIter, PyCellQueryIter};
 }

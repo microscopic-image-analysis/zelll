@@ -1,0 +1,12 @@
+{% extends "default/module.html.jinja2" %}
+{% block nav_footer %}
+    <footer><code>zelll@{{ env["GITHUB_REF_TYPE"] | default("ref") }}/{{ env["GITHUB_REF_NAME"] | default("local") }}</code></footer>
+{% endblock %}
+
+{% macro is_public(doc) %}
+    {% if doc.qualname == "CellGrid.__new__" %}
+        true
+    {% else %}
+        {{ default_is_public(doc) }}
+    {% endif %}
+{% endmacro %}

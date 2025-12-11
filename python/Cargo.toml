@@ -4,7 +4,7 @@ authors.workspace = true
 repository.workspace = true
 readme = "README.md"
 license.workspace = true
-description = "tbd."
+description = "Python bindings for zelll."
 #include = ["src/*", "Cargo.toml", "README.md", "COPYING"]
 keywords.workspace = true
 categories.workspace = true
@@ -17,6 +17,9 @@ crate-type = ["cdylib"]
 
 [dependencies]
 bincode = { version = "2.0", features = ["serde"] }
-pyo3 = "0.26"
+pyo3 = { version = "0.26", features = ["experimental-inspect"] }
 zelll = { path  = "..", features = ["serde"] }
 serde = { version = "1.0" }
+
+[dev-dependencies]
+pyo3-introspection = "0.26.0"

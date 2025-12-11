@@ -10,6 +10,11 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dynamic = ["version"]
+dynamic = ["authors", "description", "keywords", "license", "readme", "summary", "version"]
+
+[project.urls]
+repository = "https://github.com/microscopic-image-analysis/zelll"
+documentation = "https://microscopic-image-analysis.github.io/zelll"
+
 [tool.maturin]
 features = ["pyo3/extension-module"]

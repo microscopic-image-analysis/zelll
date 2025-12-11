@@ -1,7 +1,9 @@
-# `zelll`: a Rust implementation of the cell lists algorithm.
-
 [![Crates.io](https://img.shields.io/crates/v/zelll.svg)](https://crates.io/crates/zelll)
 [![Documentation](https://docs.rs/zelll/badge.svg)](https://docs.rs/zelll)
+[![PyPI](https://img.shields.io/pypi/v/zelll.svg)](https://pypi.python.org/pypi/zelll)
+[![Python API](https://img.shields.io/badge/docs-Python_API-green)](https://microscopic-image-analysis.github.io/zelll)
+
+# `zelll`: a Rust implementation of the cell lists algorithm.
 
 Particle simulations usually require to compute interactions between those particles.
 Considering all _pairwise_ interactions of _`n`_ particles would be of time complexity _`O(n²)`_.\
@@ -47,12 +49,8 @@ that can be useful in these settings, e.g. like this:
 RUSTFLAGS="-C target-cpu=native" cargo bench --features rayon
 ```
 
-Experimental Python bindings can be found in the
-[`python/`](https://github.com/microscopic-image-analysis/zelll/tree/main/python)
-directory.
-These bindings are not intended for productive use because they are
-incomplete, likely contain unsound code and carry significant overhead.
-They are, however, suitable for exploratory purposes.
+Limited Python bindings suitable for exploratory purposes are available on [PyPI](https://pypi.python.org/pypi/zelll).
+The latest Python API is documented [here](https://microscopic-image-analysis.github.io/zelll).
 
 ### Examples
 

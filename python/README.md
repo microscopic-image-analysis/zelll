@@ -1,18 +1,15 @@
-# `python-zelll`
+[![Crates.io](https://img.shields.io/crates/v/zelll.svg)](https://crates.io/crates/zelll)
+[![PyPI](https://img.shields.io/pypi/v/zelll.svg)](https://pypi.python.org/pypi/zelll)
+[![Documentation](https://img.shields.io/badge/docs-Python_API-green)](https://microscopic-image-analysis.github.io/zelll)
 
-Proof-of-concept bindings for `zelll` with the aim to allow for idiomatic use in Python.
-Features are currently not documented.
+# Python bindings for zelll
 
-## Try it Yourself
+Bindings for [`zelll`](https://github.com/microscopic-image-analysis/zelll) with the aim to allow for idiomatic use in Python.
+The latest release is documented [here](https://microscopic-image-analysis.github.io/zelll).
+Pre-built wheels can be found on [PyPI](https://pypi.python.org/pypi/zelll).
 
-The following steps assume a working Rust toolchain.
+## Usage
 
-1. clone this repository and `cd ./zelll/python/`
-2. install [`maturin`](https://www.maturin.rs/installation)
-3. create and activate a virtual environment, eg. `python3 -m venv .venv && source .venv/bin/activate`
-4. (optionally install `numpy` in your environment for testing purposes)
-5. run `maturin develop --release` to build and install an optimized `.whl` into the current virtual environment
-6. open a Python REPL and start playing around (currently w/o any documentation):
 ```python
 from zelll import CellGrid
 import numpy as np
@@ -37,16 +34,16 @@ for p, q in cg:
 # So if you want to check whether the index pairs after `rebuild()` changed,
 # prefer `set(cg)` over `list(cg)` 
 
-# you can keep a CellGridIterator object:
+# you can keep a CellGridIter object:
 it = iter(cg)
 # however, CellGrid can't be mutated while there are iterators of it alive
 # i.e. `cg.rebuild(...)` throws a RuntimeError as long as `it` is alive
 # either use `del it` or just use iterators implicitly/in local scopes
 # (see above for examples)
-# Additionally, CellGridIterator is not thread-safe 
+# Additionally, CellGridIter is not thread-safe 
 # but CellGrid is and can be sent between threads instead.
 
-# The index pairs produced by CellGridIterator also contain pairs
+# The index pairs produced by CellGridIter also contain pairs
 # with distance > cutoff.
 # Here's an example dropping pairs with distance > cutoff.
 # Note that there are faster ways to compute the (squared) euclidean distance.
@@ -58,7 +55,7 @@ pairs = [((i, p), (j, q)) for (i, p), (j, q) in cg
 
 `examples/psssh.py` illustrates how the bindings can be used for prototyping purposes
 by replicating the core design implemented in 
-[`../surface-sampling/`](https://github.com/microscopic-image-analysis/zelll/tree/main/surface-sampling):
+[`surface-sampling/`](https://github.com/microscopic-image-analysis/zelll/tree/main/surface-sampling):
 
 ```sh
 maturin develop --release
@@ -72,8 +69,13 @@ python psssh.py <PDB> -o psssh.pdb
 # you can visualize the output file using e.g. PyMol
 ```
 
-## TODO
+## Building
 
-- [ ] fix likely unsound `unsafe` code 
-- [ ] complete API
-- [ ] documentation
+The following steps assume a working Rust toolchain.
+
+1. clone this repository and `cd ./zelll/python/`
+2. install [`maturin`](https://www.maturin.rs/installation)
+3. create and activate a virtual environment, eg. `python3 -m venv .venv && source .venv/bin/activate`
+4. (optionally install `numpy` in your environment for testing purposes)
+5. run `maturin develop --release` to build and install an optimized `.whl` into the current virtual environment
+

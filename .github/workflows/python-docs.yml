@@ -1,0 +1,48 @@
+name: python-docs
+
+# build the documentation whenever there are new tags on main
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+
+# security: restrict permissions for CI jobs.
+permissions:
+  contents: read
+
+jobs:
+  # Build the documentation and upload the static HTML files as an artifact.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - run: pip install -e python/
+      - run: pip install pdoc
+      - run: pdoc --no-show-source -t python/pdoc/templates -o python/docs/ zelll
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: python/docs/
+
+  # Deploy the artifact to GitHub pages.
+  # This is a separate job so that only actions/deploy-pages has the necessary permissions.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
