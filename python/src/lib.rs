@@ -58,6 +58,16 @@ impl<'py> Iterator for ParticlesIterator<'py> {
 
 /// The central type representing a grid of cells that provides an implementation of the _cell lists_ algorithm.
 ///
+/// # Thread Safety
+///
+/// Instances of this type can be sent between threads and immutable access is safe.
+/// While immutable references are held, mutable access is not allowed.
+/// Note that multithreading only yields performance gains with
+/// [free-threaded](https://docs.python.org/3/library/threading.html#gil-and-performance-considerations).
+/// Python versions.
+///
+/// See also `CellGrid.rebuild`, `CellGridIter`, `CellQueryIter`.
+///
 /// # Examples
 ///
 /// ```python
@@ -122,8 +132,23 @@ impl PyCellGrid {
     /// Note that `particles` can be an arbitrary `Iterable` but the items it produces
     /// have to be 3D coordinates, i.e. only `Sequence[float]` of length `3`.
     ///
+    /// # Thread Safety
+    ///
+    /// Rebuilding is not thread-safe and will throw a `RuntimeError` if other threads
+    /// are holding references.
+    /// In particular, this is the case if threads are currently iterating
+    /// by means of `CellGridIter` or `CellQueryIter`.
+    ///
     /// # Examples
-    /// see `CellGrid`.
+    ///
+    /// ```python
+    /// try:
+    ///     cg.rebuild(points, 1.5)
+    /// except RuntimeError as e:
+    ///     print(e)
+    ///     # consider attempting a rebuild when no other thread is accessing the `cg` anymore
+    /// ```
+    /// also see `CellGrid`.
     #[pyo3(signature = (particles: "typing.Iterable[typing.Sequence[float]]", /, cutoff=None))]
     fn rebuild<'py>(
         mut slf: PyRefMut<'_, Self>,
@@ -233,6 +258,11 @@ impl PyCellGrid {
 
 /// `CellGridIter` is `Iterator[tuple[tuple[int, list[float]], tuple[int, list[float]]]]`
 ///
+/// # Thread Safety
+///
+/// Cannot be sent between threads but a thread that has shared access to a `CellGrid`
+/// can construct a thread-local iterator.
+///
 /// # Examples
 /// see `CellGrid`.
 // PyCellGridIter is unsendable because we need to store a PyRef directly.
@@ -254,11 +284,10 @@ impl PyCellGridIter {
         // let py = py_cellgrid.py();
         // let _owner = (&py_cellgrid).into_py(py);
         let iter = Box::new((&py_cellgrid).inner.particle_pairs());
-        // SAFETY: unclear
-        // SAFETY: (but the idea is that `_keep_borrow` makes sure that `iter`s lifetime can be extended)
-        // replicating some ideas from
-        // https://github.com/PyO3/pyo3/issues/1085 and
-        // https://github.com/PyO3/pyo3/issues/1089
+        // SAFETY: but the idea is that `_keep_borrow` makes sure that `iter`s lifetime can be extended
+        // SAFETY: replicating some ideas from
+        // SAFETY: https://github.com/PyO3/pyo3/issues/1085 and
+        // SAFETY: https://github.com/PyO3/pyo3/issues/1089
         let iter = unsafe {
             std::mem::transmute::<
                 Box<dyn Iterator<Item = ((usize, [f64; 3]), (usize, [f64; 3]))> + '_>,
@@ -266,12 +295,11 @@ impl PyCellGridIter {
             >(iter)
         };
 
-        // SAFETY: unclear
-        // SAFETY: (the idea was that `_owner` ensures our static reference is valid as long as we hold `_owner`
+        // SAFETY: the idea is that `_owner` ensures our static reference is valid as long as we hold `_owner`
         // SAFETY: but experiments show that it does not seem to be necessary.
         // SAFETY: Even if the owning `PyCellGrid` is dropped, ie. goes out of scope or using `del`, the GC
         // SAFETY: seems to keep it until the last `PyCellGridIter` is dropped but
-        // SAFETY: I guess this should be profiled somehow)
+        // SAFETY: I guess this should be profiled systematically
         // SAFETY: (this might depend on `PyRef` being a wrapper around `Bound`, which might change to `Borrowed`,
         // SAFETY: could this cause problems?)
         let _keep_borrow: PyRef<'static, PyCellGrid> = unsafe { std::mem::transmute(py_cellgrid) };
@@ -308,6 +336,11 @@ impl PyCellGridIter {
 }
 
 /// `CellQueryIter` is `Iterator[tuple[int, list[float]]]`
+///
+/// # Thread Safety
+///
+/// Cannot be sent between threads but a thread that has shared access to a `CellGrid`
+/// can construct a thread-local iterator.
 ///
 /// # Examples
 /// see `CellGrid.query_neighbors`.
@@ -356,7 +389,7 @@ impl PyCellQueryIter {
 /// for further technical details and background information.
 /// If in doubt, the Rust API docs should be considered the authoritative source for the exact behavior
 /// of the library.
-#[pymodule]
+#[pymodule(gil_used = false)]
 pub mod zelll {
     #[pymodule_export]
     pub use super::{PyCellGrid, PyCellGridIter, PyCellQueryIter};
