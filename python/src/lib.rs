@@ -74,6 +74,14 @@ impl<'py> Iterator for ParticlesIterator<'py> {
 /// cg = CellGrid()
 /// cg.rebuild(points, 0.5)
 /// ```
+///
+/// `CellGrid` is an `Iterable[...]`
+/// (see also `CellGridIter`):
+///
+/// ```python
+/// for (i, p), (j, q) in cg:
+///     dist = np.linalg.norm(np.array(p) - np.array(q))
+/// ```
 #[derive(Clone)]
 #[pyclass(name = "CellGrid", module = "zelll")]
 pub struct PyCellGrid {
@@ -82,8 +90,15 @@ pub struct PyCellGrid {
 
 #[pymethods]
 impl PyCellGrid {
+    /// Constructs an instance of `CellGrid`.
+    ///
+    /// Note that `particles` can be an arbitrary `Iterable` but the items it produces
+    /// have to be 3D coordinates, i.e. only `Sequence[float]` of length `3`.
+    ///
+    /// # Examples
+    /// see `CellGrid`.
     #[new]
-    #[pyo3(signature = (particles=None, /, cutoff=1.0))]
+    #[pyo3(signature = (particles: "typing.Iterable[typing.Sequence[float]] | None" = None, /, cutoff=1.0) -> "zelll.CellGrid")]
     fn new<'py>(py: Python<'py>, particles: Option<&Bound<'py, PyAny>>, cutoff: f64) -> Self {
         let inner = match particles {
             Some(p) => {
@@ -102,7 +117,14 @@ impl PyCellGrid {
         Self { inner }
     }
 
-    #[pyo3(signature = (particles, /, cutoff=None))]
+    /// Rebuilds a `CellGrid` instance from new data.
+    ///
+    /// Note that `particles` can be an arbitrary `Iterable` but the items it produces
+    /// have to be 3D coordinates, i.e. only `Sequence[float]` of length `3`.
+    ///
+    /// # Examples
+    /// see `CellGrid`.
+    #[pyo3(signature = (particles: "typing.Iterable[typing.Sequence[float]]", /, cutoff=None))]
     fn rebuild<'py>(
         mut slf: PyRefMut<'_, Self>,
         particles: &Bound<'py, PyAny>,
@@ -119,6 +141,9 @@ impl PyCellGrid {
         PyCellGridIter::new(slf)
     }
 
+    /// Returns the axis-aligned bounding box of this cell grid represented
+    /// by two 3D points.
+    #[pyo3(signature = () -> "tuple[list[float], list[float]]")]
     fn aabb(slf: PyRef<'_, Self>) -> ([f64; 3], [f64; 3]) {
         (
             slf.inner.info().bounding_box().inf(),
@@ -126,10 +151,29 @@ impl PyCellGrid {
         )
     }
 
+    /// Returns the cutoff radius used to partition the particle data into the cell grid.
     fn cutoff(slf: PyRef<'_, Self>) -> f64 {
         slf.inner.info().cutoff()
     }
-    #[pyo3(signature = (coordinates: "typing.Sequence[float]") -> "typing.Iterator[typing.Sequence[float]] | None")]
+
+    /// Given 3D `coordinates`, this returns an iterator over all particles in the neighborhood
+    /// of the query location.
+    ///
+    /// Returns `None` if `coordinates` is "too far away" from the cell grid, which
+    /// depends on the specific `cutoff` radius.
+    ///
+    /// The items of the resulting iterator may have a (euclidean) distance larger than `cutoff`
+    /// with respect to the query location.
+    ///
+    /// # Examples
+    ///
+    /// Filter particles in neighborhood by euclidean distance to query location:
+    /// ```python
+    /// x = np.array([0.1, 0.1, 0.1])
+    /// neighbors =  [(i, p) for (i, p) in cg.query_neighbors(x)
+    ///     if np.linalg.norm(x - np.array(p)) <= 0.5]
+    /// ```
+    #[pyo3(signature = (coordinates: "typing.Sequence[float]") -> "zelll.CellQueryIter | None")]
     fn query_neighbors(
         slf: PyRef<'_, Self>,
         coordinates: &Bound<'_, PyAny>,
@@ -137,7 +181,23 @@ impl PyCellGrid {
         PyCellQueryIter::new(slf, coordinates)
     }
 
-    // TODO: document that this filters by inner cutoff and returns Vec<> instead
+    /// Given 3D `coordinates`, this returns a list over all particles in the neighborhood
+    /// of the query location.
+    ///
+    /// Returns `None` if `coordinates` is "too far away" from the cell grid, which
+    /// depends on the specific `cutoff` radius.
+    ///
+    /// The items of the returned list are already filtered by euclidean distance
+    /// with respect to the query location.
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// x = np.array([0.1, 0.1, 0.1])
+    /// neighbors = cg.neighbors(x)
+    /// ```
+    /// See also `CellGrid.query_neighbors`.
+    #[pyo3(signature = (coordinates: "typing.Sequence[float]") -> "list[tuple[int, list[float]]] | None")]
     fn neighbors(slf: PyRef<'_, Self>, coordinates: [f64; 3]) -> Option<Vec<(usize, [f64; 3])>> {
         let cutoff_squared = slf.inner.info().cutoff().powi(2);
         let iter = slf.inner.query_neighbors(coordinates)?;
@@ -171,6 +231,10 @@ impl PyCellGrid {
     }
 }
 
+/// `CellGridIter` is `Iterator[tuple[tuple[int, list[float]], tuple[int, list[float]]]]`
+///
+/// # Examples
+/// see `CellGrid`.
 // PyCellGridIter is unsendable because we need to store a PyRef directly.
 // cf. https://docs.rs/pyo3/latest/pyo3/attr.pyclass.html
 #[pyclass(name = "CellGridIter", module = "zelll", unsendable)]
@@ -243,6 +307,10 @@ impl PyCellGridIter {
     }
 }
 
+/// `CellQueryIter` is `Iterator[tuple[int, list[float]]]`
+///
+/// # Examples
+/// see `CellGrid.query_neighbors`.
 // PyCellQueryIter is unsendable because we need to store a PyRef directly.
 #[pyclass(name = "CellQueryIter", module = "zelll", unsendable)]
 pub struct PyCellQueryIter {

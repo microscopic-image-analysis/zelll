@@ -34,16 +34,16 @@ for p, q in cg:
 # So if you want to check whether the index pairs after `rebuild()` changed,
 # prefer `set(cg)` over `list(cg)` 
 
-# you can keep a CellGridIterator object:
+# you can keep a CellGridIter object:
 it = iter(cg)
 # however, CellGrid can't be mutated while there are iterators of it alive
 # i.e. `cg.rebuild(...)` throws a RuntimeError as long as `it` is alive
 # either use `del it` or just use iterators implicitly/in local scopes
 # (see above for examples)
-# Additionally, CellGridIterator is not thread-safe 
+# Additionally, CellGridIter is not thread-safe 
 # but CellGrid is and can be sent between threads instead.
 
-# The index pairs produced by CellGridIterator also contain pairs
+# The index pairs produced by CellGridIter also contain pairs
 # with distance > cutoff.
 # Here's an example dropping pairs with distance > cutoff.
 # Note that there are faster ways to compute the (squared) euclidean distance.
