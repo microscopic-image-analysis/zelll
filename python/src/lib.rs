@@ -63,7 +63,7 @@ impl<'py> Iterator for ParticlesIterator<'py> {
 /// Instances of this type can be sent between threads and immutable access is safe.
 /// While immutable references are held, mutable access is not allowed.
 /// Note that multithreading only yields performance gains with
-/// [free-threaded](https://docs.python.org/3/library/threading.html#gil-and-performance-considerations).
+/// [free-threaded](https://docs.python.org/3/library/threading.html#gil-and-performance-considerations)
 /// Python versions.
 ///
 /// See also `CellGrid.rebuild`, `CellGridIter`, `CellQueryIter`.
