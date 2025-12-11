@@ -1,13 +1,12 @@
 name: python-docs
 
-# build the documentation whenever there are new commits on main
+# build the documentation whenever there are new tags on main
 on:
   push:
     branches:
-      - python-api
-    # Alternative: only build for tags.
-    # tags:
-    #   - '*'
+      - main
+    tags:
+      - '*'
 
 # security: restrict permissions for CI jobs.
 permissions:
