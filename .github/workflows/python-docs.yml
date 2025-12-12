@@ -5,8 +5,7 @@ on:
   push:
     # branches:
     #   - main
-    tags:
-      - ['v*']
+    tags: ['v*']
 
 # security: restrict permissions for CI jobs.
 permissions:
