@@ -4,3 +4,4 @@ numpy==2.2.6
 nutpie==0.15.2
 pymc==5.25.1
 pytensor==2.31.7
+numba==0.63.1
