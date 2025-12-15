@@ -7,8 +7,6 @@ name: Build and Publish to pypi.org
 
 on:
   push:
-    branches:
-      - main
     tags: ['v*']
   pull_request:
   workflow_dispatch:
