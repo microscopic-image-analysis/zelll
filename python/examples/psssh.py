@@ -121,6 +121,7 @@ if __name__ == "__main__":
         compiled = nutpie.compile_pymc_model(model)
         # zelll's Python bindings don't benefit from nutpie's multithreading
         # unless a free-threaded Python build is used
+        # however, num_dual currently has no pre-built free-threaded wheels
         trace = nutpie.sample(
             compiled,
             save_warmup=False,
