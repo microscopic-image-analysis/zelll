@@ -272,9 +272,7 @@ impl PyCellGrid {
 #[pyclass(name = "CellGridIter", module = "zelll", unsendable)]
 pub struct PyCellGridIter {
     // TODO: it looks like we probably don't need `_owner`
-    // TODO: also haven't yet figured out how to migrate this from IntoPy to IntoPyObject
-    // TODO: likely need more unsafe using Py::from_*_pointer()
-    // _owner: PyObject,
+    // _owner: Py<PyAny>,
     // TODO: `_keep_borrow` is enough to maintain correct drop order *and* prevents `PyCellGrid`
     // TODO: from being mutated while `PyCellGridIter` is still alive
     _keep_borrow: PyRef<'static, PyCellGrid>,
@@ -284,9 +282,11 @@ pub struct PyCellGridIter {
 impl PyCellGridIter {
     fn new(py_cellgrid: PyRef<'_, PyCellGrid>) -> Self {
         // let py = py_cellgrid.py();
-        // let _owner = (&py_cellgrid).into_py(py);
+        // let _owner = (&py_cellgrid)
+        //     .into_py_any(py)
+        //     .expect("could not store owner internally");
         let iter = Box::new((&py_cellgrid).inner.particle_pairs());
-        // SAFETY: but the idea is that `_keep_borrow` makes sure that `iter`s lifetime can be extended
+        // SAFETY: the idea is that `_keep_borrow` makes sure that `iter`s lifetime can be extended
         // SAFETY: replicating some ideas from
         // SAFETY: https://github.com/PyO3/pyo3/issues/1085 and
         // SAFETY: https://github.com/PyO3/pyo3/issues/1089
