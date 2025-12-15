@@ -12,11 +12,11 @@ use pyo3::types::PyIterator;
 // TODO: where we accept an arbitrary `ParticlesIterable` as we currently do
 // TODO: but also perhaps clone into some buffer so we don't have to hold the GIL for too long
 #[derive(Clone)]
-struct ParticlesIterable<'py> {
-    inner: Bound<'py, PyAny>,
+struct ParticlesIterable<'a, 'py> {
+    inner: Borrowed<'a, 'py, PyAny>,
 }
 
-impl<'py> IntoIterator for ParticlesIterable<'py> {
+impl<'a, 'py> IntoIterator for ParticlesIterable<'a, 'py> {
     type Item = [f64; 3];
     type IntoIter = ParticlesIterator<'py>;
 
@@ -45,7 +45,7 @@ impl<'py> Iterator for ParticlesIterator<'py> {
         // otherwise, retry with next element
         loop {
             match self.iter.next().transpose() {
-                Ok(Some(p)) => match <[f64; 3] as FromPyObject>::extract_bound(&p) {
+                Ok(Some(p)) => match <[f64; 3] as FromPyObject>::extract(p.as_borrowed()) {
                     Ok(p) => break Some(p),
                     Err(_) => (),
                 },
@@ -109,12 +109,14 @@ impl PyCellGrid {
     /// see `CellGrid`.
     #[new]
     #[pyo3(signature = (particles: "typing.Iterable[typing.Sequence[float]] | None" = None, /, cutoff=1.0) -> "zelll.CellGrid")]
-    fn new<'py>(py: Python<'py>, particles: Option<&Bound<'py, PyAny>>, cutoff: f64) -> Self {
+    fn new<'py>(py: Python<'py>, particles: Option<Bound<PyAny>>, cutoff: f64) -> Self {
         let inner = match particles {
             Some(p) => {
                 // TODO: see if we can simplify ParticlesIterable, it wraps Bound<>, so holds the GIL
                 // TODO: would like to call ::new() detached from the GIL if that's possible?
-                let particles = ParticlesIterable { inner: p.clone() };
+                let particles = ParticlesIterable {
+                    inner: p.as_borrowed(),
+                };
                 CellGrid::new(particles, cutoff)
             }
             // nutpie+multithreading needs to serialize/deserialize PyCellGrid
@@ -152,11 +154,11 @@ impl PyCellGrid {
     #[pyo3(signature = (particles: "typing.Iterable[typing.Sequence[float]]", /, cutoff=None))]
     fn rebuild<'py>(
         mut slf: PyRefMut<'_, Self>,
-        particles: &Bound<'py, PyAny>,
+        particles: Bound<'py, PyAny>,
         cutoff: Option<f64>,
     ) -> () {
         let particles = ParticlesIterable {
-            inner: particles.clone(),
+            inner: particles.as_borrowed(),
         };
 
         slf.inner.rebuild_mut(particles, cutoff);
@@ -201,9 +203,9 @@ impl PyCellGrid {
     #[pyo3(signature = (coordinates: "typing.Sequence[float]") -> "zelll.CellQueryIter | None")]
     fn query_neighbors(
         slf: PyRef<'_, Self>,
-        coordinates: &Bound<'_, PyAny>,
+        coordinates: Bound<'_, PyAny>,
     ) -> Option<PyCellQueryIter> {
-        PyCellQueryIter::new(slf, coordinates)
+        PyCellQueryIter::new(slf, coordinates.as_borrowed())
     }
 
     /// Given 3D `coordinates`, this returns a list over all particles in the neighborhood
@@ -324,6 +326,12 @@ impl PyCellGridIter {
 //     }
 // }
 
+// impl Drop for PyCellQueryIter {
+//     fn drop(&mut self) {
+//         eprintln!("Dropping PyCellQueryIter");
+//     }
+// }
+
 #[pymethods]
 impl PyCellGridIter {
     fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
@@ -352,8 +360,11 @@ pub struct PyCellQueryIter {
 }
 
 impl PyCellQueryIter {
-    fn new(py_cellgrid: PyRef<'_, PyCellGrid>, coordinates: &Bound<'_, PyAny>) -> Option<Self> {
-        let coordinates = <[f64; 3] as FromPyObject>::extract_bound(coordinates).ok()?;
+    fn new(
+        py_cellgrid: PyRef<'_, PyCellGrid>,
+        coordinates: Borrowed<'_, '_, PyAny>,
+    ) -> Option<Self> {
+        let coordinates = <[f64; 3] as FromPyObject>::extract(coordinates).ok()?;
         let iter = Box::new((&py_cellgrid).inner.query_neighbors(coordinates)?);
         // SAFETY: see PyCellGridIter
         let iter = unsafe {
