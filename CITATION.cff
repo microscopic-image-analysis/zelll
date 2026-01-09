@@ -1,0 +1,48 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: ' zelll: a fast, framework-free, and flexible implementation of the cell lists algorithm for the Rust programming language'
+message: >-
+  If you use this software, please cite the research article
+  and a versioned Zenodo DOI if appropriate.
+type: software
+authors:
+  - given-names: Vincent
+    family-names: Messow
+    orcid: 'https://orcid.org/0000-0002-4467-8804'
+  - given-names: Christian
+    family-names: Höner zu Siederdissen
+    orcid: 'https://orcid.org/0000-0001-9517-5839'
+  - given-names: Michael
+    family-names: Habeck
+    orcid: 'https://orcid.org/0000-0002-2188-5667'
+identifiers:
+  - type: doi
+    value: 10.1093/bioadv/vbaf330
+    description: Open Access Article
+  - type: doi
+    value: 10.5281/zenodo.18183795
+    description: >-
+      The unversioned DOI of the Zenodo Archive for this
+      work
+repository-code: 'https://github.com/microscopic-image-analysis/zelll'
+url: 'https://microscopic-image-analysis.github.io/zelll'
+repository: 'https://crates.io/crates/zelll'
+repository-artifact: 'https://pypi.python.org/pypi/zelll'
+abstract: >-
+  The cell lists algorithm is widely used to compute
+  pairwise particle interactions below a fixed cutoff
+  distance in approximately linear time. Prominent molecular
+  dynamics frameworks implementing cell lists variants
+  assume pre-determined and densely populated simulation
+  boxes suitable for e.g. all-atom simulations with explicit
+  solvents. zelll implements a simple yet efficient variant
+  of the cell lists algorithm that uses sparse storage for
+  the underlying partitioning grid. This allows for
+  applications with dynamic simulation boundaries and
+  sparsely populated simulation space not strictly fitting
+  into the scope of common molecular dynamics frameworks,
+  such as many coarse-grained simulations. For this reason,
+  zelll does not target specific frameworks.
+license: MIT

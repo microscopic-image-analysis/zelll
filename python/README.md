@@ -2,6 +2,9 @@
 [![PyPI](https://img.shields.io/pypi/v/zelll.svg)](https://pypi.python.org/pypi/zelll)
 [![Documentation](https://img.shields.io/badge/docs-Python_API-green)](https://microscopic-image-analysis.github.io/zelll)
 
+[![Paper](https://img.shields.io/badge/Paper-10.1093%2Fbioadv%2Fvbaf330-darkblue)](https://doi.org/10.1093/bioadv/vbaf330)
+[![Zenodo](https://zenodo.org/badge/DOI/10.5281/zenodo.18183795.svg)](https://doi.org/10.5281/zenodo.18183795)
+
 # Python bindings for zelll
 
 Bindings for [`zelll`](https://github.com/microscopic-image-analysis/zelll) with the aim to allow for idiomatic use in Python.
