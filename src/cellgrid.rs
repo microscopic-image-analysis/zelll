@@ -100,11 +100,11 @@ pub use util::{Aabb, GridInfo};
 /// ```
 /// Any type implementing [`Particle`] can be used:
 /// ```
-/// # use zelll::CellGrid;
+/// # use zelll::{CellGrid, WrappedParticle};
 /// use nalgebra::SVector;
 ///
 /// let data: Vec<SVector<f32, 2>> = vec![[0.0, 0.0].into(), [1.0,2.0].into(), [0.0, 0.1].into()];
-/// let mut cg = CellGrid::new(data.iter().copied(), 1.0);
+/// let mut cg = CellGrid::new(data.iter().copied().map(WrappedParticle::from), 1.0);
 /// ```
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

@@ -124,13 +124,85 @@ pub trait Particle<T = [f64; 3]>: Copy {
 // TODO: Might consider restricting this impl.
 // TODO: While we can be this generic, this might help articulating our intentions better:
 // TODO: impl<P, T, const N: usize> Particle<[T; N]> for P where P: Into<[T; N]> + Copy {
-impl<P, T> Particle<T> for P
+// impl<P, T, const N: usize> Particle<[T; N]> for P
+// where
+//     P: Into<[T; N]> + Copy,
+// {
+//     #[inline]
+//     fn coords(&self) -> [T; N] {
+//         <P as Into<[T; N]>>::into(*self)
+//     }
+// }
+
+// #[derive(Copy, Clone)]
+// pub struct LabeledParticle<L, T>(L, T);
+
+// impl<L: Copy, T: Copy, P: Particle<T>> Particle<T> for LabeledParticle<L, P> {
+//     fn coords(&self) -> T {
+//         self.1.coords()
+//     }
+// }
+
+// TODO: maybe name this Particle, and the trait should be ParticleLike?
+// TODO: could have additional trait alias IntoParticle: Into<[T; N]> + Copy where T: Copy?
+// TODO: then blanket impl ParticleLike on IntoParticle? is that possible?
+// TODO: alternative: IntoParticle could be somewhat object-safe in the sense that it has
+// TODO: a trait method returning (formerly Wrapped)Particle<P>
+// TODO: maybe it would be object-safe it has an associated type instead of parameter P
+// TODO: if I make (Wrapped)Particle a tuple struct again, we wouldn't need the from impl anymore
+// TODO: which would turn .map(WrappedParticle::from) into .map(WrappedParticle)
+// TODO: ( or rather .map(Particle) after renaming)
+#[derive(Copy, Clone, Debug, Default)]
+pub struct WrappedParticle<P> {
+    inner: P,
+}
+
+impl<P, T: Copy, const N: usize> Particle<[T; N]> for WrappedParticle<P>
 where
-    P: Into<T> + Copy,
+    // P: Particle<T>,
+    P: Into<[T; N]> + Copy,
+{
+    fn coords(&self) -> [T; N] {
+        // self.inner.coords()
+        <P as Into<[T; N]>>::into(self.inner)
+    }
+}
+
+use std::ops::Deref;
+
+impl<P> Deref for WrappedParticle<P> {
+    type Target = P;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<P> From<P> for WrappedParticle<P> {
+    fn from(value: P) -> Self {
+        Self { inner: value }
+    }
+}
+
+impl<P, T, const N: usize> Particle<[T; N]> for (usize, P)
+where
+    /* P: Into<[T; N]> + Copy, */
+    P: Particle<[T; N]>,
 {
     #[inline]
-    fn coords(&self) -> T /* [T; N] */ {
-        <P as Into<T>>::into(*self)
+    fn coords(&self) -> [T; N] /* [T; N] */ {
+        /* <P as Into<[T; N]>>::into(self.1) */
+        self.1.coords()
+    }
+}
+
+impl<T, const N: usize> Particle<[T; N]> for [T; N]
+where
+    T: Copy,
+{
+    #[inline]
+    fn coords(&self) -> [T; N] {
+        *self
     }
 }
 
@@ -199,13 +271,49 @@ mod tests {
     }
 
     #[test]
+    fn test_wrapped_particle() {
+        // let x: WrappedParticle<_> = [0.0f64; 3].into();
+        let x = WrappedParticle::from([0.0f64; 3]);
+        x.coords(); // calls impl Particle<T> for WrappedParticle<P>
+        (*x).coords(); // calls implParticle<T> for P where P: Particle<T>
+
+        let points = std::iter::repeat_n(x, 10);
+
+        let _ = points.clone().enumerate().map(|ix| ix.coords());
+        let _ = points.enumerate().map(|(_i, x)| x.coords());
+
+        let points = std::iter::repeat_n([0.0f64; 3], 10);
+
+        let _ = points.clone().enumerate().map(|ix| ix.coords());
+        let _ = points.enumerate().map(|(_i, x)| x.coords());
+
+        let points = std::iter::repeat_n(SVector::from([0.0f64; 3]), 10);
+
+        let _ = points
+            .clone()
+            .map(WrappedParticle::from)
+            .enumerate()
+            .map(|ix| -> [f64; 3] { ix.coords() });
+
+        let _ = points
+            .clone()
+            .map(WrappedParticle::from)
+            .enumerate()
+            .map(|(_i, x)| -> [f64; 3] { x.coords() });
+    }
+
+    #[test]
     fn test_impl_particle() {
         let points = vec![[0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3]];
 
         let _ps = PStorage::<_, SparseGrid>::new(points.iter().copied());
         let _ps: PStorage<_> = PStorage::new(points.clone().into_iter());
 
-        let points: Vec<_> = points.into_iter().map(|p| SVector::from(p)).collect();
+        let points: Vec<_> = points
+            .into_iter()
+            .map(SVector::from)
+            .map(WrappedParticle::from)
+            .collect();
         let ps = PStorage::new_sparse(points.iter().copied());
 
         let _: Vec<[_; 3]> = ps.convert();
@@ -225,8 +333,7 @@ mod tests {
 
         let points = vec![[0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3]];
 
-        let ps: PStorage<ParticleRef> =
-            PStorage::new(points.iter().map(|p| ParticleRef(p)).clone());
+        let ps: PStorage<ParticleRef> = PStorage::new(points.iter().map(ParticleRef).clone());
         let _: Vec<[_; 3]> = ps.convert();
     }
 }

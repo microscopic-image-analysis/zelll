@@ -5,9 +5,9 @@ use criterion::{
 use nalgebra::{Point, Point3, Vector3, distance_squared};
 use rand::distributions::Standard;
 use rand::prelude::*;
-use zelll::CellGrid;
 #[cfg(feature = "rayon")]
 use zelll::rayon::ParallelIterator;
+use zelll::{CellGrid, WrappedParticle};
 
 type F32or64 = f64;
 
@@ -53,12 +53,28 @@ pub fn bench_cellgrid(c: &mut Criterion) {
 
         let pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0], None);
         // pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
-        let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
+        let cg = CellGrid::new(
+            pointcloud
+                .iter()
+                .map(|p| p.coords)
+                .map(WrappedParticle::from),
+            cutoff,
+        );
 
         group.bench_with_input(
             BenchmarkId::new("::new()", size),
             &pointcloud,
-            |b, pointcloud| b.iter(|| CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff)),
+            |b, pointcloud| {
+                b.iter(|| {
+                    CellGrid::new(
+                        pointcloud
+                            .iter()
+                            .map(|p| p.coords)
+                            .map(WrappedParticle::from),
+                        cutoff,
+                    )
+                })
+            },
         );
 
         group.bench_with_input(
@@ -69,7 +85,7 @@ pub fn bench_cellgrid(c: &mut Criterion) {
                 b.iter(|| {
                     cg.particle_pairs()
                         .filter(|&((_i, p), (_j, q))| {
-                            distance_squared(&p.into(), &q.into()) <= cutoff_squared
+                            distance_squared(&(*p).into(), &(*q).into()) <= cutoff_squared
                         })
                         .for_each(|_| {});
                 })
@@ -84,7 +100,7 @@ pub fn bench_cellgrid(c: &mut Criterion) {
                 let cutoff_squared = cutoff.powi(2);
                 b.iter(|| {
                     cg.par_particle_pairs().for_each(|((_i, p), (_j, q))| {
-                        if distance_squared(&p.into(), &q.into()) <= cutoff_squared {
+                        if distance_squared(&(*p).into(), &(*q).into()) <= cutoff_squared {
                         } else {
                         }
                     });
