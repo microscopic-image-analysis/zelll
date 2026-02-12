@@ -3,7 +3,7 @@
 use crate::cellgrid::storage::CellSliceMeta;
 #[cfg(feature = "rayon")]
 use crate::rayon::ParallelIterator;
-use crate::{CellGrid, Particle};
+use crate::{CellGrid, ParticleLike};
 use core::iter::FusedIterator;
 use core::slice::Iter;
 use itertools::Itertools;
@@ -95,7 +95,7 @@ pub mod neighborhood {
 pub struct GridCell<'g, P, const N: usize = 3, F: Float = f64>
 where
     F: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
-    P: Particle<[F; N]>,
+    P: ParticleLike<[F; N]>,
 {
     //TODO: maybe provide proper accessors to these fields for neighbors.rs to use?
     //TODO: is there a better way than having a reference to the containing CellGrid?
@@ -106,7 +106,7 @@ where
 impl<'g, P, const N: usize, F> GridCell<'g, P, N, F>
 where
     F: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
-    P: Particle<[F; N]> + Send + Sync,
+    P: ParticleLike<[F; N]> + Send + Sync,
 {
     /// Returns the (flat) cell index of this (possibly empty) `GridCell`.
     pub(crate) fn index(&self) -> i32 {
@@ -218,7 +218,7 @@ where
 impl<P, const N: usize, F> CellGrid<P, N, F>
 where
     F: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
-    P: Particle<[F; N]>,
+    P: ParticleLike<[F; N]>,
 {
     /// Returns an iterator over all [`GridCell`]s in this `CellGrid`, excluding empty cells.
     ///

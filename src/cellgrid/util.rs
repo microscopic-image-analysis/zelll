@@ -1,5 +1,5 @@
 //! Several utility items that might be useful but usually do not need be interacted with.
-use crate::Particle;
+use crate::ParticleLike;
 use nalgebra::{Point, SVector, SimdPartialOrd};
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
 #[cfg(feature = "serde")]
@@ -32,7 +32,7 @@ where
 {
     /// Computes the componentwise minimum and maximum from the coordinates
     /// of the supplied particle data.
-    pub fn from_particles<P: Particle<[F; N]>>(
+    pub fn from_particles<P: ParticleLike<[F; N]>>(
         mut particles: impl Iterator<Item = impl Borrow<P>>,
     ) -> Self {
         let init = particles
@@ -52,7 +52,7 @@ where
     }
 
     //TODO: could also pass iterators here (single point could be wrapped by std::iter::once or Option::iter())
-    fn update<P: Particle<[F; N]>>(&mut self, particle: impl Borrow<P>) {
+    fn update<P: ParticleLike<[F; N]>>(&mut self, particle: impl Borrow<P>) {
         let p = Point::from(particle.borrow().coords());
         self.inf = p.inf(&self.inf);
         self.sup = p.sup(&self.sup);

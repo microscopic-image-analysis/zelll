@@ -2,7 +2,7 @@ use crate::Angstrom;
 use crate::sdf::SmoothDistanceField;
 use nalgebra::{ComplexField, SVector};
 use num_dual::*;
-use zelll::Particle;
+use zelll::ParticleLike;
 
 impl SmoothDistanceField {
     // TODO: this actually looks cleaner with a for loop...

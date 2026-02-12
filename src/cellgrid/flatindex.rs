@@ -1,7 +1,7 @@
 //TODO: currently assuming that the order of points in point cloud does not change
 //TODO: i.e. index in flatindex corresponds to index in point cloud, this should be documented
 use super::util::{Aabb, GridInfo};
-use crate::Particle;
+use crate::ParticleLike;
 use itertools::Itertools;
 use nalgebra::SimdPartialOrd;
 use num_traits::{AsPrimitive, ConstOne, ConstZero, Float, NumAssignOps};
@@ -73,7 +73,7 @@ where
     //TODO: see https://www.rustsim.org/blog/2020/03/23/simd-aosoa-in-nalgebra/#using-simd-aosoa-for-linear-algebra-in-rust-ultraviolet-and-nalgebra
     //TODO: or can I chunk iterators such that rustc auto-vectorizes?
     //TODO: see https://www.nickwilcox.com/blog/autovec/
-    pub fn from_particles<P: Particle<[F; N]>>(
+    pub fn from_particles<P: ParticleLike<[F; N]>>(
         particles: impl IntoIterator<Item = impl Borrow<P>> + Clone,
         cutoff: F,
     ) -> Self {
@@ -110,7 +110,7 @@ where
     // there is no rebuild(), named it rebuild_mut() to match CellGrid::rebuild_mut()
     // TODO: Documentation: return bool indicating whether the index changed at all (in length or any individual entry)
     // TODO: benchmark with changing point iterators
-    pub fn rebuild_mut<P: Particle<[F; N]>>(
+    pub fn rebuild_mut<P: ParticleLike<[F; N]>>(
         &mut self,
         particles: impl IntoIterator<Item = impl Borrow<P>> + Clone,
         cutoff: Option<F>,

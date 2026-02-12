@@ -11,7 +11,7 @@ mod storage;
 #[allow(dead_code)]
 pub mod util;
 
-use crate::Particle;
+use crate::ParticleLike;
 #[cfg(feature = "rayon")]
 use crate::rayon::ParallelIterator;
 use flatindex::FlatIndex;
@@ -129,7 +129,7 @@ where
 // TODO: however for sequential data (biomolecules) this may destroy implicit order (so that would have to be modelled implicitley)
 // TODO: also, with reordered data, leapfrog integration buffers have to be shuffled accordingly
 // TODO: which is not that nice
-impl<P: Particle<[T; N]>, const N: usize, T> CellGrid<P, N, T>
+impl<P: ParticleLike<[T; N]>, const N: usize, T> CellGrid<P, N, T>
 where
     T: Float
         + NumAssignOps
@@ -321,7 +321,7 @@ where
     }
 }
 
-impl<P: Particle<[T; N]>, const N: usize, T> CellGrid<P, N, T>
+impl<P: ParticleLike<[T; N]>, const N: usize, T> CellGrid<P, N, T>
 where
     T: Float + ConstOne + AsPrimitive<i32> + std::fmt::Debug + NumAssignOps + Send + Sync,
     P: Send + Sync,
@@ -388,7 +388,7 @@ where
     /// This restriction might be lifted in the future.
     ///
     /// </div>
-    pub fn query<Q: Particle<[T; N]>>(&self, particle: Q) -> Option<GridCell<'_, P, N, T>> {
+    pub fn query<Q: ParticleLike<[T; N]>>(&self, particle: Q) -> Option<GridCell<'_, P, N, T>> {
         self.info()
             .try_cell_index(particle.coords())
             .map(|index| self.info().flatten_index(index))
@@ -419,7 +419,7 @@ where
     ///     });
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn query_neighbors<Q: Particle<[T; N]>>(
+    pub fn query_neighbors<Q: ParticleLike<[T; N]>>(
         &self,
         particle: Q,
     ) -> Option<impl Iterator<Item = (usize, P)> + Clone> {
@@ -436,7 +436,7 @@ where
 impl<P, const N: usize, T> CellGrid<P, N, T>
 where
     T: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
-    P: Particle<[T; N]> + Send + Sync,
+    P: ParticleLike<[T; N]> + Send + Sync,
 {
     /// Returns a parallel iterator over all relevant (i.e. within cutoff threshold + some extra)
     /// unique pairs of particles in this `CellGrid`.

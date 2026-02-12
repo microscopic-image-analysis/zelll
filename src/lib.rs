@@ -83,8 +83,9 @@ pub use crate::cellgrid::CellGrid;
 /// Only [`Copy`] types can be used.
 /// In general, the smaller the type, the better (for the CPU cache).
 ///
+// FIXME: update this doc section
 /// A blanket implementation for `Into<T> + Copy` types is provided.\
-/// [`CellGrid`] is slightly more specific and requires implementing `Particle<[{float}; N]>`.
+/// [`CellGrid`] is slightly more specific and requires implementing `ParticleLike<[{float}; N]>`.
 /// Therefore, fixed-size float arrays, [`nalgebra::SVector`](https://docs.rs/nalgebra/latest/nalgebra/base/type.SVector.html), or types that can be `Deref`-coerced
 /// into the former or [`mint`](https://docs.rs/mint/latest/mint/) types, can be directly used.
 ///
@@ -94,7 +95,7 @@ pub use crate::cellgrid::CellGrid;
 ///
 /// # Examples
 /// ```
-/// # use zelll::Particle;
+/// # use zelll::ParticleLike;
 /// # #[derive(Clone, Copy)]
 /// # enum Element {
 /// #    Hydrogen, // no associated coordinate data since it's the same for all variants
@@ -109,39 +110,17 @@ pub use crate::cellgrid::CellGrid;
 ///     kind: Element,
 ///     coords: [f64; 3],
 /// }
-/// impl Particle for Atom {
+/// impl ParticleLike for Atom {
 ///     #[inline]
 ///     fn coords(&self) -> [f64; 3] {
 ///         self.coords // no pattern matching required here
 ///     }
 /// }
 /// ```
-pub trait Particle<T = [f64; 3]>: Copy {
+pub trait ParticleLike<T = [f64; 3]>: Copy {
     /// Returns a copy of this particle's coordinates.
     fn coords(&self) -> T;
 }
-
-// TODO: Might consider restricting this impl.
-// TODO: While we can be this generic, this might help articulating our intentions better:
-// TODO: impl<P, T, const N: usize> Particle<[T; N]> for P where P: Into<[T; N]> + Copy {
-// impl<P, T, const N: usize> Particle<[T; N]> for P
-// where
-//     P: Into<[T; N]> + Copy,
-// {
-//     #[inline]
-//     fn coords(&self) -> [T; N] {
-//         <P as Into<[T; N]>>::into(*self)
-//     }
-// }
-
-// #[derive(Copy, Clone)]
-// pub struct LabeledParticle<L, T>(L, T);
-
-// impl<L: Copy, T: Copy, P: Particle<T>> Particle<T> for LabeledParticle<L, P> {
-//     fn coords(&self) -> T {
-//         self.1.coords()
-//     }
-// }
 
 // TODO: maybe name this Particle, and the trait should be ParticleLike?
 // TODO: could have additional trait alias IntoParticle: Into<[T; N]> + Copy where T: Copy?
@@ -157,9 +136,9 @@ pub struct WrappedParticle<P> {
     inner: P,
 }
 
-impl<P, T: Copy, const N: usize> Particle<[T; N]> for WrappedParticle<P>
+impl<P, T: Copy, const N: usize> ParticleLike<[T; N]> for WrappedParticle<P>
 where
-    // P: Particle<T>,
+    // P: ParticleLike<T>,
     P: Into<[T; N]> + Copy,
 {
     fn coords(&self) -> [T; N] {
@@ -184,10 +163,10 @@ impl<P> From<P> for WrappedParticle<P> {
     }
 }
 
-impl<P, T, const N: usize> Particle<[T; N]> for (usize, P)
+impl<P, T, const N: usize> ParticleLike<[T; N]> for (usize, P)
 where
     /* P: Into<[T; N]> + Copy, */
-    P: Particle<[T; N]>,
+    P: ParticleLike<[T; N]>,
 {
     #[inline]
     fn coords(&self) -> [T; N] /* [T; N] */ {
@@ -196,7 +175,7 @@ where
     }
 }
 
-impl<T, const N: usize> Particle<[T; N]> for [T; N]
+impl<T, const N: usize> ParticleLike<[T; N]> for [T; N]
 where
     T: Copy,
 {
@@ -264,7 +243,7 @@ mod tests {
 
         fn convert<T>(&self) -> Vec<T>
         where
-            P: Particle<T>,
+            P: ParticleLike<T>,
         {
             self.buffer.iter().map(|p| p.coords()).collect()
         }
@@ -324,7 +303,7 @@ mod tests {
         #[derive(Clone, Copy)]
         struct ParticleRef<'p>(&'p [f64; 3]);
 
-        impl Particle<[f64; 3]> for ParticleRef<'_> {
+        impl ParticleLike<[f64; 3]> for ParticleRef<'_> {
             #[inline]
             fn coords(&self) -> [f64; 3] {
                 (*self.0).coords() // equivalent to *self.0
