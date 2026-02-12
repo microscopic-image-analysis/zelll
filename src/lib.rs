@@ -83,7 +83,7 @@ pub use crate::cellgrid::CellGrid;
 /// Only [`Copy`] types can be used.
 /// In general, the smaller the type, the better (for the CPU cache).
 ///
-// FIXME: update this doc section
+// FIXME: update this doc section/move example to Particle<P>
 /// A blanket implementation for `Into<T> + Copy` types is provided.\
 /// [`CellGrid`] is slightly more specific and requires implementing `ParticleLike<[{float}; N]>`.
 /// Therefore, fixed-size float arrays, [`nalgebra::SVector`](https://docs.rs/nalgebra/latest/nalgebra/base/type.SVector.html), or types that can be `Deref`-coerced
@@ -122,34 +122,27 @@ pub trait ParticleLike<T = [f64; 3]>: Copy {
     fn coords(&self) -> T;
 }
 
-// TODO: maybe name this Particle, and the trait should be ParticleLike?
 // TODO: could have additional trait alias IntoParticle: Into<[T; N]> + Copy where T: Copy?
 // TODO: then blanket impl ParticleLike on IntoParticle? is that possible?
 // TODO: alternative: IntoParticle could be somewhat object-safe in the sense that it has
-// TODO: a trait method returning (formerly Wrapped)Particle<P>
+// TODO: a trait method returning Particle<P>
 // TODO: maybe it would be object-safe it has an associated type instead of parameter P
-// TODO: if I make (Wrapped)Particle a tuple struct again, we wouldn't need the from impl anymore
-// TODO: which would turn .map(WrappedParticle::from) into .map(WrappedParticle)
-// TODO: ( or rather .map(Particle) after renaming)
 #[derive(Copy, Clone, Debug, Default)]
-pub struct WrappedParticle<P> {
+pub struct Particle<P> {
     inner: P,
 }
 
-impl<P, T: Copy, const N: usize> ParticleLike<[T; N]> for WrappedParticle<P>
+impl<P, T: Copy, const N: usize> ParticleLike<[T; N]> for Particle<P>
 where
-    // P: ParticleLike<T>,
     P: Into<[T; N]> + Copy,
 {
+    #[inline]
     fn coords(&self) -> [T; N] {
-        // self.inner.coords()
         <P as Into<[T; N]>>::into(self.inner)
     }
 }
 
-use std::ops::Deref;
-
-impl<P> Deref for WrappedParticle<P> {
+impl<P> std::ops::Deref for Particle<P> {
     type Target = P;
 
     fn deref(&self) -> &Self::Target {
@@ -157,7 +150,7 @@ impl<P> Deref for WrappedParticle<P> {
     }
 }
 
-impl<P> From<P> for WrappedParticle<P> {
+impl<P> From<P> for Particle<P> {
     fn from(value: P) -> Self {
         Self { inner: value }
     }
@@ -165,12 +158,10 @@ impl<P> From<P> for WrappedParticle<P> {
 
 impl<P, T, const N: usize> ParticleLike<[T; N]> for (usize, P)
 where
-    /* P: Into<[T; N]> + Copy, */
     P: ParticleLike<[T; N]>,
 {
     #[inline]
-    fn coords(&self) -> [T; N] /* [T; N] */ {
-        /* <P as Into<[T; N]>>::into(self.1) */
+    fn coords(&self) -> [T; N] {
         self.1.coords()
     }
 }
@@ -251,10 +242,10 @@ mod tests {
 
     #[test]
     fn test_wrapped_particle() {
-        // let x: WrappedParticle<_> = [0.0f64; 3].into();
-        let x = WrappedParticle::from([0.0f64; 3]);
-        x.coords(); // calls impl Particle<T> for WrappedParticle<P>
-        (*x).coords(); // calls implParticle<T> for P where P: Particle<T>
+        // let x: Particle<_> = [0.0f64; 3].into();
+        let x = Particle::from([0.0f64; 3]);
+        x.coords(); // calls impl ParticleLike<T> for Particle<P>
+        (*x).coords(); // calls impl ParticleLike<T> for P where P: ParticleLike<T>
 
         let points = std::iter::repeat_n(x, 10);
 
@@ -266,18 +257,15 @@ mod tests {
         let _ = points.clone().enumerate().map(|ix| ix.coords());
         let _ = points.enumerate().map(|(_i, x)| x.coords());
 
-        let points = std::iter::repeat_n(SVector::from([0.0f64; 3]), 10);
+        let points = std::iter::repeat_n(SVector::from([0.0f64; 3]), 10)
+            .map(Particle::from)
+            .enumerate();
 
         let _ = points
             .clone()
-            .map(WrappedParticle::from)
-            .enumerate()
             .map(|ix| -> [f64; 3] { ix.coords() });
 
         let _ = points
-            .clone()
-            .map(WrappedParticle::from)
-            .enumerate()
             .map(|(_i, x)| -> [f64; 3] { x.coords() });
     }
 
@@ -291,7 +279,7 @@ mod tests {
         let points: Vec<_> = points
             .into_iter()
             .map(SVector::from)
-            .map(WrappedParticle::from)
+            .map(Particle::from)
             .collect();
         let ps = PStorage::new_sparse(points.iter().copied());
 

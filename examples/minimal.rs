@@ -6,7 +6,7 @@ use rand::prelude::*;
 #[cfg(feature = "rayon")]
 use rayon::prelude::ParallelIterator;
 use std::hint::black_box;
-use zelll::{CellGrid, WrappedParticle};
+use zelll::{CellGrid, Particle};
 
 type PointCloud<const N: usize> = Vec<Point<f64, N>>;
 /// Generate a uniformly random 3D point cloud of size `n` in a cuboid of edge lengths `vol` centered around `origin`.
@@ -42,7 +42,7 @@ fn main() {
             pointcloud
                 .iter()
                 .map(|p| p.coords)
-                .map(WrappedParticle::from),
+                .map(Particle::from),
             cutoff,
         );
         println!("{:?}", cg.info().shape());
@@ -60,7 +60,7 @@ fn main() {
 
         #[cfg(feature = "rayon")]
         cg.par_particle_pairs()
-            .filter(|&((_i, p), (_j, q))| distance_squared(&p.into(), &q.into()) <= _cutoff_squared)
+            .filter(|&((_i, p), (_j, q))| distance_squared(&(*p).into(), &(*q).into()) <= _cutoff_squared)
             .for_each(|_| {
                 //count += 1;
                 black_box(());
