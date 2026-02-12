@@ -14,7 +14,7 @@ impl SmoothDistanceField {
     ) -> Option<D> {
         let at: [D; 3] = x.into();
         let at = at.map(|coord| coord.re());
-        let neighbors = self.inner.query_neighbors(at)?.map(|(_, atom)| {
+        let neighbors = self.inner.query_neighbors(at)?.map(|atom| {
             let coords: [Angstrom; 3] = atom.coords();
             let coords = coords.map(|c| c.into());
             (atom.element.radius(), SVector::from(coords))
@@ -166,11 +166,13 @@ mod tests {
 
         let sdf = SmoothDistanceField {
             inner: CellGrid::new(
-                points.iter().map(|&coords| Atom {
-                    element: Element::default(),
-                    coords,
-                })
-                .map(Particle::from),
+                points
+                    .iter()
+                    .map(|&coords| Atom {
+                        element: Element::default(),
+                        coords,
+                    })
+                    .map(Particle::from),
                 1.0,
             ),
             surface_radius: 1.05,

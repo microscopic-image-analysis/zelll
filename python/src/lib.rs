@@ -95,7 +95,7 @@ impl<'py> Iterator for ParticlesIterator<'py> {
 #[derive(Clone)]
 #[pyclass(name = "CellGrid", module = "zelll")]
 pub struct PyCellGrid {
-    inner: CellGrid<[f64; 3]>,
+    inner: CellGrid<(usize, [f64; 3])>,
 }
 
 #[pymethods]
@@ -117,7 +117,7 @@ impl PyCellGrid {
                 let particles = ParticlesIterable {
                     inner: p.as_borrowed(),
                 };
-                CellGrid::new(particles, cutoff)
+                CellGrid::new(particles.into_iter().enumerate(), cutoff)
             }
             // nutpie+multithreading needs to serialize/deserialize PyCellGrid
             // and the latter calls ::new() (albeit with default arguments)
@@ -161,7 +161,8 @@ impl PyCellGrid {
             inner: particles.as_borrowed(),
         };
 
-        slf.inner.rebuild_mut(particles, cutoff);
+        slf.inner
+            .rebuild_mut(particles.into_iter().enumerate(), cutoff);
     }
 
     fn __iter__(slf: PyRef<'_, Self>) -> PyCellGridIter {

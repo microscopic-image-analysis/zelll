@@ -60,7 +60,8 @@ pub fn bench_iters(c: &mut Criterion) {
             pointcloud
                 .iter()
                 .map(|p| p.coords)
-                .map(Particle::from),
+                .map(Particle::from)
+                .enumerate(),
             cutoff,
         );
 

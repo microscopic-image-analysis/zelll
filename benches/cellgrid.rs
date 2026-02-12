@@ -57,7 +57,8 @@ pub fn bench_cellgrid(c: &mut Criterion) {
             pointcloud
                 .iter()
                 .map(|p| p.coords)
-                .map(Particle::from),
+                .map(Particle::from)
+                .enumerate(),
             cutoff,
         );
 
@@ -67,10 +68,7 @@ pub fn bench_cellgrid(c: &mut Criterion) {
             |b, pointcloud| {
                 b.iter(|| {
                     CellGrid::new(
-                        pointcloud
-                            .iter()
-                            .map(|p| p.coords)
-                            .map(Particle::from),
+                        pointcloud.iter().map(|p| p.coords).map(Particle::from),
                         cutoff,
                     )
                 })

@@ -74,7 +74,8 @@ pub fn bench_lj(c: &mut Criterion) {
                 pointcloud
                     .iter()
                     .map(|p| p.coords)
-                    .map(Particle::from),
+                    .map(Particle::from)
+                    .enumerate(),
                 cutoff,
             );
             let potential_energy: F32or64 = cg
@@ -102,7 +103,8 @@ pub fn bench_lj(c: &mut Criterion) {
                         pointcloud
                             .iter()
                             .map(|p| p.coords)
-                            .map(Particle::from),
+                            .map(Particle::from)
+                            .enumerate(),
                         cutoff,
                     );
                     let _potential_energy: F32or64 = cg

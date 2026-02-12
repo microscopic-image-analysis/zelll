@@ -5,7 +5,7 @@ cff-version: 1.2.0
 title: ' zelll: a fast, framework-free, and flexible implementation of the cell lists algorithm for the Rust programming language'
 message: >-
   If you use this software, please cite the research article
-  and a versioned Zenodo DOI if appropriate.
+  and a versioned Zenodo DOI where appropriate.
 type: software
 authors:
   - given-names: Vincent

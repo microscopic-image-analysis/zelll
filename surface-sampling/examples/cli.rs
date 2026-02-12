@@ -105,10 +105,7 @@ fn main() {
             //     .map_or([0.0; 3], |atom| atom.coords());
             // TODO: alternatively, let's just use the first atom, assuming it's at one of the ends
             // TODO: we're discarding the first `b` samples anyway
-            let init = data
-                .points
-                .first()
-                .map_or([0.0; 3], |atom| atom.coords);
+            let init = data.points.first().map_or([0.0; 3], |atom| atom.coords);
 
             sampler
                 .set_position(init.as_slice())

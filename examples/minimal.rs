@@ -39,7 +39,11 @@ fn main() {
         //pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
 
         let cg = CellGrid::new(
-            pointcloud.iter().map(|p| p.coords).map(Particle::from),
+            pointcloud
+                .iter()
+                .map(|p| p.coords)
+                .map(Particle::from)
+                .enumerate(),
             cutoff,
         );
         println!("{:?}", cg.info().shape());

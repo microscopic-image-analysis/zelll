@@ -61,13 +61,13 @@ The latest Python API is documented [here](https://microscopic-image-analysis.gi
 use zelll::CellGrid;
 
 let data = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
-let mut cg = CellGrid::new(data.iter().copied(), 1.0);
+let mut cg = CellGrid::new(data.iter().copied().enumerate(), 1.0);
 
 for ((i, p), (j, q)) in cg.particle_pairs() {
     /* do some work */
 }
 
-cg.rebuild_mut(data.iter().copied(), Some(0.5));
+cg.rebuild_mut(data.iter().copied().enumerate(), Some(0.5));
 ```
 
 ### Benchmarks

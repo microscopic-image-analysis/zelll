@@ -49,13 +49,13 @@
 //! use zelll::CellGrid;
 //!
 //! let data = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
-//! let mut cg = CellGrid::new(data.iter().copied(), 1.0);
+//! let mut cg = CellGrid::new(data.iter().copied().enumerate(), 1.0);
 //!
 //! for ((i, p), (j, q)) in cg.particle_pairs() {
 //!     /* do some work */
 //! }
 //!
-//! cg.rebuild_mut(data.iter().copied(), Some(0.5));
+//! cg.rebuild_mut(data.iter().copied().enumerate(), Some(0.5));
 //! ```
 //!
 //! [^etymology]: abbrv. from German _Zelllisten_ /ˈʦɛlɪstən/, for cell lists.
@@ -129,9 +129,8 @@ pub trait ParticleLike<T = [f64; 3]>: Copy {
 /// Wrapper type that implements [`ParticleLike`] for types that are `Into<[T; N]> + Copy`.
 ///
 /// Notable types that can be used with `Particle` include `({float}, ...)`,
-/// [`nalgebra::SVector`](https://docs.rs/nalgebra/latest/nalgebra/base/type.SVector.html), or types
-/// that can be `Deref`-coerced into the former or [`mint`](https://docs.rs/mint/latest/mint/) types,
-/// respectively.
+/// [`nalgebra::SVector`](https://docs.rs/nalgebra/latest/nalgebra/base/type.SVector.html),
+/// or [`mint`](https://docs.rs/mint/latest/mint/) types.
 ///
 /// `Particle` can be `Deref`-coerced into the wrapped type.
 ///
