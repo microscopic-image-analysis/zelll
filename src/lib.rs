@@ -261,12 +261,9 @@ mod tests {
             .map(Particle::from)
             .enumerate();
 
-        let _ = points
-            .clone()
-            .map(|ix| -> [f64; 3] { ix.coords() });
+        let _ = points.clone().map(|ix| -> [f64; 3] { ix.coords() });
 
-        let _ = points
-            .map(|(_i, x)| -> [f64; 3] { x.coords() });
+        let _ = points.map(|(_i, x)| -> [f64; 3] { x.coords() });
     }
 
     #[test]

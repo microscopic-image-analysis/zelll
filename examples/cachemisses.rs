@@ -65,10 +65,7 @@ fn main() {
         valgrind::start_instrumentation();
         for _ in 0..repeat {
             let _cg = CellGrid::new(
-                pointcloud
-                    .iter()
-                    .map(|p| p.coords)
-                    .map(Particle::from),
+                pointcloud.iter().map(|p| p.coords).map(Particle::from),
                 cutoff,
             );
         }
@@ -77,10 +74,7 @@ fn main() {
         valgrind::start_instrumentation();
         for _ in 0..repeat {
             let _cg = CellGrid::new(
-                pointcloud
-                    .iter()
-                    .map(|p| p.coords)
-                    .map(Particle::from),
+                pointcloud.iter().map(|p| p.coords).map(Particle::from),
                 cutoff,
             );
         }

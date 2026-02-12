@@ -19,10 +19,7 @@ pub struct SmoothDistanceField {
 impl SmoothDistanceField {
     pub fn new(protein: &PointCloud, cutoff: Angstrom) -> Self {
         Self {
-            inner: CellGrid::new(
-                protein.points.iter().copied().map(Particle::from),
-                cutoff,
-            ),
+            inner: CellGrid::new(protein.points.iter().copied().map(Particle::from), cutoff),
             surface_radius: 1.05,
             k_force: 10.0,
         }

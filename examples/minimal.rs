@@ -39,10 +39,7 @@ fn main() {
         //pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
 
         let cg = CellGrid::new(
-            pointcloud
-                .iter()
-                .map(|p| p.coords)
-                .map(Particle::from),
+            pointcloud.iter().map(|p| p.coords).map(Particle::from),
             cutoff,
         );
         println!("{:?}", cg.info().shape());
@@ -60,7 +57,9 @@ fn main() {
 
         #[cfg(feature = "rayon")]
         cg.par_particle_pairs()
-            .filter(|&((_i, p), (_j, q))| distance_squared(&(*p).into(), &(*q).into()) <= _cutoff_squared)
+            .filter(|&((_i, p), (_j, q))| {
+                distance_squared(&(*p).into(), &(*q).into()) <= _cutoff_squared
+            })
             .for_each(|_| {
                 //count += 1;
                 black_box(());
