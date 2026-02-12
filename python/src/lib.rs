@@ -94,7 +94,7 @@ impl<'py> Iterator for ParticlesIterator<'py> {
 ///     dist = np.linalg.norm(np.array(p) - np.array(q))
 /// ```
 #[derive(Clone)]
-#[pyclass(name = "CellGrid", module = "zelll")]
+#[pyclass(name = "CellGrid", module = "zelll", skip_from_py_object)]
 pub struct PyCellGrid {
     inner: CellGrid<(usize, [f64; 3])>,
 }
@@ -401,7 +401,7 @@ impl PyCellQueryIter {
 /// for further technical details and background information.
 /// If in doubt, the Rust API docs should be considered the authoritative source for the exact behavior
 /// of the library.
-#[pymodule(gil_used = false)]
+#[pymodule]
 pub mod zelll {
     #[pymodule_export]
     pub use super::{PyCellGrid, PyCellGridIter, PyCellQueryIter};

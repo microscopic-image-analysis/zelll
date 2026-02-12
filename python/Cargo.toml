@@ -17,7 +17,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 bincode = { version = "2.0", features = ["serde"] }
-pyo3 = { version = "0.27", features = ["experimental-inspect"] }
+pyo3 = { version = "0.28", features = ["experimental-inspect"] }
 zelll = { path  = "..", features = ["serde"] }
 serde = { version = "1.0" }
 
