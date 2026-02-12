@@ -156,8 +156,9 @@ impl<P> From<P> for Particle<P> {
     }
 }
 
-impl<P, T, const N: usize> ParticleLike<[T; N]> for (usize, P)
+impl<L, P, T, const N: usize> ParticleLike<[T; N]> for (L, P)
 where
+    L: Copy,
     P: ParticleLike<[T; N]>,
 {
     #[inline]

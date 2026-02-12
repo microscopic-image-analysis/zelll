@@ -335,7 +335,7 @@ where
     /// The `Item` type is currently `((usize, P), (usize, P))`,
     /// where each particle is labelled with its position it was inserted into this `CellGrid`.
     /// A future breaking change might remove this label (think _entity ID_), putting the responsibility to associate `P`
-    /// with additional data (eg. velocities, momenta) onto implementors of [`Particle`].
+    /// with additional data (eg. velocities, momenta) onto implementors of [`ParticleLike`].
     /// This will likely also deprecate [`pair_indices()`](CellGrid::pair_indices()).
     ///
     /// </div>
