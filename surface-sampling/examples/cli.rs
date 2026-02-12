@@ -6,7 +6,6 @@ use psssh::io::PointCloud;
 use psssh::sdf::SmoothDistanceField;
 use std::path::PathBuf;
 use std::time::Instant;
-use zelll::{Particle, WrappedParticle};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -109,7 +108,7 @@ fn main() {
             let init = data
                 .points
                 .first()
-                .map_or([0.0; 3], |atom| WrappedParticle::from(atom).coords());
+                .map_or([0.0; 3], |atom| atom.coords);
 
             sampler
                 .set_position(init.as_slice())

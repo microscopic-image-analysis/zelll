@@ -10,7 +10,7 @@ use rand::prelude::*;
 use rayon::ThreadPoolBuilder;
 #[cfg(feature = "rayon")]
 use zelll::rayon::ParallelIterator;
-use zelll::{CellGrid, WrappedParticle};
+use zelll::{CellGrid, Particle};
 
 type F32or64 = f64;
 
@@ -60,7 +60,7 @@ pub fn bench_iters(c: &mut Criterion) {
             pointcloud
                 .iter()
                 .map(|p| p.coords)
-                .map(WrappedParticle::from),
+                .map(Particle::from),
             cutoff,
         );
 

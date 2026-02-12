@@ -108,7 +108,7 @@ impl SmoothDistanceField {
 mod tests {
     use super::*;
     use crate::atom::{Atom, Element};
-    use zelll::CellGrid;
+    use zelll::{CellGrid, Particle};
 
     // TODO: should use `approx` for this
     #[test]
@@ -169,7 +169,8 @@ mod tests {
                 points.iter().map(|&coords| Atom {
                     element: Element::default(),
                     coords,
-                }),
+                })
+                .map(Particle::from),
                 1.0,
             ),
             surface_radius: 1.05,

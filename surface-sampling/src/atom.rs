@@ -33,7 +33,7 @@ pub struct Atom {
     pub coords: [Angstrom; 3],
 }
 
-// The blanket implementation for Particle can use this
+// This allows Atom to be wrapped in zelll::Particle
 impl From<Atom> for [Angstrom; 3] {
     fn from(atom: Atom) -> Self {
         atom.coords

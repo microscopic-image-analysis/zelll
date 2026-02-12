@@ -7,7 +7,7 @@ use rand::distributions::Standard;
 use rand::prelude::*;
 #[cfg(feature = "rayon")]
 use zelll::rayon::ParallelIterator;
-use zelll::{CellGrid, WrappedParticle};
+use zelll::{CellGrid, Particle};
 
 type F32or64 = f64;
 
@@ -57,7 +57,7 @@ pub fn bench_cellgrid(c: &mut Criterion) {
             pointcloud
                 .iter()
                 .map(|p| p.coords)
-                .map(WrappedParticle::from),
+                .map(Particle::from),
             cutoff,
         );
 
@@ -70,7 +70,7 @@ pub fn bench_cellgrid(c: &mut Criterion) {
                         pointcloud
                             .iter()
                             .map(|p| p.coords)
-                            .map(WrappedParticle::from),
+                            .map(Particle::from),
                         cutoff,
                     )
                 })
