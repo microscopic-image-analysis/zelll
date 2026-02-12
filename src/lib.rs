@@ -40,8 +40,8 @@
 //!
 //! While the main struct [`CellGrid`] is generic over dimension `N`,
 //! it is intended to be used with `N = 2` or `N = 3`.
-//! Particle data represented as fixed-size arrays is supported without additional work.\
-//! Additionally, implementing [`Particle`] allows usage of custom types as particle data.
+//! Data represented as fixed-size arrays is supported by wrapping in [`Particle`].\
+//! Additionally, implementing [`ParticleLike`] allows usage of custom types as particle data.
 //! This can be used to encode different kinds of particles or enable interior mutability if required.
 //!
 //! # Examples
@@ -83,11 +83,15 @@ pub use crate::cellgrid::CellGrid;
 /// Only [`Copy`] types can be used.
 /// In general, the smaller the type, the better (for the CPU cache).
 ///
-// FIXME: update this doc section/move example to Particle<P>
-/// A blanket implementation for `Into<T> + Copy` types is provided.\
-/// [`CellGrid`] is slightly more specific and requires implementing `ParticleLike<[{float}; N]>`.
-/// Therefore, fixed-size float arrays, [`nalgebra::SVector`](https://docs.rs/nalgebra/latest/nalgebra/base/type.SVector.html), or types that can be `Deref`-coerced
-/// into the former or [`mint`](https://docs.rs/mint/latest/mint/) types, can be directly used.
+/// Note that [`CellGrid`] is more specific than this trait and requires implementing `ParticleLike<[{float}; N]>`.
+///
+/// We do not provide a blanket implementation for types implementing `Into<[T; N]> + Copy` but
+/// a wrapper type instead.
+/// Therefore, [`nalgebra::SVector`](https://docs.rs/nalgebra/latest/nalgebra/base/type.SVector.html), or types that can be `Deref`-coerced
+/// into the former or [`mint`](https://docs.rs/mint/latest/mint/) types, can be used
+/// by wrapping them in [`Particle`].
+///
+/// For convenience, this trait is implemented for `[{float}; N]` and key-value tuples.
 ///
 /// Having custom types implement this trait allows for patterns like interior mutability,
 /// referencing separate storage (e.g. with ECS, or concurrent storage types),
@@ -122,11 +126,22 @@ pub trait ParticleLike<T = [f64; 3]>: Copy {
     fn coords(&self) -> T;
 }
 
-// TODO: could have additional trait alias IntoParticle: Into<[T; N]> + Copy where T: Copy?
-// TODO: then blanket impl ParticleLike on IntoParticle? is that possible?
-// TODO: alternative: IntoParticle could be somewhat object-safe in the sense that it has
-// TODO: a trait method returning Particle<P>
-// TODO: maybe it would be object-safe it has an associated type instead of parameter P
+/// Wrapper type that implements [`ParticleLike`] for types that are `Into<[T; N]> + Copy`.
+///
+/// Notable types that can be used with `Particle` include `({float}, ...)`,
+/// [`nalgebra::SVector`](https://docs.rs/nalgebra/latest/nalgebra/base/type.SVector.html), or types
+/// that can be `Deref`-coerced into the former or [`mint`](https://docs.rs/mint/latest/mint/) types,
+/// respectively.
+///
+/// `Particle` can be `Deref`-coerced into the wrapped type.
+///
+/// # Examples
+/// ```
+/// use zelll::{Particle, ParticleLike};
+///
+/// let x: Particle<_> = (0.0f64, 0.0f64, 0.0f64).into();
+/// x.coords();
+/// ```
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Particle<P> {
     inner: P,
@@ -142,6 +157,14 @@ where
     }
 }
 
+/// # Examples
+/// Wrapping an array is redundant but illustrates the `Deref` behavior:
+/// ```
+/// # use zelll::{Particle, ParticleLike};
+/// let x = Particle::from([0.0f64; 3]);
+/// x.coords(); // calls impl ParticleLike<T> for Particle<P>
+/// (*x).coords(); // calls impl ParticleLike<T> for P where P: ParticleLike<T>
+/// ```
 impl<P> std::ops::Deref for Particle<P> {
     type Target = P;
 
@@ -156,6 +179,35 @@ impl<P> From<P> for Particle<P> {
     }
 }
 
+/// Sometimes, it is useful to store indices alongside particle data.
+/// This is easily facilitated by enumerating the iterator used to construct a `CellGrid`.
+///
+/// Other types such as [`std::collections::HashMap`] can also be used
+/// although it is less straight-forward
+///
+/// # Examples
+/// Here, `ip` is a tuple `(usize, P)`.
+/// ```
+/// # use zelll::ParticleLike;
+/// # let x = [0.0f64; 3];
+/// # let points: Vec<_> = std::iter::repeat_n(x, 10).collect();
+/// points.iter()
+///     .copied()
+///     .enumerate()
+///     .map(|ip| ip.coords());
+/// ```
+/// ```
+/// # use zelll::ParticleLike;
+/// # use std::collections::HashMap;
+/// # let data = [("a", [0.0f64; 3]); 10];
+/// let points = HashMap::from(data);
+/// // this iterator is consuming
+/// points.into_iter()
+///     .map(|kv| kv.coords());
+/// // after constructing a CellGrid
+/// // and iterating over pairs, the particles have to be inserted
+/// // into a hash map again to do any meaningful work
+/// ```
 impl<L, P, T, const N: usize> ParticleLike<[T; N]> for (L, P)
 where
     L: Copy,
