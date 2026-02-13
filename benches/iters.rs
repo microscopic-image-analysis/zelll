@@ -8,9 +8,9 @@ use rand::distributions::Standard;
 use rand::prelude::*;
 #[cfg(feature = "rayon")]
 use rayon::ThreadPoolBuilder;
-use zelll::CellGrid;
 #[cfg(feature = "rayon")]
 use zelll::rayon::ParallelIterator;
+use zelll::{CellGrid, Particle};
 
 type F32or64 = f64;
 
@@ -56,7 +56,14 @@ pub fn bench_iters(c: &mut Criterion) {
 
         let pointcloud = generate_points_random(size, [a, b, c], [0.0, 0.0, 0.0], None);
         // pointcloud.sort_unstable_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
-        let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
+        let cg = CellGrid::new(
+            pointcloud
+                .iter()
+                .map(|p| p.coords)
+                .map(Particle::from)
+                .enumerate(),
+            cutoff,
+        );
 
         #[cfg(not(feature = "rayon"))]
         group.bench_with_input(BenchmarkId::new("sequential", size), &cg, |b, cg| {
@@ -64,7 +71,7 @@ pub fn bench_iters(c: &mut Criterion) {
             b.iter(|| {
                 cg.particle_pairs()
                     .filter(|&((_i, p), (_j, q))| {
-                        distance_squared(&p.into(), &q.into()) <= cutoff_squared
+                        distance_squared(&(*p).into(), &(*q).into()) <= cutoff_squared
                     })
                     .for_each(|_| {});
             })
@@ -85,7 +92,7 @@ pub fn bench_iters(c: &mut Criterion) {
                     b.iter(|| {
                         pool.install(|| {
                             cg.par_particle_pairs().for_each(|((_i, p), (_j, q))| {
-                                if distance_squared(&p.into(), &q.into()) <= cutoff_squared {
+                                if distance_squared(&(*p).into(), &(*q).into()) <= cutoff_squared {
                                 } else {
                                 }
                             })

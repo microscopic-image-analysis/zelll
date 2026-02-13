@@ -11,7 +11,7 @@ mod storage;
 #[allow(dead_code)]
 pub mod util;
 
-use crate::Particle;
+use crate::ParticleLike;
 #[cfg(feature = "rayon")]
 use crate::rayon::ParallelIterator;
 use flatindex::FlatIndex;
@@ -98,13 +98,16 @@ pub use util::{Aabb, GridInfo};
 /// let data: Vec<[f32; 2]> = vec![[0.0, 0.0], [1.0,2.0], [0.0, 0.1]];
 /// let mut cg = CellGrid::new(data.iter().copied(), 1.0);
 /// ```
-/// Any type implementing [`Particle`] can be used:
+/// Any type that is able to be wrapped in [`Particle`](crate::Particle)
+/// or implements [`ParticleLike`] can be used:
 /// ```
-/// # use zelll::CellGrid;
+/// # use zelll::{CellGrid, Particle};
 /// use nalgebra::SVector;
 ///
 /// let data: Vec<SVector<f32, 2>> = vec![[0.0, 0.0].into(), [1.0,2.0].into(), [0.0, 0.1].into()];
-/// let mut cg = CellGrid::new(data.iter().copied(), 1.0);
+/// let mut cg = CellGrid::new(data.iter().copied().map(Particle::from), 1.0);
+/// // the input data can be easily augmented with indices by enumerating:
+/// let mut cg = CellGrid::new(data.iter().copied().map(Particle::from).enumerate(), 1.0);
 /// ```
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -118,7 +121,7 @@ where
     // TODO: rebuild from CellStorage iterator (boils down to counting/bucket sorting)
     // TODO: iterate (mutably) over cell storage, iterate mutably over particle pairs
     // TODO: make it responsibility of user to associate some index/label with P: Particle?
-    cell_lists: CellStorage<(usize, P)>,
+    cell_lists: CellStorage<P>,
     index: FlatIndex<N, T>,
 }
 
@@ -129,7 +132,7 @@ where
 // TODO: however for sequential data (biomolecules) this may destroy implicit order (so that would have to be modelled implicitley)
 // TODO: also, with reordered data, leapfrog integration buffers have to be shuffled accordingly
 // TODO: which is not that nice
-impl<P: Particle<[T; N]>, const N: usize, T> CellGrid<P, N, T>
+impl<P: ParticleLike<[T; N]>, const N: usize, T> CellGrid<P, N, T>
 where
     T: Float
         + NumAssignOps
@@ -149,19 +152,17 @@ where
     /// # use zelll::CellGrid;
     /// let data = vec![[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
     /// let cell_grid = CellGrid::new(data.iter().copied(), 1.0);
+    /// // some examples iterate over enumerated particles:
+    /// let cell_grid = CellGrid::new(data.iter().copied().enumerate(), 1.0);
     /// ```
     ///
     /// <div class="warning">
     ///
-    /// Note that the intended usage includes `.iter().copied()`
-    /// because we require the items of `particles` to implement `Particle` and we do not
-    /// provide a blanket implementation for references to types implementing `Particle`.
+    /// Here, the preferred usage includes `.iter().copied()`
+    /// but iteration by reference is supported.
     ///
-    /// Previously we required `<I as IntoIterator>::Item: Borrow<P>`
-    /// which provided more flexibility by accepting both `P` and `&P`
-    /// but this forces lots of type annotations on the user.\
-    /// Since `Particle<T>: Copy` anyway, we sacrifice this flexibility
-    /// in favor of not cluttering user code with type annotations.
+    /// See [`ParticleLike`](trait.ParticleLike.html#foreign-impls)
+    /// for detailed information and examples.
     ///
     /// </div>
     pub fn new<I>(particles: I, cutoff: T) -> Self
@@ -222,15 +223,14 @@ where
                 .index
                 .iter()
                 .zip(particles)
-                .enumerate()
                 // TODO: we know cells.get_mut() won't fail by construction
                 // TODO: but maybe use try_for_each() instead
-                .for_each(|(i, (cell, particle))| {
+                .for_each(|(cell, particle)| {
                     // FIXME: in principle could have multiple &mut slices into CellStorage (for parallel pushing)
                     // FIXME: would just have to make sure that cell is always unique when operating on chunks
                     // FIXME: (pretty much the same issue as with counting cell sizes concurrently)
                     cell_lists.push(
-                        (i, particle),
+                        particle,
                         cells
                             .get_mut(cell)
                             .expect("cell grid should contain every cell in the grid index"),
@@ -307,11 +307,10 @@ where
                 .index
                 .iter()
                 .zip(particles)
-                .enumerate()
                 //TODO: see `::rebuild()`
-                .for_each(|(i, (cell, particle))| {
+                .for_each(|(cell, particle)| {
                     self.cell_lists.push(
-                        (i, particle),
+                        particle,
                         self.cells
                             .get_mut(cell)
                             .expect("cell grid should contain every cell in the grid index"),
@@ -321,7 +320,7 @@ where
     }
 }
 
-impl<P: Particle<[T; N]>, const N: usize, T> CellGrid<P, N, T>
+impl<P: ParticleLike<[T; N]>, const N: usize, T> CellGrid<P, N, T>
 where
     T: Float + ConstOne + AsPrimitive<i32> + std::fmt::Debug + NumAssignOps + Send + Sync,
     P: Send + Sync,
@@ -329,22 +328,12 @@ where
     /// Returns an iterator over all relevant (i.e. within cutoff threshold + some extra) unique
     /// pairs of particles in this `CellGrid`.
     ///
-    /// <div class="warning">
-    ///
-    /// The `Item` type is currently `((usize, P), (usize, P))`,
-    /// where each particle is labelled with its position it was inserted into this `CellGrid`.
-    /// A future breaking change might remove this label (think _entity ID_), putting the responsibility to associate `P`
-    /// with additional data (eg. velocities, momenta) onto implementors of [`Particle`].
-    /// This will likely also deprecate [`pair_indices()`](CellGrid::pair_indices()).
-    ///
-    /// </div>
-    ///
     /// # Examples
     /// ```
     /// # use zelll::CellGrid;
     /// use nalgebra::distance_squared;
     /// # let data = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
-    /// # let cell_grid = CellGrid::new(data.iter().copied(), 1.0);
+    /// let cell_grid = CellGrid::new(data.iter().copied().enumerate(), 1.0);
     /// cell_grid.particle_pairs()
     ///     // usually, .filter_map() is preferable (so distance computations can be re-used)
     ///     .filter(|&((_i, p), (_j, q))| {
@@ -355,19 +344,8 @@ where
     ///     });
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn particle_pairs(&self) -> impl Iterator<Item = ((usize, P), (usize, P))> + Clone {
+    pub fn particle_pairs(&self) -> impl Iterator<Item = (P, P)> + Clone {
         self.iter().flat_map(|cell| cell.particle_pairs())
-    }
-
-    /// Returns an iterator over all relevant (i.e. within cutoff threshold + some extra) unique
-    /// pairs of particle indices in this `CellGrid`.
-    ///
-    /// A particle index is its position in the iterator that was used for constructing or rebuilding a `CellGrid`.
-    #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn pair_indices(&self) -> impl Iterator<Item = (usize, usize)> + Clone {
-        self.iter()
-            .flat_map(|cell| cell.particle_pairs())
-            .map(|((i, _p), (j, _q))| (i, j))
     }
 
     /// Returns spatial information about this cell grid, as well as auxiliary functionality
@@ -388,7 +366,7 @@ where
     /// This restriction might be lifted in the future.
     ///
     /// </div>
-    pub fn query<Q: Particle<[T; N]>>(&self, particle: Q) -> Option<GridCell<'_, P, N, T>> {
+    pub fn query<Q: ParticleLike<[T; N]>>(&self, particle: Q) -> Option<GridCell<'_, P, N, T>> {
         self.info()
             .try_cell_index(particle.coords())
             .map(|index| self.info().flatten_index(index))
@@ -406,7 +384,7 @@ where
     /// # use zelll::CellGrid;
     /// use nalgebra::distance_squared;
     /// # let data = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
-    /// # let cell_grid = CellGrid::new(data.iter().copied(), 1.0);
+    /// let cell_grid = CellGrid::new(data.iter().copied().enumerate(), 1.0);
     /// let p = [0.5, 1.0, 0.1];
     /// cell_grid.query_neighbors(p)
     ///     .expect("the queried particle should be within `cutoff` of this grid's shape")
@@ -419,10 +397,10 @@ where
     ///     });
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn query_neighbors<Q: Particle<[T; N]>>(
+    pub fn query_neighbors<Q: ParticleLike<[T; N]>>(
         &self,
         particle: Q,
-    ) -> Option<impl Iterator<Item = (usize, P)> + Clone> {
+    ) -> Option<impl Iterator<Item = P> + Clone> {
         self.query(particle).map(|this| {
             this.iter().copied().chain(
                 this.neighbors::<neighborhood::Full>()
@@ -436,7 +414,7 @@ where
 impl<P, const N: usize, T> CellGrid<P, N, T>
 where
     T: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
-    P: Particle<[T; N]> + Send + Sync,
+    P: ParticleLike<[T; N]> + Send + Sync,
 {
     /// Returns a parallel iterator over all relevant (i.e. within cutoff threshold + some extra)
     /// unique pairs of particles in this `CellGrid`.
@@ -452,7 +430,7 @@ where
     /// # use zelll::{CellGrid, rayon::ParallelIterator};
     /// use nalgebra::distance_squared;
     /// # let data = [[0.0, 0.0, 0.0], [1.0,2.0,0.0], [0.0, 0.1, 0.2]];
-    /// # let cell_grid = CellGrid::new(data.iter().copied(), 1.0);
+    /// let cell_grid = CellGrid::new(data.iter().copied().enumerate(), 1.0);
     /// cell_grid.par_particle_pairs()
     //      TODO: fact-check the statement below:
     ///     // Try to avoid filtering this ParallelIterator to avoid significant overhead:
@@ -462,19 +440,9 @@ where
     ///         }
     ///     });
     /// ```
-    pub fn par_particle_pairs(&self) -> impl ParallelIterator<Item = ((usize, P), (usize, P))> {
+    pub fn par_particle_pairs(&self) -> impl ParallelIterator<Item = (P, P)> {
         // TODO: ideally, we would schedule 2 threads for cell.particle_pairs() with the same CPU affinity
         // TODO: so they can share their resources
         self.par_iter().flat_map_iter(|cell| cell.particle_pairs())
-    }
-
-    /// Returns a parallel iterator over all relevant (i.e. within cutoff threshold + some extra) unique
-    /// pairs of particle indices in this `CellGrid`.
-    ///
-    /// A particle index is its position in the iterator that was used for constructing or rebuilding a `CellGrid`.
-    pub fn par_pair_indices(&self) -> impl ParallelIterator<Item = (usize, usize)> {
-        self.par_iter()
-            .flat_map_iter(|cell| cell.particle_pairs())
-            .map(|((i, _p), (j, _q))| (i, j))
     }
 }

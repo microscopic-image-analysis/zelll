@@ -6,7 +6,7 @@ use criterion::{
 use nalgebra::{Point, Point3, Vector3, distance_squared};
 use rand::distributions::Standard;
 use rand::prelude::*;
-use zelll::CellGrid;
+use zelll::{CellGrid, Particle};
 
 type F32or64 = f64;
 
@@ -70,11 +70,18 @@ pub fn bench_lj(c: &mut Criterion) {
         // so Massif doesn't keep it in its snapshots the whole time
         {
             let cutoff_squared = cutoff.powi(2);
-            let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
+            let cg = CellGrid::new(
+                pointcloud
+                    .iter()
+                    .map(|p| p.coords)
+                    .map(Particle::from)
+                    .enumerate(),
+                cutoff,
+            );
             let potential_energy: F32or64 = cg
                 .particle_pairs()
                 .filter_map(|((_i, p), (_j, q))| {
-                    let dsq = distance_squared(&p.into(), &q.into());
+                    let dsq = distance_squared(&(*p).into(), &(*q).into());
                     if dsq < cutoff_squared {
                         Some(dsq)
                     } else {
@@ -92,11 +99,18 @@ pub fn bench_lj(c: &mut Criterion) {
             |b, pointcloud| {
                 b.iter(|| {
                     let cutoff_squared = cutoff.powi(2);
-                    let cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
+                    let cg = CellGrid::new(
+                        pointcloud
+                            .iter()
+                            .map(|p| p.coords)
+                            .map(Particle::from)
+                            .enumerate(),
+                        cutoff,
+                    );
                     let _potential_energy: F32or64 = cg
                         .particle_pairs()
                         .filter_map(|((_i, p), (_j, q))| {
-                            let dsq = distance_squared(&p.into(), &q.into());
+                            let dsq = distance_squared(&(*p).into(), &(*q).into());
                             if dsq < cutoff_squared {
                                 Some(dsq)
                             } else {

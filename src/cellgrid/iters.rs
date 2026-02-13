@@ -3,7 +3,7 @@
 use crate::cellgrid::storage::CellSliceMeta;
 #[cfg(feature = "rayon")]
 use crate::rayon::ParallelIterator;
-use crate::{CellGrid, Particle};
+use crate::{CellGrid, ParticleLike};
 use core::iter::FusedIterator;
 use core::slice::Iter;
 use itertools::Itertools;
@@ -95,7 +95,7 @@ pub mod neighborhood {
 pub struct GridCell<'g, P, const N: usize = 3, F: Float = f64>
 where
     F: NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
-    P: Particle<[F; N]>,
+    P: ParticleLike<[F; N]>,
 {
     //TODO: maybe provide proper accessors to these fields for neighbors.rs to use?
     //TODO: is there a better way than having a reference to the containing CellGrid?
@@ -106,7 +106,7 @@ where
 impl<'g, P, const N: usize, F> GridCell<'g, P, N, F>
 where
     F: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
-    P: Particle<[F; N]> + Send + Sync,
+    P: ParticleLike<[F; N]> + Send + Sync,
 {
     /// Returns the (flat) cell index of this (possibly empty) `GridCell`.
     pub(crate) fn index(&self) -> i32 {
@@ -115,10 +115,10 @@ where
 
     /// Returns an iterator over all particles in this `GridCell`.
     ///
-    /// The item type is a pair consisting of the particle index as iterated during `CellGrid`
+    // The item type is a pair consisting of the particle index as iterated during `CellGrid`
     /// construction and the particle data itself.
     // TODO: should probably rather impl IntoIterator to match consuming/copy behaviour of neighbors()/point_pairs()?
-    pub fn iter(self) -> Iter<'g, (usize, P)> {
+    pub fn iter(self) -> Iter<'g, P> {
         self.grid
             .cell_lists
             .cell_slice(
@@ -182,9 +182,9 @@ where
 
     /// Returns an iterator over all unique pairs of points in this `GridCell`.
     #[inline]
-    fn intra_cell_pairs(self) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone {
+    fn intra_cell_pairs(self) -> impl FusedIterator<Item = (P, P)> + Clone {
         // this is equivalent to
-        // self.iter().copied().tuple_combinations::<((usize, P), (usize, P))>()
+        // self.iter().copied().tuple_combinations::<(P, P)>()
         // but faster for our specific case (pairs from slice of `Copy` values)
         self.iter()
             .copied()
@@ -194,7 +194,7 @@ where
 
     /// Returns an iterator over all unique pairs of points in this `GridCell` with points of the neighboring cells.
     #[inline]
-    fn inter_cell_pairs(self) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone {
+    fn inter_cell_pairs(self) -> impl FusedIterator<Item = (P, P)> + Clone {
         self.iter().copied().cartesian_product(
             self.neighbors::<Half>()
                 .flat_map(|cell| cell.iter().copied()),
@@ -208,9 +208,7 @@ where
     /// This method consumes `self` but `GridCell` implements [`Copy`].
     //TODO: handle full-space as well
     //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
-    pub fn particle_pairs(
-        self,
-    ) -> impl FusedIterator<Item = ((usize, P), (usize, P))> + Clone + Send + Sync {
+    pub fn particle_pairs(self) -> impl FusedIterator<Item = (P, P)> + Clone + Send + Sync {
         self.intra_cell_pairs().chain(self.inter_cell_pairs())
     }
 }
@@ -218,7 +216,7 @@ where
 impl<P, const N: usize, F> CellGrid<P, N, F>
 where
     F: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
-    P: Particle<[F; N]>,
+    P: ParticleLike<[F; N]>,
 {
     /// Returns an iterator over all [`GridCell`]s in this `CellGrid`, excluding empty cells.
     ///

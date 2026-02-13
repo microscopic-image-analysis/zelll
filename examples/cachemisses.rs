@@ -8,7 +8,7 @@ use crabgrind::callgrind as valgrind;
 use nalgebra::{Point, Point3, Vector3};
 use rand::distributions::Standard;
 use rand::prelude::*;
-use zelll::CellGrid;
+use zelll::{CellGrid, Particle};
 
 type PointCloud<const N: usize> = Vec<Point<f64, N>>;
 /// Generate a uniformly random 3D point cloud of size `n` in a cuboid of edge lengths `vol` centered around `origin`.
@@ -64,13 +64,19 @@ fn main() {
 
         valgrind::start_instrumentation();
         for _ in 0..repeat {
-            let _cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
+            let _cg = CellGrid::new(
+                pointcloud.iter().map(|p| p.coords).map(Particle::from),
+                cutoff,
+            );
         }
         valgrind::stop_instrumentation();
     } else {
         valgrind::start_instrumentation();
         for _ in 0..repeat {
-            let _cg = CellGrid::new(pointcloud.iter().map(|p| p.coords), cutoff);
+            let _cg = CellGrid::new(
+                pointcloud.iter().map(|p| p.coords).map(Particle::from),
+                cutoff,
+            );
         }
         valgrind::stop_instrumentation();
     }

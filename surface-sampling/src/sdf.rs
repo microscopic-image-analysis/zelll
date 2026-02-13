@@ -7,11 +7,11 @@ pub use numdual::*;
 use crate::Angstrom;
 use crate::atom::Atom;
 use crate::io::PointCloud;
-use zelll::CellGrid;
+use zelll::{CellGrid, Particle};
 
 #[derive(Clone, Debug)]
 pub struct SmoothDistanceField {
-    inner: CellGrid<Atom, 3, Angstrom>,
+    inner: CellGrid<Particle<Atom>, 3, Angstrom>,
     pub(crate) surface_radius: Angstrom,
     pub(crate) k_force: Angstrom, // this wouldn't survive dimensional analysis though
 }
@@ -19,7 +19,7 @@ pub struct SmoothDistanceField {
 impl SmoothDistanceField {
     pub fn new(protein: &PointCloud, cutoff: Angstrom) -> Self {
         Self {
-            inner: CellGrid::new(protein.points.iter().copied(), cutoff),
+            inner: CellGrid::new(protein.points.iter().copied().map(Particle::from), cutoff),
             surface_radius: 1.05,
             k_force: 10.0,
         }
@@ -39,7 +39,7 @@ impl SmoothDistanceField {
         Self { k_force, ..self }
     }
 
-    pub fn grid(&self) -> &CellGrid<Atom, 3, Angstrom> {
+    pub fn grid(&self) -> &CellGrid<Particle<Atom>, 3, Angstrom> {
         &self.inner
     }
 }

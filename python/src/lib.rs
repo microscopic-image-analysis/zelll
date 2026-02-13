@@ -5,6 +5,7 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3::types::PyIterator;
+use std::iter::Enumerate;
 
 // TODO: While having a borrowing iterator is nice, it's expensive on Python's side
 // TODO: (every call to next() is an expensive python function call).
@@ -17,24 +18,24 @@ struct ParticlesIterable<'a, 'py> {
 }
 
 impl<'a, 'py> IntoIterator for ParticlesIterable<'a, 'py> {
-    type Item = [f64; 3];
+    type Item = (usize, [f64; 3]);
     type IntoIter = ParticlesIterator<'py>;
 
     fn into_iter(self) -> Self::IntoIter {
         ParticlesIterator {
             // PyO3 also just `unwrap()`s in their specific iterators
-            iter: self.inner.try_iter().unwrap(),
+            iter: self.inner.try_iter().unwrap().enumerate(),
         }
     }
 }
 
 #[derive(Clone)]
 struct ParticlesIterator<'py> {
-    iter: Bound<'py, PyIterator>,
+    iter: Enumerate<Bound<'py, PyIterator>>,
 }
 
 impl<'py> Iterator for ParticlesIterator<'py> {
-    type Item = [f64; 3];
+    type Item = (usize, [f64; 3]);
 
     fn next(&mut self) -> Option<Self::Item> {
         // TODO: document behavior:
@@ -44,13 +45,13 @@ impl<'py> Iterator for ParticlesIterator<'py> {
         // if it's Some, attempt conversion and break loop if it was successful
         // otherwise, retry with next element
         loop {
-            match self.iter.next().transpose() {
-                Ok(Some(p)) => match <[f64; 3] as FromPyObject>::extract(p.as_borrowed()) {
-                    Ok(p) => break Some(p),
+            match self.iter.next() {
+                Some((i, Ok(x))) => match <[f64; 3] as FromPyObject>::extract(x.as_borrowed()) {
+                    Ok(p) => break Some((i, p)),
                     Err(_) => (),
                 },
-                Ok(None) => break None,
-                Err(_) => (),
+                None => break None,
+                Some((_, Err(_))) => (),
             }
         }
     }
@@ -93,9 +94,9 @@ impl<'py> Iterator for ParticlesIterator<'py> {
 ///     dist = np.linalg.norm(np.array(p) - np.array(q))
 /// ```
 #[derive(Clone)]
-#[pyclass(name = "CellGrid", module = "zelll")]
+#[pyclass(name = "CellGrid", module = "zelll", skip_from_py_object)]
 pub struct PyCellGrid {
-    inner: CellGrid<[f64; 3]>,
+    inner: CellGrid<(usize, [f64; 3])>,
 }
 
 #[pymethods]
@@ -400,7 +401,7 @@ impl PyCellQueryIter {
 /// for further technical details and background information.
 /// If in doubt, the Rust API docs should be considered the authoritative source for the exact behavior
 /// of the library.
-#[pymodule(gil_used = false)]
+#[pymodule]
 pub mod zelll {
     #[pymodule_export]
     pub use super::{PyCellGrid, PyCellGridIter, PyCellQueryIter};

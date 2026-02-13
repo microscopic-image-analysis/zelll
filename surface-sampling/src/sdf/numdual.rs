@@ -2,7 +2,7 @@ use crate::Angstrom;
 use crate::sdf::SmoothDistanceField;
 use nalgebra::{ComplexField, SVector};
 use num_dual::*;
-use zelll::Particle;
+use zelll::ParticleLike;
 
 impl SmoothDistanceField {
     // TODO: this actually looks cleaner with a for loop...
@@ -14,7 +14,7 @@ impl SmoothDistanceField {
     ) -> Option<D> {
         let at: [D; 3] = x.into();
         let at = at.map(|coord| coord.re());
-        let neighbors = self.inner.query_neighbors(at)?.map(|(_, atom)| {
+        let neighbors = self.inner.query_neighbors(at)?.map(|atom| {
             let coords: [Angstrom; 3] = atom.coords();
             let coords = coords.map(|c| c.into());
             (atom.element.radius(), SVector::from(coords))
@@ -108,7 +108,7 @@ impl SmoothDistanceField {
 mod tests {
     use super::*;
     use crate::atom::{Atom, Element};
-    use zelll::CellGrid;
+    use zelll::{CellGrid, Particle};
 
     // TODO: should use `approx` for this
     #[test]
@@ -166,10 +166,13 @@ mod tests {
 
         let sdf = SmoothDistanceField {
             inner: CellGrid::new(
-                points.iter().map(|&coords| Atom {
-                    element: Element::default(),
-                    coords,
-                }),
+                points
+                    .iter()
+                    .map(|&coords| Atom {
+                        element: Element::default(),
+                        coords,
+                    })
+                    .map(Particle::from),
                 1.0,
             ),
             surface_radius: 1.05,
