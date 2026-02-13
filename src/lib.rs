@@ -182,7 +182,15 @@ impl<P> From<P> for Particle<P> {
 /// This is easily facilitated by enumerating the iterator used to construct a `CellGrid`.
 ///
 /// Other types such as [`std::collections::HashMap`] can also be used
-/// although it is less straight-forward
+/// although it is less straight-forward.
+///
+/// <div class="warning">
+///
+/// See
+/// [`impl ParticleLike<[T; N]> for &P`](#impl-ParticleLike%3C%5BT;+N%5D%3E-for-%26P)
+/// for more information.
+///
+/// </div>
 ///
 /// # Examples
 /// Here, `ip` is a tuple `(usize, P)`.
@@ -201,8 +209,7 @@ impl<P> From<P> for Particle<P> {
 /// # let data = [("a", [0.0f64; 3]); 10];
 /// let points = HashMap::from(data);
 /// // this iterator is consuming
-/// points.into_iter()
-///     .map(|kv| kv.coords());
+/// points.into_iter().map(|kv| kv.coords());
 /// // after constructing a CellGrid
 /// // and iterating over pairs, the particles have to be inserted
 /// // into a hash map again to do any meaningful work
@@ -225,6 +232,59 @@ where
     #[inline]
     fn coords(&self) -> [T; N] {
         *self
+    }
+}
+
+/// References to `ParticleLike` types can also be used with
+/// [`CellGrid`].
+///
+/// <div class="warning">
+///
+/// This trait `impl` aims to support collections like `HashMap` in an ergonomic way.
+/// Usually, `CellGrid` is intended to be used without references to particle data, i.e. use
+/// `.iter().copied()` where possible (and `.enumerate()` if preferable).
+///
+/// </div>
+///
+/// # Examples
+/// `HashMap::iter()` cannot be used with [`Iterator::copied()`]:
+/// ```compile_fail
+/// # use zelll::ParticleLike;
+/// # use std::collections::HashMap;
+/// let data = [("a", [0.0f64; 3]); 10];
+/// let points = HashMap::from(data);
+/// // this iterator is not consuming the hash map
+/// points.iter()
+///     .copied() // this does not work on HashMap
+///     .map(|kv| kv.coords());
+/// ```
+/// Either just iterate by reference if you cannot consume the hash map using `.into_iter()`:
+/// ```
+/// # use zelll::ParticleLike;
+/// # use std::collections::HashMap;
+/// # let data = [("a", [0.0f64; 3]); 10];
+/// # let points = HashMap::from(data);
+/// // this iterator is not consuming the hash map
+/// points.iter().map(|kv| kv.coords());
+/// ```
+/// Or replicate `.copied()` behavior manually (preferred method):
+/// ```
+/// # use zelll::ParticleLike;
+/// # use std::collections::HashMap;
+/// # let data = [("a", [0.0f64; 3]); 10];
+/// # let points = HashMap::from(data);
+/// // this iterator manually copies its values
+/// points.iter()
+///     .map(|(&k, &v)| (k, v))
+///     .map(|kv| kv.coords());
+/// ```
+impl<P, T, const N: usize> ParticleLike<[T; N]> for &P
+where
+    P: ParticleLike<[T; N]>,
+{
+    #[inline]
+    fn coords(&self) -> [T; N] {
+        (*self).coords()
     }
 }
 

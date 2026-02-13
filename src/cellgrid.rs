@@ -98,7 +98,8 @@ pub use util::{Aabb, GridInfo};
 /// let data: Vec<[f32; 2]> = vec![[0.0, 0.0], [1.0,2.0], [0.0, 0.1]];
 /// let mut cg = CellGrid::new(data.iter().copied(), 1.0);
 /// ```
-/// Any type able to be wrapped in [`crate::Particle`] or implementing [`ParticleLike`] can be used:
+/// Any type that is able to be wrapped in [`Particle`](crate::Particle)
+/// or implements [`ParticleLike`] can be used:
 /// ```
 /// # use zelll::{CellGrid, Particle};
 /// use nalgebra::SVector;
@@ -157,16 +158,11 @@ where
     ///
     /// <div class="warning">
     ///
-    /// Note that the intended usage includes `.iter().copied()`
-    /// (and `.enumerate()` if preferable)
-    /// because we require the items of `particles` to implement `ParticleLike` and we do not
-    /// provide a blanket implementation for references to types implementing `ParticleLike`.
+    /// Here, the preferred usage includes `.iter().copied()`
+    /// but iteration by reference is supported.
     ///
-    /// Previously we required `<I as IntoIterator>::Item: Borrow<P>`
-    /// which provided more flexibility by accepting both `P` and `&P`
-    /// but this forces lots of type annotations on the user.\
-    /// Since `ParticleLike<T>: Copy` anyway, we sacrifice this flexibility
-    /// in favor of not cluttering user code with type annotations.
+    /// See [`ParticleLike`](trait.ParticleLike.html#foreign-impls)
+    /// for detailed information and examples.
     ///
     /// </div>
     pub fn new<I>(particles: I, cutoff: T) -> Self
