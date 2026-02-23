@@ -105,8 +105,8 @@ where
 
 impl<'g, P, const N: usize, F> GridCell<'g, P, N, F>
 where
-    F: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
-    P: ParticleLike<[F; N]> + Send + Sync,
+    F: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
+    P: ParticleLike<[F; N]>,
 {
     /// Returns the (flat) cell index of this (possibly empty) `GridCell`.
     pub(crate) fn index(&self) -> i32 {
@@ -208,14 +208,14 @@ where
     /// This method consumes `self` but `GridCell` implements [`Copy`].
     //TODO: handle full-space as well
     //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
-    pub fn particle_pairs(self) -> impl FusedIterator<Item = (P, P)> + Clone + Send + Sync {
+    pub fn particle_pairs(self) -> impl FusedIterator<Item = (P, P)> + Clone {
         self.intra_cell_pairs().chain(self.inter_cell_pairs())
     }
 }
 
 impl<P, const N: usize, F> CellGrid<P, N, F>
 where
-    F: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
+    F: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + std::fmt::Debug,
     P: ParticleLike<[F; N]>,
 {
     /// Returns an iterator over all [`GridCell`]s in this `CellGrid`, excluding empty cells.
@@ -253,7 +253,8 @@ where
     #[cfg(feature = "rayon")]
     pub fn par_iter(&self) -> impl ParallelIterator<Item = GridCell<'_, P, N, F>>
     where
-        P: Send + Sync,
+        P: Sync,
+        F: Sync,
     {
         self.cells
             .par_keys()

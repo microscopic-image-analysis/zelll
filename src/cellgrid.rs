@@ -140,8 +140,6 @@ where
         + ConstZero
         + AsPrimitive<i32>
         + SimdPartialOrd
-        + Send
-        + Sync
         + std::fmt::Debug
         + Default,
 {
@@ -322,8 +320,7 @@ where
 
 impl<P: ParticleLike<[T; N]>, const N: usize, T> CellGrid<P, N, T>
 where
-    T: Float + ConstOne + AsPrimitive<i32> + std::fmt::Debug + NumAssignOps + Send + Sync,
-    P: Send + Sync,
+    T: Float + ConstOne + AsPrimitive<i32> + std::fmt::Debug + NumAssignOps,
 {
     /// Returns an iterator over all relevant (i.e. within cutoff threshold + some extra) unique
     /// pairs of particles in this `CellGrid`.
@@ -413,7 +410,7 @@ where
 #[cfg(feature = "rayon")]
 impl<P, const N: usize, T> CellGrid<P, N, T>
 where
-    T: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Send + Sync + std::fmt::Debug,
+    T: Float + NumAssignOps + ConstOne + AsPrimitive<i32> + Sync + std::fmt::Debug,
     P: ParticleLike<[T; N]> + Send + Sync,
 {
     /// Returns a parallel iterator over all relevant (i.e. within cutoff threshold + some extra)
