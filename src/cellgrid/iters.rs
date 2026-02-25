@@ -16,10 +16,23 @@ mod private {
 
 /// "Marker" trait indicating a type being a valid neighborhood configuration.
 pub trait SpaceConfig {
+    /// Default implementation suitable for `Full`.
     #[doc(hidden)]
     #[inline]
     fn neighbors_as_slice(neighbors: &[i32], _: private::Token) -> &[i32] {
         neighbors
+    }
+
+    /// Default implementation suitable for `Half`.
+    #[doc(hidden)]
+    #[inline]
+    fn intra_cell_pairs<P>(
+        iter: Iter<'_, P>,
+        _: private::Token,
+    ) -> impl FusedIterator<Item = (&'_ P, &'_ P)> + Clone {
+        iter.clone()
+            .enumerate()
+            .flat_map(move |(n, i)| iter.clone().skip(n + 1).map(move |j| (i, j)))
     }
 }
 
@@ -28,7 +41,20 @@ pub struct Full;
 /// _Half-space_ neighborhood.
 pub struct Half;
 
-impl SpaceConfig for Full {}
+impl SpaceConfig for Full {
+    #[inline]
+    fn intra_cell_pairs<P>(
+        iter: Iter<'_, P>,
+        _: private::Token,
+    ) -> impl FusedIterator<Item = (&'_ P, &'_ P)> + Clone {
+        let rev = iter.clone().rev();
+        rev.clone()
+            .enumerate()
+            .flat_map(move |(n, i)| rev.clone().skip(n + 1).map(move |j| (i, j)))
+            .chain(Half::intra_cell_pairs(iter.clone(), private::Token))
+    }
+}
+
 impl SpaceConfig for Half {
     #[inline]
     fn neighbors_as_slice(neighbors: &[i32], _: private::Token) -> &[i32] {
@@ -189,20 +215,19 @@ where
 
     /// Returns an iterator over all unique pairs of points in this `GridCell`.
     #[inline]
-    fn intra_cell_pairs(self) -> impl FusedIterator<Item = (&'g P, &'g P)> + Clone {
+    fn intra_cell_pairs<S: SpaceConfig>(self) -> impl FusedIterator<Item = (&'g P, &'g P)> + Clone {
         // this is equivalent to
         // self.iter().copied().tuple_combinations::<(P, P)>()
         // but faster for our specific case (pairs from slice of `Copy` values)
-        self.iter()
-            .enumerate()
-            .flat_map(move |(n, i)| self.iter().skip(n + 1).map(move |j| (i, j)))
+        // TODO: expose type parameter `S: SpaceConfig` on `{CellGrid, GridCell}::particle_pairs()`
+        S::intra_cell_pairs(self.iter(), private::Token)
     }
 
     /// Returns an iterator over all unique pairs of points in this `GridCell` with points of the neighboring cells.
     #[inline]
-    fn inter_cell_pairs(self) -> impl FusedIterator<Item = (&'g P, &'g P)> + Clone {
+    fn inter_cell_pairs<S: SpaceConfig>(self) -> impl FusedIterator<Item = (&'g P, &'g P)> + Clone {
         self.iter()
-            .cartesian_product(self.neighbors::<Half>().flat_map(|cell| cell.iter()))
+            .cartesian_product(self.neighbors::<S>().flat_map(|cell| cell.iter()))
     }
 
     /// Returns an iterator over all _relevant_ pairs of particles within in the neighborhood of this `GridCell`.
@@ -210,10 +235,9 @@ where
     /// _Relevant_ means the distance between paired particles might be less than the `cutoff` but
     /// this cannot be guaranteed.\
     /// This method consumes `self` but `GridCell` implements [`Copy`].
-    //TODO: handle full-space as well
-    //TODO: document that we're relying on GridCell impl'ing Copy here (so we can safely consume `self`)
     pub fn particle_pairs(self) -> impl FusedIterator<Item = (&'g P, &'g P)> + Clone {
-        self.intra_cell_pairs().chain(self.inter_cell_pairs())
+        self.intra_cell_pairs::<Half>()
+            .chain(self.inter_cell_pairs::<Half>())
     }
 }
 
@@ -315,7 +339,7 @@ mod tests {
         assert_eq!(
             cell_grid
                 .iter()
-                .map(|cell| cell.intra_cell_pairs().count())
+                .map(|cell| cell.intra_cell_pairs::<Half>().count())
                 .sum::<usize>(),
             4,
             "testing intra_cell_pairs()"
@@ -324,10 +348,41 @@ mod tests {
         assert_eq!(
             cell_grid
                 .iter()
-                .map(|cell| cell.inter_cell_pairs().count())
+                .map(|cell| cell.inter_cell_pairs::<Half>().count())
                 .sum::<usize>(),
             24,
             "testing inter_cell_pairs()"
+        );
+    }
+
+    #[test]
+    fn test_half_full_space_particle_pairs() {
+        // Using 0-origin to avoid floating point errors
+        let points = generate_pointcloud([2, 2, 2], 1.0, [0.0, 0.0, 0.0]);
+        let cell_grid = CellGrid::new(points.iter().copied(), 1.0);
+
+        assert_eq!(
+            2 * cell_grid
+                .iter()
+                .map(|cell| cell.intra_cell_pairs::<Half>().count())
+                .sum::<usize>(),
+            cell_grid
+                .iter()
+                .map(|cell| cell.intra_cell_pairs::<Full>().count())
+                .sum::<usize>(),
+            "testing intra_cell_pairs() half-/full-space"
+        );
+
+        assert_eq!(
+            2 * cell_grid
+                .iter()
+                .map(|cell| cell.inter_cell_pairs::<Half>().count())
+                .sum::<usize>(),
+            cell_grid
+                .iter()
+                .map(|cell| cell.inter_cell_pairs::<Full>().count())
+                .sum::<usize>(),
+            "testing inter_cell_pairs() half-/full-space"
         );
     }
 }
