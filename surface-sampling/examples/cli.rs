@@ -48,7 +48,6 @@ enum Commands {
     },
 
     /// Evaluate SDF of a PDB file for a specified grid of q=l³ query points
-    /// in a gr
     Eval {
         /// Protein structure file to generate SDF from.
         pdb: PathBuf,
