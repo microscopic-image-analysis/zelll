@@ -191,55 +191,49 @@ where
     {
         let cutoff = cutoff.unwrap_or(self.index.grid_info.cutoff);
         let index = FlatIndex::from_particles(particles.clone(), cutoff);
+        let mut cell_lists = CellStorage::with_capacity(index.index.len());
 
-        if index == self.index {
-            self
+        let mut cells = if index == self.index {
+            self.cells
         } else {
-            let mut cell_lists = CellStorage::with_capacity(index.index.len());
-
-            // let estimated_cap = (index.grid_info.shape().iter().product::<i32>() as usize).min(index.index.len());
-            // FIXME: This should be HashMap<i32, Either<usize, CellSliceMeta>> or CellSliceMeta an enum
-            let mut cells: HashMap<i32, CellSliceMeta> = HashMap::new(); // HashMap::with_capacity(estimated_cap);
+            let mut cells: HashMap<i32, CellSliceMeta> = HashMap::new();
             index.index.iter().for_each(|idx| {
-                // FIXME: this will trigger debug_assert!() in CellSliceMeta::move_cursor()
                 cells.entry(*idx).or_default().move_cursor(1);
             });
-
-            // cells.shrink_to_fit();
-
-            // technically, this is O(capacity) not O(n)
-            // cf. https://github.com/rust-lang/rust/pull/97215
-            cells.iter_mut().for_each(|(_, slice)| {
-                *slice = cell_lists.reserve_cell(slice.cursor());
+            cells
+        };
+        // technically, this is O(capacity) not O(n)
+        // cf. https://github.com/rust-lang/rust/pull/97215
+        cells.iter_mut().for_each(|(_, slice)| {
+            *slice = cell_lists.reserve_cell(slice.cursor());
+        });
+        // FIXME: what happens (below) if I reserve cells sorted by their size (above)?
+        // FIXME: this seems to be more likely to be the cache miss culprit
+        // FIXME: can we do something clever here? use an LRU cache?
+        // FIXME: use sth. like itertools::tree_reduce() to somehow deal with
+        // FIXME: the random access pattern of cell_lists' slices?
+        index
+            .index
+            .iter()
+            .zip(particles)
+            // TODO: we know cells.get_mut() won't fail by construction
+            // TODO: but maybe use try_for_each() instead
+            .for_each(|(cell, particle)| {
+                // FIXME: in principle could have multiple &mut slices into CellStorage (for parallel pushing)
+                // FIXME: would just have to make sure that cell is always unique when operating on chunks
+                // FIXME: (pretty much the same issue as with counting cell sizes concurrently)
+                cell_lists.push(
+                    particle.clone(),
+                    cells
+                        .get_mut(cell)
+                        .expect("cell grid should contain every cell in the grid index"),
+                )
             });
-            // FIXME: what happens (below) if I reserve cells sorted by their size (above)?
-            // FIXME: this seems to be more likely to be the cache miss culprit
-            // FIXME: can we do something clever here? use an LRU cache?
-            // FIXME: use sth. like itertools::tree_reduce() to somehow deal with
-            // FIXME: the random access pattern of cell_lists' slices?
-            index
-                .index
-                .iter()
-                .zip(particles)
-                // TODO: we know cells.get_mut() won't fail by construction
-                // TODO: but maybe use try_for_each() instead
-                .for_each(|(cell, particle)| {
-                    // FIXME: in principle could have multiple &mut slices into CellStorage (for parallel pushing)
-                    // FIXME: would just have to make sure that cell is always unique when operating on chunks
-                    // FIXME: (pretty much the same issue as with counting cell sizes concurrently)
-                    cell_lists.push(
-                        particle.clone(),
-                        cells
-                            .get_mut(cell)
-                            .expect("cell grid should contain every cell in the grid index"),
-                    )
-                });
 
-            Self {
-                cells,
-                cell_lists,
-                index,
-            }
+        Self {
+            cells,
+            cell_lists,
+            index,
         }
     }
     // TODO: rebuild() could simply do this but rebuild_mut() on
@@ -274,7 +268,6 @@ where
     {
         if self.index.rebuild_mut(particles.clone(), cutoff) {
             self.cells.clear();
-            self.cell_lists.clear();
 
             // let estimated_cap = self.index.grid_info.shape().iter().product::<i32>().min(self.index.index.len() as i32);
             // self.cells.reserve(estimated_cap as usize);
@@ -290,31 +283,32 @@ where
             // TODO: that the load factor does not degenerate (resize policy says ~ 0.5-0.85)
             // TODO: however this means potential re-allocation
             self.cells.shrink_to_fit();
-
-            self.cells.iter_mut().for_each(|(_, slice)| {
-                *slice = self.cell_lists.reserve_cell(slice.cursor());
-            });
-
-            // TODO: https://docs.rs/hashbrown/latest/hashbrown/struct.HashMap.html#method.get_many_mut
-            // TODO: maybe could use get_many_mut here, but unfortunately we'd have to handle
-            // TODO: duplicate keys (i.e. cells)
-            // TODO: for that, we could chunk the index iter(), sort & count the chunks and then
-            // TODO: get the cell once and push each particle index with a single lookup into the hashmap
-            // TODO: perhaps this would be autovectorized?
-            self.index
-                .index
-                .iter()
-                .zip(particles)
-                //TODO: see `::rebuild()`
-                .for_each(|(cell, particle)| {
-                    self.cell_lists.push(
-                        particle.clone(),
-                        self.cells
-                            .get_mut(cell)
-                            .expect("cell grid should contain every cell in the grid index"),
-                    )
-                });
         }
+
+        self.cell_lists.clear();
+        self.cells.iter_mut().for_each(|(_, slice)| {
+            *slice = self.cell_lists.reserve_cell(slice.cursor());
+        });
+
+        // TODO: https://docs.rs/hashbrown/latest/hashbrown/struct.HashMap.html#method.get_many_mut
+        // TODO: maybe could use get_many_mut here, but unfortunately we'd have to handle
+        // TODO: duplicate keys (i.e. cells)
+        // TODO: for that, we could chunk the index iter(), sort & count the chunks and then
+        // TODO: get the cell once and push each particle index with a single lookup into the hashmap
+        // TODO: perhaps this would be autovectorized?
+        self.index
+            .index
+            .iter()
+            .zip(particles)
+            //TODO: see `::rebuild()`
+            .for_each(|(cell, particle)| {
+                self.cell_lists.push(
+                    particle.clone(),
+                    self.cells
+                        .get_mut(cell)
+                        .expect("cell grid should contain every cell in the grid index"),
+                )
+            });
     }
 }
 
