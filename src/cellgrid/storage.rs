@@ -46,7 +46,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub(crate) struct CellStorage<T> {
-    buffer: Vec<T>,
+    pub(crate) buffer: Vec<T>,
 }
 
 impl<T> CellStorage<T> {

@@ -80,7 +80,7 @@ pub fn bench_lj(c: &mut Criterion) {
             );
             let potential_energy: F32or64 = cg
                 .particle_pairs()
-                .filter_map(|((_i, p), (_j, q))| {
+                .filter_map(|(&(_i, p), &(_j, q))| {
                     let dsq = distance_squared(&(*p).into(), &(*q).into());
                     if dsq < cutoff_squared {
                         Some(dsq)
@@ -109,7 +109,7 @@ pub fn bench_lj(c: &mut Criterion) {
                     );
                     let _potential_energy: F32or64 = cg
                         .particle_pairs()
-                        .filter_map(|((_i, p), (_j, q))| {
+                        .filter_map(|(&(_i, p), &(_j, q))| {
                             let dsq = distance_squared(&(*p).into(), &(*q).into());
                             if dsq < cutoff_squared {
                                 Some(dsq)

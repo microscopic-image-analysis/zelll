@@ -228,7 +228,7 @@ where
                     // FIXME: would just have to make sure that cell is always unique when operating on chunks
                     // FIXME: (pretty much the same issue as with counting cell sizes concurrently)
                     cell_lists.push(
-                        particle,
+                        particle.clone(),
                         cells
                             .get_mut(cell)
                             .expect("cell grid should contain every cell in the grid index"),
@@ -308,7 +308,7 @@ where
                 //TODO: see `::rebuild()`
                 .for_each(|(cell, particle)| {
                     self.cell_lists.push(
-                        particle,
+                        particle.clone(),
                         self.cells
                             .get_mut(cell)
                             .expect("cell grid should contain every cell in the grid index"),
@@ -333,7 +333,7 @@ where
     /// let cell_grid = CellGrid::new(data.iter().copied().enumerate(), 1.0);
     /// cell_grid.particle_pairs()
     ///     // usually, .filter_map() is preferable (so distance computations can be re-used)
-    ///     .filter(|&((_i, p), (_j, q))| {
+    ///     .filter(|&(&(_i, p), &(_j, q))| {
     ///         distance_squared(&p.into(), &q.into()) <= 1.0
     ///     })
     ///     .for_each(|((_i, p), (_j, q))| {
@@ -341,7 +341,7 @@ where
     ///     });
     /// ```
     #[must_use = "iterators are lazy and do nothing unless consumed"]
-    pub fn particle_pairs(&self) -> impl Iterator<Item = (P, P)> + Clone {
+    pub fn particle_pairs(&self) -> impl Iterator<Item = (&P, &P)> + Clone {
         self.iter().flat_map(|cell| cell.particle_pairs())
     }
 
@@ -387,7 +387,7 @@ where
     ///     .expect("the queried particle should be within `cutoff` of this grid's shape")
     ///     // usually, .filter_map() is preferable (so distance computations can be re-used)
     ///     .filter(|&(_j, q)| {
-    ///         distance_squared(&p.into(), &q.into()) <= 1.0
+    ///         distance_squared(&p.into(), &(*q).into()) <= 1.0
     ///     })
     ///     .for_each(|(_j, q)| {
     ///         /* do some work */
@@ -397,13 +397,26 @@ where
     pub fn query_neighbors<Q: ParticleLike<[T; N]>>(
         &self,
         particle: Q,
-    ) -> Option<impl Iterator<Item = P> + Clone> {
+    ) -> Option<impl Iterator<Item = &P> + Clone> {
         self.query(particle).map(|this| {
-            this.iter().copied().chain(
+            this.iter().chain(
                 this.neighbors::<neighborhood::Full>()
-                    .flat_map(|cell| cell.iter().copied()),
+                    .flat_map(|cell| cell.iter()),
             )
         })
+    }
+
+    /// Returns a slice of the internal cell storage.
+    ///
+    /// <div class="warning">
+    ///
+    /// This is an experimental item.
+    /// It might get removed in the future or its usage might change.
+    ///
+    /// </div>
+    #[doc(hidden)]
+    pub fn cell_storage(&self) -> &[P] {
+        &self.cell_lists.buffer
     }
 }
 
@@ -431,13 +444,13 @@ where
     /// cell_grid.par_particle_pairs()
     //      TODO: fact-check the statement below:
     ///     // Try to avoid filtering this ParallelIterator to avoid significant overhead:
-    ///     .for_each(|((_i, p), (_j, q))| {
+    ///     .for_each(|(&(_i, p), &(_j, q))| {
     ///         if distance_squared(&p.into(), &q.into()) <= 1.0 {
     ///             /* do some work */
     ///         }
     ///     });
     /// ```
-    pub fn par_particle_pairs(&self) -> impl ParallelIterator<Item = (P, P)> {
+    pub fn par_particle_pairs(&self) -> impl ParallelIterator<Item = (&P, &P)> {
         // TODO: ideally, we would schedule 2 threads for cell.particle_pairs() with the same CPU affinity
         // TODO: so they can share their resources
         self.par_iter().flat_map_iter(|cell| cell.particle_pairs())
