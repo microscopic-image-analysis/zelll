@@ -53,7 +53,7 @@ fn main() {
         #[cfg(not(feature = "rayon"))]
         // let count = cg.point_pairs().count();
         cg.particle_pairs()
-            .filter(|&((_i, p), (_j, q))| {
+            .filter(|&(&(_i, p), &(_j, q))| {
                 distance_squared(&(*p).into(), &(*q).into()) <= _cutoff_squared
             })
             .for_each(|_| black_box(()));
@@ -61,7 +61,7 @@ fn main() {
 
         #[cfg(feature = "rayon")]
         cg.par_particle_pairs()
-            .filter(|&((_i, p), (_j, q))| {
+            .filter(|&(&(_i, p), &(_j, q))| {
                 distance_squared(&(*p).into(), &(*q).into()) <= _cutoff_squared
             })
             .for_each(|_| {

@@ -80,8 +80,16 @@ pub use crate::cellgrid::CellGrid;
 ///
 /// This trait is required for types used with [`CellGrid`]
 /// which needs to know how to get coordinate data.\
-/// Only [`Copy`] types can be used.
+///
+/// <div class="warning">
+///
+/// `ParticleLike` is a subtrait of [`Clone`].
+/// This allows to use the [_interior mutability_](https://doc.rust-lang.org/stable/std/cell/index.html#when-to-choose-interior-mutability) pattern.
+///
+/// Usually, [`Copy`] types are preferable (they tend to implement `Clone` by copying).
 /// In general, the smaller the type, the better (for the CPU cache).
+///
+/// </div>
 ///
 /// Note that [`CellGrid`] is more specific than this trait and requires implementing `ParticleLike<[{float}; N]>`.
 ///
@@ -121,7 +129,7 @@ pub use crate::cellgrid::CellGrid;
 ///     }
 /// }
 /// ```
-pub trait ParticleLike<T = [f64; 3]>: Copy {
+pub trait ParticleLike<T = [f64; 3]>: Clone {
     /// Returns a copy of this particle's coordinates.
     fn coords(&self) -> T;
 }
@@ -216,7 +224,7 @@ impl<P> From<P> for Particle<P> {
 /// ```
 impl<L, P, T, const N: usize> ParticleLike<[T; N]> for (L, P)
 where
-    L: Copy,
+    L: Clone,
     P: ParticleLike<[T; N]>,
 {
     #[inline]

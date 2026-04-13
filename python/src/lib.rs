@@ -236,7 +236,7 @@ impl PyCellGrid {
                     std::array::from_fn(|i| coordinates[i] - other[i]).map(|diff| diff * diff);
                 x + y + z <= cutoff_squared
             });
-            Some(out.collect())
+            Some(out.copied().collect())
         })
     }
 
@@ -286,7 +286,7 @@ impl PyCellGridIter {
         // let _owner = (&py_cellgrid)
         //     .into_py_any(py)
         //     .expect("could not store owner internally");
-        let iter = Box::new((&py_cellgrid).inner.particle_pairs());
+        let iter = Box::new((&py_cellgrid).inner.particle_pairs().map(|(&p, &q)| (p, q)));
         // SAFETY: the idea is that `_keep_borrow` makes sure that `iter`s lifetime can be extended
         // SAFETY: replicating some ideas from
         // SAFETY: https://github.com/PyO3/pyo3/issues/1085 and
@@ -366,7 +366,7 @@ impl PyCellQueryIter {
         coordinates: Borrowed<'_, '_, PyAny>,
     ) -> Option<Self> {
         let coordinates = <[f64; 3] as FromPyObject>::extract(coordinates).ok()?;
-        let iter = Box::new((&py_cellgrid).inner.query_neighbors(coordinates)?);
+        let iter = Box::new((&py_cellgrid).inner.query_neighbors(coordinates)?.copied());
         // SAFETY: see PyCellGridIter
         let iter = unsafe {
             std::mem::transmute::<

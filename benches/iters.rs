@@ -91,7 +91,7 @@ pub fn bench_iters(c: &mut Criterion) {
                     let cutoff_squared = cutoff.powi(2);
                     b.iter(|| {
                         pool.install(|| {
-                            cg.par_particle_pairs().for_each(|((_i, p), (_j, q))| {
+                            cg.par_particle_pairs().for_each(|(&(_i, p), &(_j, q))| {
                                 if distance_squared(&(*p).into(), &(*q).into()) <= cutoff_squared {
                                 } else {
                                 }
